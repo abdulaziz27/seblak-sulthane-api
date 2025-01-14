@@ -1,3 +1,3 @@
 <div class="simple-footer mt-5">
-    Copyright &copy; JAGOFLUTTER 2024
+    Copyright &copy; Seblak Sulthane 2024
 </div>
