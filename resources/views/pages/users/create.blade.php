@@ -84,6 +84,22 @@
                             </div>
 
                             <div class="form-group">
+                                <label>Outlet</label>
+                                <select name="outlet_id" class="form-control @error('outlet_id') is-invalid @enderror">
+                                    <option value="" disabled selected>Choose Outlet</option>
+                                    @foreach ($outlets as $outlet)
+                                        <option value="{{ $outlet->id }}">{{ $outlet->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('outlet_id')
+                                    <div class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div>
+
+
+                            <div class="form-group">
                                 <label class="form-label">Role</label>
                                 <div class="selectgroup w-100">
                                     <label class="selectgroup-item">

@@ -95,6 +95,10 @@ class OrderController extends Controller
 
             $query->whereBetween('created_at', [$start, $end]);
         }
+        if ($outletId) {
+            $query->where('outlet_id', $outletId);
+        }
+
         $totalRevenue = $query->sum('payment_amount');
         $totalDiscount = $query->sum('discount_amount');
         $totalTax = $query->sum('tax');

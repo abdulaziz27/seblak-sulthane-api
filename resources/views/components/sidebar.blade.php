@@ -34,7 +34,11 @@
                 <a class="nav-link" href="{{ route('categories.index') }}"><i class="fas fa-sitemap"></i>Categories</a>
             </li>
 
-
+            <li class='nav-item'>
+                <a class="nav-link" href="{{ route('outlets.index') }}"><i class="fas fa-sitemap"></i>Outlets</a>
             </li>
+
+
+        </ul>
 
 </div>
