@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\OrderItem;
+use Carbon\Carbon;
 
 class OrderController extends Controller
 {
@@ -66,7 +67,10 @@ class OrderController extends Controller
         $start_date = $request->input('start_date');
         $end_date = $request->input('end_date');
         if ($start_date && $end_date) {
-            $orders = Order::whereBetween('created_at', [$start_date, $end_date])->get();
+            $start = Carbon::parse($start_date)->startOfDay();
+            $end = Carbon::parse($end_date)->endOfDay();
+
+            $orders = Order::whereBetween('created_at', [$start, $end])->get();
         } else {
             $orders = Order::all();
         }
@@ -82,7 +86,10 @@ class OrderController extends Controller
         $endDate = $request->input('end_date');
         $query = Order::query();
         if ($startDate && $endDate) {
-            $query->whereBetween('created_at', [$startDate, $endDate]);
+            $start = Carbon::parse($startDate)->startOfDay();
+            $end = Carbon::parse($endDate)->endOfDay();
+
+            $query->whereBetween('created_at', [$start, $end]);
         }
         $totalRevenue = $query->sum('payment_amount');
         $totalDiscount = $query->sum('discount_amount');
