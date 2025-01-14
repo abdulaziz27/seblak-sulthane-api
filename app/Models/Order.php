@@ -23,4 +23,9 @@ class Order extends Model
         'nama_kasir',
         'transaction_time'
     ];
+
+    public function outlet()
+    {
+        return $this->belongsTo(Outlet::class);
+    }
 }
