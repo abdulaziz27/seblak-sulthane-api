@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Users')
+@section('title', 'Outlets')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -11,14 +11,14 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Users</h1>
+                <h1>Daftar Outlet</h1>
                 <div class="section-header-button">
-                    <a href="{{ route('users.create') }}" class="btn btn-primary">Add New</a>
+                    <a href="{{ route('outlets.create') }}" class="btn btn-primary">Add New</a>
                 </div>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Users</a></div>
-                    <div class="breadcrumb-item">All Users</div>
+                    <div class="breadcrumb-item"><a href="#">Outlets</a></div>
+                    <div class="breadcrumb-item">All Outlets</div>
                 </div>
             </div>
             <div class="section-body">
@@ -27,7 +27,7 @@
                         @include('layouts.alert')
                     </div>
                 </div>
-                <h2 class="section-title">Users</h2>
+
 
                 <div class="row mt-4">
                     <div class="col-12">
@@ -36,7 +36,7 @@
                             <div class="card-body">
 
                                 <div class="float-right">
-                                    <form method="GET" action="{{ route('users.index') }}">
+                                    <form method="GET" action="{{ route('outlets.index') }}">
                                         <div class="input-group">
                                             <input type="text" class="form-control" placeholder="Search" name="name">
                                             <div class="input-group-append">
@@ -51,42 +51,31 @@
                                 <div class="table-responsive">
                                     <table class="table-striped table">
                                         <tr>
-
                                             <th>Name</th>
-                                            <th>Email</th>
-                                            <th>Outlet</th>
-                                            <th>Rule</th>
-                                            <th>Created At</th>
+                                            <th>Address</th>
+                                            <th>Phone</th>
                                             <th>Action</th>
                                         </tr>
-                                        @foreach ($users as $user)
+                                        @foreach ($outlets as $outlet)
                                             <tr>
 
-                                                <td>{{ $user->name }}
+                                                <td>{{ $outlet->name }}
                                                 </td>
                                                 <td>
-                                                    {{ $user->email }}
+                                                    {{ $outlet->address }}
                                                 </td>
                                                 <td>
-                                                    @if ($user->outlet)
-                                                        {{ $user->outlet->name }}
-                                                    @else
-                                                        N/A
-                                                    @endif
+                                                    {{ $outlet->phone }}
                                                 </td>
-                                                <td>
-                                                    {{ $user->role }}
-                                                </td>
-                                                <td>{{ $user->created_at }}</td>
                                                 <td>
                                                     <div class="d-flex justify-content-center">
-                                                        <a href='{{ route('users.edit', $user->id) }}'
+                                                        <a href='{{ route('outlets.edit', $outlet->id) }}'
                                                             class="btn btn-sm btn-info btn-icon">
                                                             <i class="fas fa-edit"></i>
                                                             Edit
                                                         </a>
 
-                                                        <form action="{{ route('users.destroy', $user->id) }}"
+                                                        <form action="{{ route('outlets.destroy', $outlet->id) }}"
                                                             method="POST" class="ml-2">
                                                             <input type="hidden" name="_method" value="DELETE" />
                                                             <input type="hidden" name="_token"
@@ -104,7 +93,7 @@
                                     </table>
                                 </div>
                                 <div class="float-right">
-                                    {{ $users->withQueryString()->links() }}
+                                    {{ $outlets->withQueryString()->links() }}
                                 </div>
                             </div>
                         </div>
