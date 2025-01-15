@@ -27,7 +27,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
 
     // Categories
-    Route::apiResource('/api-categories', CategoryController::class);
+    Route::apiResource('/categories', CategoryController::class);
 
     // Orders
     Route::post('/save-order', [OrderController::class, 'saveOrder']);
