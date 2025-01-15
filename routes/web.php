@@ -4,6 +4,7 @@ use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\MemberController;
 use App\Http\Controllers\OutletController;
 
 /*
@@ -34,6 +35,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('products', ProductController::class)->except(['show']);
     Route::resource('categories', CategoryController::class)->except(['show']);
     Route::resource('outlets', OutletController::class);
+    Route::resource('members', MemberController::class);
 
     //post update products
     Route::post('products/update/{id}', [ProductController::class, 'update'])->name('products.newupdate');
@@ -52,6 +54,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('categories/export-update', [CategoryController::class, 'exportForUpdate'])->name('categories.exportForUpdate');
 
 
+    Route::get('members/{member}/history', [MemberController::class, 'orderHistory'])->name('members.history');
+    Route::get('top-members', [MemberController::class, 'topMembers'])->name('members.top');
     // Route::get('/reports/outlet-sales', [ReportController::class, 'outletSalesReport'])->name('reports.outletSales');
     // Route::get('/reports/outlet-performance', [ReportController::class, 'outletPerformanceAnalysis'])->name('reports.outletPerformance');
 });

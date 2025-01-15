@@ -2,46 +2,54 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\OrderItemController;
+use App\Http\Controllers\Api\MemberController;
+use App\Http\Controllers\Api\DiscountController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-//login api
-Route::post('/login', [App\Http\Controllers\Api\AuthController::class, 'login']);
+// Auth Routes
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
-//logout api
-Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout'])->middleware('auth:sanctum');
+// Protected Routes
+Route::middleware('auth:sanctum')->group(function () {
+    // Products
+    Route::get('/products', [ProductController::class, 'index']);
+    Route::post('/products', [ProductController::class, 'store']);
+    Route::post('/products/edit', [ProductController::class, 'update']);
+    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
 
-//products api
-Route::get('/products', [App\Http\Controllers\Api\ProductController::class, 'index'])->middleware('auth:sanctum');
-Route::post('/products', [App\Http\Controllers\Api\ProductController::class, 'store'])->middleware('auth:sanctum');
-Route::post('/products/edit', [App\Http\Controllers\Api\ProductController::class, 'update'])->middleware('auth:sanctum');
-Route::delete('/products/{id}', [App\Http\Controllers\Api\ProductController::class, 'destroy'])->middleware('auth:sanctum');
-//categories api
-Route::apiResource('/api-categories', App\Http\Controllers\Api\CategoryController::class)->middleware('auth:sanctum');
+    // Categories
+    Route::apiResource('/api-categories', CategoryController::class);
 
-//orders api
-Route::post('/save-order', [App\Http\Controllers\Api\OrderController::class, 'saveOrder'])->middleware('auth:sanctum');
+    // Orders
+    Route::post('/save-order', [OrderController::class, 'saveOrder']);
+    Route::get('/orders/{date?}', [OrderController::class, 'index']);
+    Route::get('/summary/{date?}', [OrderController::class, 'summary']);
 
-//discounts api
-Route::get('/api-discounts', [App\Http\Controllers\Api\DiscountController::class, 'index'])->middleware('auth:sanctum');
+    // Order Items
+    Route::get('/order-item/{date?}', [OrderItemController::class, 'index']);
+    Route::get('/order-sales', [OrderItemController::class, 'orderSales']);
 
-Route::post('/api-discounts', [App\Http\Controllers\Api\DiscountController::class, 'store'])->middleware('auth:sanctum');
+    // Discounts
+    Route::get('/discounts', [DiscountController::class, 'index']);
+    Route::post('/discounts', [DiscountController::class, 'store']);
+    Route::get('/discounts/{id}', [DiscountController::class, 'show']);
+    Route::put('/discounts/{id}', [DiscountController::class, 'update']);
+    Route::delete('/discounts/{id}', [DiscountController::class, 'destroy']);
 
-// api resource report
-Route::get('/orders/{date?}', [App\Http\Controllers\Api\OrderController::class, 'index'])->middleware('auth:sanctum');
-Route::get('/summary/{date?}', [App\Http\Controllers\Api\OrderController::class, 'summary'])->middleware('auth:sanctum');
-Route::get('/order-item/{date?}', [App\Http\Controllers\Api\OrderItemController::class, 'index'])->middleware('auth:sanctum');
-Route::get('/order-sales', [App\Http\Controllers\Api\OrderItemController::class, 'orderSales'])->middleware('auth:sanctum');
+    // Members
+    Route::get('/members', [MemberController::class, 'index']);
+    Route::post('/members', [MemberController::class, 'store']);
+    Route::get('/members/{id}', [MemberController::class, 'show']);
+    Route::put('/members/{id}', [MemberController::class, 'update']);
+    Route::delete('/members/{id}', [MemberController::class, 'destroy']);
+    Route::get('/members/search/phone', [MemberController::class, 'getMemberByPhone']);
+});
