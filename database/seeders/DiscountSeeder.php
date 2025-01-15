@@ -14,30 +14,30 @@ class DiscountSeeder extends Seeder
     {
         //manual input
         \App\Models\Discount::create([
-            'name' => 'Welcome WCB',
-            'description' => 'Member baru WCB',
-            'type' => 'percentage',
-            'value' => 20,
-            'status' => 'active',
-            'expired_date' => '2025-01-31'
-        ]);
-
-        \App\Models\Discount::create([
-            'name' => 'New Year',
-            'description' => 'Discount New Year',
-            'type' => 'percentage',
-            'value' => 10,
-            'status' => 'active',
-            'expired_date' => '2025-01-07'
-        ]);
-
-        \App\Models\Discount::create([
-            'name' => 'Black Friday',
-            'description' => 'Discount Black Friday',
+            'name' => 'Member Discount',
+            'description' => 'Diskon untuk member',
             'type' => 'percentage',
             'value' => 15,
-            'status' => 'active',
-            'expired_date' => '2025-12-31'
+            'category' => 'member',
+            'status' => 'active'
         ]);
+
+        \App\Models\Discount::create([
+            'name' => 'Grand Opening Cabang',
+            'description' => 'Diskon grand opening outlet',
+            'type' => 'percentage',
+            'value' => 5,
+            'category' => 'event',
+            'status' => 'active'
+        ]);
+
+        // \App\Models\Discount::create([
+        //     'name' => 'Black Friday',
+        //     'description' => 'Discount Black Friday',
+        //     'type' => 'percentage',
+        //     'value' => 15,
+        //     'status' => 'active',
+        //     'expired_date' => '2025-12-31'
+        // ]);
     }
 }
