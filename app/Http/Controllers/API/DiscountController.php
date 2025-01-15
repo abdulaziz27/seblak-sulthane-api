@@ -3,39 +3,138 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Discount;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class DiscountController extends Controller
 {
-    //index
     public function index()
     {
-        //get data discount
-        $discounts = \App\Models\Discount::all();
+        try {
+            $discounts = Discount::where('status', 'active')
+                ->where(function ($query) {
+                    $query->whereNull('expired_date')
+                        ->orWhere('expired_date', '>=', Carbon::now());
+                })
+                ->get();
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $discounts
-        ], 200);
+            return response()->json([
+                'status' => 'success',
+                'data' => $discounts
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch discounts',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
-    //store
     public function store(Request $request)
     {
-        //validate request
-        $request->validate([
-            'name' => 'required',
-            'description' => 'required',
-            'value' => 'required',
+        try {
+            $request->validate([
+                'name' => 'required|string',
+                'description' => 'required|string',
+                'value' => 'required|numeric',
+                'type' => 'required|in:percentage,fixed',
+                'status' => 'required|in:active,inactive',
+                'expired_date' => 'nullable|date'
+            ]);
 
-        ]);
+            $discount = Discount::create($request->all());
 
-        //create discount
-        $discount = \App\Models\Discount::create($request->all());
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Discount created successfully',
+                'data' => $discount
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to create discount',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $discount
-        ], 201);
+    public function show($id)
+    {
+        try {
+            $discount = Discount::findOrFail($id);
+            return response()->json([
+                'status' => 'success',
+                'data' => $discount
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Discount not found',
+                'error' => $e->getMessage()
+            ], 404);
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            $discount = Discount::findOrFail($id);
+
+            $request->validate([
+                'name' => 'required|string',
+                'description' => 'required|string',
+                'value' => 'required|numeric',
+                'type' => 'required|in:percentage,fixed',
+                'status' => 'required|in:active,inactive',
+                'expired_date' => 'nullable|date'
+            ]);
+
+            $discount->update($request->all());
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Discount updated successfully',
+                'data' => $discount
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update discount',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $discount = Discount::findOrFail($id);
+            $discount->delete();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Discount deleted successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete discount',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
