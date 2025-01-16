@@ -25,7 +25,7 @@ class DiscountSeeder extends Seeder
             'name' => 'Grand Opening Cabang',
             'description' => 'Diskon grand opening outlet',
             'type' => 'percentage',
-            'value' => 5,
+            'value' => 10,
             'category' => 'event',
         ]);
     }

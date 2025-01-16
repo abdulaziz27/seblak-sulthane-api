@@ -32,7 +32,6 @@ class DiscountController extends Controller
         }
     }
 
-
     public function store(Request $request)
     {
         try {
