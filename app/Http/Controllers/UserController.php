@@ -11,15 +11,6 @@ use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware(function ($request, $next) {
-            if (Auth::user()->role === 'staff') {
-                return redirect()->route('home')->with('error', 'Unauthorized access');
-            }
-            return $next($request);
-        });
-    }
 
     public function index(Request $request)
     {
@@ -89,13 +80,13 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
 
-        // If admin, can only edit users from their outlet
+        // If admin, can only edit their own account or staff from their outlet
         if (Auth::user()->role === 'admin') {
-            if ($user->outlet_id !== Auth::user()->outlet_id) {
+            if (
+                $user->id !== Auth::id() && // Allow editing self
+                ($user->outlet_id !== Auth::user()->outlet_id || $user->role !== 'staff')
+            ) {
                 return redirect()->route('users.index')->with('error', 'Unauthorized access');
-            }
-            if ($user->role !== 'staff') {
-                return redirect()->route('users.index')->with('error', 'You can only edit staff accounts');
             }
         }
 
@@ -120,14 +111,19 @@ class UserController extends Controller
 
         // Check permissions
         if (Auth::user()->role === 'admin') {
-            if ($user->outlet_id !== Auth::user()->outlet_id) {
-                return redirect()->route('users.index')->with('error', 'Unauthorized access');
+            if ($user->id !== Auth::id()) { // Not editing self
+                if ($user->outlet_id !== Auth::user()->outlet_id || $user->role !== 'staff') {
+                    return redirect()->route('users.index')->with('error', 'Unauthorized access');
+                }
+                // Force outlet_id to admin's outlet for staff
+                $request->merge(['outlet_id' => Auth::user()->outlet_id]);
+            } else {
+                // Admin editing themselves - don't allow role or outlet change
+                $request->merge([
+                    'role' => $user->role,
+                    'outlet_id' => $user->outlet_id
+                ]);
             }
-            if ($request->role !== 'staff' || $user->role !== 'staff') {
-                return redirect()->route('users.index')->with('error', 'You can only manage staff accounts');
-            }
-            // Force outlet_id to admin's outlet
-            $request->merge(['outlet_id' => Auth::user()->outlet_id]);
         }
 
         // Update the user

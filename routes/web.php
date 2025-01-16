@@ -24,6 +24,10 @@ Route::get('/', function () {
     return view('pages.auth.login');
 });
 
+Route::middleware('auth', 'prevent-staff')->group(function () {
+    Route::resource('users', UserController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+});
+
 Route::middleware(['auth'])->group(function () {
     Route::get('home', [DashboardController::class, 'index'])->name('home');
 
@@ -31,7 +35,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('categories/delete-all', [CategoryController::class, 'deleteAll'])->name('categories.deleteAll');
 
     // Resource routes
-    Route::resource('users', UserController::class);
+    // Route::resource('users', UserController::class);
     Route::resource('products', ProductController::class)->except(['show']);
     Route::resource('categories', CategoryController::class)->except(['show']);
     Route::resource('outlets', OutletController::class);
