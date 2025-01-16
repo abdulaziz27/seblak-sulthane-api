@@ -28,13 +28,5 @@ class DiscountSeeder extends Seeder
             'value' => 5,
             'category' => 'event',
         ]);
-
-        // \App\Models\Discount::create([
-        //     'name' => 'Black Friday',
-        //     'description' => 'Discount Black Friday',
-        //     'type' => 'percentage',
-        //     'value' => 15,
-        //     'expired_date' => '2025-12-31'
-        // ]);
     }
 }
