@@ -35,6 +35,14 @@
             </li>
 
 
+            <li class='nav-item'>
+                <a class="nav-link" href="{{ route('orders.index') }}">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Orders</span>
+                </a>
+            </li>
+
+
 
             <li class='nav-item'>
                 <a class="nav-link" href="{{ route('outlets.index') }}"><i class="fas fa-sitemap"></i>Outlets</a>
