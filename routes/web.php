@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\MemberController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OutletController;
 
 /*
@@ -58,4 +59,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('top-members', [MemberController::class, 'topMembers'])->name('members.top');
     // Route::get('/reports/outlet-sales', [ReportController::class, 'outletSalesReport'])->name('reports.outletSales');
     // Route::get('/reports/outlet-performance', [ReportController::class, 'outletPerformanceAnalysis'])->name('reports.outletPerformance');
+
+    Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('orders/{id}', [OrderController::class, 'show'])->name('orders.show');
 });

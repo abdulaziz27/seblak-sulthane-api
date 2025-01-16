@@ -28,13 +28,10 @@
                     </div>
                 </div>
 
-
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="card">
-
                             <div class="card-body">
-
                                 <div class="float-right">
                                     <form method="GET" action="{{ route('outlets.index') }}">
                                         <div class="input-group">
@@ -54,19 +51,15 @@
                                             <th>Name</th>
                                             <th>Address</th>
                                             <th>Phone</th>
+                                            <th>Created At</th>
                                             <th>Action</th>
                                         </tr>
-                                        @foreach ($outlets as $outlet)
+                                        @foreach($outlets as $outlet)
                                             <tr>
-
-                                                <td>{{ $outlet->name }}
-                                                </td>
-                                                <td>
-                                                    {{ $outlet->address }}
-                                                </td>
-                                                <td>
-                                                    {{ $outlet->phone }}
-                                                </td>
+                                                <td>{{ $outlet->name }}</td>
+                                                <td>{{ $outlet->address }}</td>
+                                                <td>{{ $outlet->phone }}</td>
+                                                <td>{{ $outlet->created_at }}</td>
                                                 <td>
                                                     <div class="d-flex justify-content-center">
                                                         <a href='{{ route('outlets.edit', $outlet->id) }}'
@@ -88,8 +81,6 @@
                                                 </td>
                                             </tr>
                                         @endforeach
-
-
                                     </table>
                                 </div>
                                 <div class="float-right">

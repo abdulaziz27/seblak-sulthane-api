@@ -7,9 +7,14 @@ use Illuminate\Http\Request;
 
 class OutletController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $outlets = Outlet::paginate(10);
+        $outlets = Outlet::when($request->name, function ($query, $name) {
+            $query->where('name', 'like', "%{$name}%");
+        })
+            ->latest()
+            ->paginate(10);
+
         return view('pages.outlets.index', compact('outlets'));
     }
 
