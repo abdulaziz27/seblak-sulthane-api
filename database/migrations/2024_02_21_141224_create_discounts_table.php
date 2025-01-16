@@ -20,8 +20,6 @@ return new class extends Migration
             $table->enum('type', ['percentage', 'fixed'])->default('percentage');
             //value
             $table->decimal('value', 15, 2);
-            //status
-            $table->enum('status', ['active', 'inactive'])->default('active');
             //expired date
             $table->date('expired_date')->nullable();
             $table->timestamps();
