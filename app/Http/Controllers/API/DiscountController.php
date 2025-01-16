@@ -36,9 +36,9 @@ class DiscountController extends Controller
     {
         try {
             $data = $request->all();
-            if (empty($data['status'])) {
-                unset($data['status']);
-            }
+
+            // Tetapkan nilai default untuk status jika tidak ada
+            $data['status'] = $data['status'] ?? 'active';
 
             $validated = $request->validate([
                 'name' => 'required|string',
@@ -71,6 +71,7 @@ class DiscountController extends Controller
             ], 500);
         }
     }
+
 
     public function show($id)
     {
