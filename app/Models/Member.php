@@ -14,20 +14,31 @@ class Member extends Model
         'phone'
     ];
 
+    // Relasi ke tabel orders
     public function orders()
     {
         return $this->hasMany(Order::class);
     }
 
-    // Calculate total spending
+    // Total spending dihitung dari jumlah total_amount di orders
     public function getTotalSpendingAttribute()
     {
-        return $this->orders()->sum('total_amount');
+        return $this->orders()->sum('total');
     }
 
-    // Get order count
-    public function getOrdersCountAttribute()
+    // Jumlah total order
+    public function getTotalOrdersAttribute()
     {
         return $this->orders()->count();
+    }
+
+    // Format nomor telepon
+    public function getFormattedPhoneAttribute()
+    {
+        $phone = $this->phone;
+        if (strlen($phone) > 4) {
+            return substr($phone, 0, 4) . '-' . substr($phone, 4);
+        }
+        return $phone;
     }
 }

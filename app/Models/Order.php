@@ -21,11 +21,23 @@ class Order extends Model
         'total_item',
         'id_kasir',
         'nama_kasir',
-        'transaction_time'
+        'transaction_time',
+        'outlet_id',
+        'member_id'
     ];
 
     public function outlet()
     {
         return $this->belongsTo(Outlet::class);
+    }
+
+    public function member()
+    {
+        return $this->belongsTo(Member::class);
+    }
+
+    public function orderItems()
+    {
+        return $this->hasMany(OrderItem::class);
     }
 }
