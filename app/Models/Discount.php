@@ -14,7 +14,6 @@ class Discount extends Model
         'description',
         'type',
         'value',
-        'status',
         'expired_date',
         'category'
     ];
