@@ -70,16 +70,22 @@ class DiscountController extends Controller
     {
         try {
             $discount = Discount::findOrFail($id);
+
             return response()->json([
                 'status' => 'success',
                 'data' => $discount
             ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Discount not found'
+            ], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Discount not found',
+                'message' => 'An error occurred while fetching the discount',
                 'error' => $e->getMessage()
-            ], 404);
+            ], 500);
         }
     }
 
@@ -88,22 +94,28 @@ class DiscountController extends Controller
         try {
             $discount = Discount::findOrFail($id);
 
-            $request->validate([
+            $validated = $request->validate([
                 'name' => 'required|string',
                 'description' => 'required|string',
                 'value' => 'required|numeric',
                 'type' => 'required|in:percentage,fixed',
                 'status' => 'required|in:active,inactive',
-                'expired_date' => 'nullable|date'
+                'expired_date' => 'nullable|date',
+                'category' => 'nullable|string'
             ]);
 
-            $discount->update($request->all());
+            $discount->update($validated);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Discount updated successfully',
-                'data' => $discount
+                'data' => $discount->fresh()
             ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Discount not found'
+            ], 404);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'status' => 'error',
@@ -113,7 +125,7 @@ class DiscountController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to update discount',
+                'message' => 'An error occurred while updating the discount',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -129,10 +141,15 @@ class DiscountController extends Controller
                 'status' => 'success',
                 'message' => 'Discount deleted successfully'
             ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Discount not found'
+            ], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to delete discount',
+                'message' => 'An error occurred while deleting the discount',
                 'error' => $e->getMessage()
             ], 500);
         }
