@@ -19,7 +19,6 @@ class DiscountSeeder extends Seeder
             'type' => 'percentage',
             'value' => 15,
             'category' => 'member',
-            'status' => 'active'
         ]);
 
         \App\Models\Discount::create([
@@ -28,7 +27,6 @@ class DiscountSeeder extends Seeder
             'type' => 'percentage',
             'value' => 5,
             'category' => 'event',
-            'status' => 'active'
         ]);
 
         // \App\Models\Discount::create([
@@ -36,7 +34,6 @@ class DiscountSeeder extends Seeder
         //     'description' => 'Discount Black Friday',
         //     'type' => 'percentage',
         //     'value' => 15,
-        //     'status' => 'active',
         //     'expired_date' => '2025-12-31'
         // ]);
     }

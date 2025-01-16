@@ -12,11 +12,11 @@ class DiscountController extends Controller
     public function index()
     {
         try {
-            $discounts = Discount::where('status', 'active')
-                ->where(function ($query) {
-                    $query->whereNull('expired_date')
-                        ->orWhere('expired_date', '>=', Carbon::now());
-                })
+            // Mengambil diskon yang belum kadaluarsa
+            $discounts = Discount::where(function ($query) {
+                $query->whereNull('expired_date')
+                    ->orWhere('expired_date', '>=', Carbon::now());
+            })
                 ->get();
 
             return response()->json([
@@ -32,20 +32,15 @@ class DiscountController extends Controller
         }
     }
 
+
     public function store(Request $request)
     {
         try {
-            $data = $request->all();
-
-            // Tetapkan nilai default untuk status jika tidak ada
-            $data['status'] = $data['status'] ?? 'active';
-
             $validated = $request->validate([
                 'name' => 'required|string',
                 'description' => 'required|string',
                 'value' => 'required|numeric',
                 'type' => 'required|in:percentage,fixed',
-                'status' => 'nullable|in:active,inactive',
                 'expired_date' => 'nullable|date',
                 'category' => 'nullable|string',
             ]);
@@ -106,7 +101,6 @@ class DiscountController extends Controller
                 'description' => 'required|string',
                 'value' => 'required|numeric',
                 'type' => 'required|in:percentage,fixed',
-                'status' => 'nullable|in:active,inactive',
                 'expired_date' => 'nullable|date',
                 'category' => 'nullable|string'
             ]);
