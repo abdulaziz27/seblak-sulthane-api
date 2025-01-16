@@ -13,6 +13,9 @@ class OrderController extends Controller
     //save order
     public function saveOrder(Request $request)
     {
+        $user = auth()->user();
+        $outletId = $user->outlet_id;
+
         //validate request
         $request->validate([
             'payment_amount' => 'required',
@@ -27,7 +30,6 @@ class OrderController extends Controller
             'id_kasir' => 'required',
             'nama_kasir' => 'required',
             'transaction_time' => 'required',
-            'outlet_id' => 'required|exists:outlets,id',
             // 'order_items' => 'required'
         ]);
 
@@ -45,7 +47,7 @@ class OrderController extends Controller
             'id_kasir' => $request->id_kasir,
             'nama_kasir' => $request->nama_kasir,
             'transaction_time' => $request->transaction_time,
-            'outlet_id' => $request->outlet_id,
+            'outlet_id' => $outletId,
         ]);
 
         //create order items
