@@ -15,6 +15,7 @@ class Discount extends Model
         'type',
         'value',
         'status',
-        'expired_date'
+        'expired_date',
+        'category'
     ];
 }
