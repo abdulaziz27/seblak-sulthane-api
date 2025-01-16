@@ -40,8 +40,9 @@ class DiscountController extends Controller
                 'description' => 'required|string',
                 'value' => 'required|numeric',
                 'type' => 'required|in:percentage,fixed',
-                'status' => 'required|in:active,inactive',
-                'expired_date' => 'nullable|date'
+                'status' => 'nullable|in:active,inactive',
+                'expired_date' => 'nullable|date',
+                'category' => 'nullable|string'
             ]);
 
             $discount = Discount::create($request->all());
@@ -99,7 +100,7 @@ class DiscountController extends Controller
                 'description' => 'required|string',
                 'value' => 'required|numeric',
                 'type' => 'required|in:percentage,fixed',
-                'status' => 'required|in:active,inactive',
+                'status' => 'nullable|in:active,inactive',
                 'expired_date' => 'nullable|date',
                 'category' => 'nullable|string'
             ]);
