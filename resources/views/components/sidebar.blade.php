@@ -1,17 +1,17 @@
 <div class="main-sidebar sidebar-style-2">
     <aside id="sidebar-wrapper">
         <div class="sidebar-brand">
-            <a href="index.html">Seblak Sulthane</a>
+            <a href="#">Seblak Sulthane</a>
         </div>
         <div class="sidebar-brand sidebar-brand-sm">
-            <a href="index.html">SS</a>
+            <a href="#">SS</a>
         </div>
         <ul class="sidebar-menu">
 
 
 
             <li class='nav-item'>
-                <a class="nav-link" href="#"><i class="fas fa-columns"></i>General Dashboard</a>
+                <a class="nav-link" href="{{ route('home') }}"><i class="fas fa-columns"></i>General Dashboard</a>
             </li>
 
 
