@@ -31,7 +31,7 @@ class CategoryController extends Controller
             'name' => $request->name,
         ]);
 
-        return redirect()->route('categories.index')->with('success', 'Category created successfully');
+        return redirect()->route('categories.index')->with('success', 'Kategori berhasil dibuat.');
     }
 
     public function edit($id)
@@ -51,15 +51,23 @@ class CategoryController extends Controller
             'name' => $request->name,
         ]);
 
-        return redirect()->route('categories.index')->with('success', 'Category updated successfully');
+        return redirect()->route('categories.index')->with('success', 'Kategori berhasil diperbarui.');
     }
 
     public function destroy($id)
     {
         $category = Category::findOrFail($id);
+
+        // Cek apakah kategori memiliki produk aktif
+        if ($category->products()->exists()) {
+            return redirect()->route('categories.index')->with('warning', 'Kategori ini masih memiliki produk aktif. Harap pindahkan atau hapus produk terlebih dahulu.');
+        }
+
         $category->delete();
-        return redirect()->route('categories.index')->with('success', 'Category deleted successfully');
+
+        return redirect()->route('categories.index')->with('success', 'Kategori berhasil dihapus.');
     }
+
 
     public function import(Request $request)
     {
@@ -85,10 +93,10 @@ class CategoryController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('categories.index')->with('success', 'Categories imported successfully');
+            return redirect()->route('categories.index')->with('success', 'Kategori berhasil diimpor.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->route('categories.index')->with('error', 'Error importing categories: ' . $e->getMessage());
+            return redirect()->route('categories.index')->with('error', 'Error import kategori: ' . $e->getMessage());
         }
     }
 
@@ -231,13 +239,22 @@ class CategoryController extends Controller
         try {
             DB::beginTransaction();
 
+            // Cek apakah ada kategori yang masih memiliki produk
+            $categoriesWithProducts = Category::has('products')->get();
+
+            if ($categoriesWithProducts->isNotEmpty()) {
+                $categoryNames = $categoriesWithProducts->pluck('name')->join(', ');
+                return redirect()->route('categories.index')->with('warning', "Kategori berikut masih memiliki produk aktif: {$categoryNames}. Harap pindahkan atau hapus produk terlebih dahulu.");
+            }
+
+            // Jika tidak ada kategori yang berelasi dengan produk, lanjutkan penghapusan
             DB::statement('SET FOREIGN_KEY_CHECKS=0');
             Category::query()->delete();
             DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
             DB::commit();
 
-            return redirect()->route('categories.index')->with('success', 'All categories have been deleted successfully');
+            return redirect()->route('categories.index')->with('success', 'Semua kategori berhasil dihapus.');
         } catch (\Exception $e) {
             DB::rollBack();
             DB::statement('SET FOREIGN_KEY_CHECKS=1');
