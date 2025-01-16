@@ -35,17 +35,22 @@ class DiscountController extends Controller
     public function store(Request $request)
     {
         try {
-            $request->validate([
+            $data = $request->all();
+            if (empty($data['status'])) {
+                unset($data['status']);
+            }
+
+            $validated = $request->validate([
                 'name' => 'required|string',
                 'description' => 'required|string',
                 'value' => 'required|numeric',
                 'type' => 'required|in:percentage,fixed',
                 'status' => 'nullable|in:active,inactive',
                 'expired_date' => 'nullable|date',
-                'category' => 'nullable|string'
+                'category' => 'nullable|string',
             ]);
 
-            $discount = Discount::create($request->all());
+            $discount = Discount::create($validated);
 
             return response()->json([
                 'status' => 'success',
