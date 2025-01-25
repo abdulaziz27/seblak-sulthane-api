@@ -31,19 +31,24 @@
                                     <div class="row">
                                         <div class="form-group col-3">
                                             <label>Date</label>
-                                            <input type="date" class="form-control" name="date" value="{{ request('date') }}">
+                                            <input type="date" class="form-control" name="date"
+                                                value="{{ request('date') }}">
                                         </div>
-                                        <div class="form-group col-3">
-                                            <label>Outlet</label>
-                                            <select class="form-control" name="outlet_id">
-                                                <option value="">All Outlets</option>
-                                                @foreach($outlets as $outlet)
-                                                    <option value="{{ $outlet->id }}" {{ request('outlet_id') == $outlet->id ? 'selected' : '' }}>
-                                                        {{ $outlet->name }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </div>
+                                        <!-- Filter outlet hanya untuk owner -->
+                                        @if (Auth::user()->role === 'owner')
+                                            <div class="form-group col-3">
+                                                <label>Outlet</label>
+                                                <select class="form-control" name="outlet_id">
+                                                    <option value="">All Outlets</option>
+                                                    @foreach ($outlets as $outlet)
+                                                        <option value="{{ $outlet->id }}"
+                                                            {{ request('outlet_id') == $outlet->id ? 'selected' : '' }}>
+                                                            {{ $outlet->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        @endif
                                         <div class="form-group col-3">
                                             <label>&nbsp;</label>
                                             <button type="submit" class="btn btn-primary d-block w-100">Filter</button>
@@ -74,10 +79,11 @@
                                             <th>Total</th>
                                             <th>Action</th>
                                         </tr>
-                                        @foreach($orders as $order)
+                                        @foreach ($orders as $order)
                                             <tr>
                                                 <td>#{{ $order->id }}</td>
-                                                <td>{{ Carbon\Carbon::parse($order->transaction_time)->format('d M Y H:i') }}</td>
+                                                <td>{{ Carbon\Carbon::parse($order->transaction_time)->format('d M Y H:i') }}
+                                                </td>
                                                 <td>{{ $order->outlet->name }}</td>
                                                 <td>{{ $order->nama_kasir }}</td>
                                                 <td>{{ strtoupper($order->payment_method) }}</td>
@@ -88,7 +94,7 @@
                                                 <td>Rp {{ number_format($order->total, 0, ',', '.') }}</td>
                                                 <td>
                                                     <a href="{{ route('orders.show', $order->id) }}"
-                                                       class="btn btn-sm btn-info">
+                                                        class="btn btn-sm btn-info">
                                                         <i class="fas fa-eye"></i>
                                                     </a>
                                                 </td>

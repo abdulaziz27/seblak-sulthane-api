@@ -53,6 +53,21 @@
                 <a class="nav-link" href="{{ route('members.index') }}"><i class="fas fa-sitemap"></i>Members</a>
             </li>
 
+            <li class="nav-item">
+                <a href="{{ route('discounts.index') }}" class="nav-link">
+                    <i class="fas fa-percentage"></i>
+                    <span>Discounts</span>
+                </a>
+            </li>
+
+            <li class="menu-header">Inventory</li>
+            <li class="nav-item">
+                <a href="#" class="nav-link"><i class="fas fa-boxes"></i><span>Inventories</span></a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link"><i class="fas fa-shopping-cart"></i><span>Orders</span></a>
+            </li>
+
         </ul>
 
 </div>

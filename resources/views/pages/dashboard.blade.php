@@ -23,10 +23,32 @@
                             <form action="{{ route('home') }}" method="GET" class="form-inline">
                                 <div class="form-group mr-3">
                                     <label class="mr-2">Periode:</label>
-                                    <input type="date" class="form-control" name="start_date" value="{{ request('start_date', now()->startOfMonth()->format('Y-m-d')) }}">
+                                    <input type="date" class="form-control" name="start_date"
+                                        value="{{ request('start_date', now()->startOfMonth()->format('Y-m-d')) }}">
                                     <span class="mx-2">s/d</span>
-                                    <input type="date" class="form-control" name="end_date" value="{{ request('end_date', now()->format('Y-m-d')) }}">
+                                    <input type="date" class="form-control" name="end_date"
+                                        value="{{ request('end_date', now()->format('Y-m-d')) }}">
                                 </div>
+                                @if (Auth::user()->role === 'owner')
+                                    <div class="form-group mr-3">
+                                        <label class="mr-2">Outlet:</label>
+                                        <select class="form-control" name="outlet_id">
+                                            <option value="">Semua Outlet</option>
+                                            @foreach ($outlets as $outlet)
+                                                <option value="{{ $outlet->id }}"
+                                                    {{ request('outlet_id') == $outlet->id ? 'selected' : '' }}>
+                                                    {{ $outlet->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                @else
+                                    <div class="form-group mr-3">
+                                        <label class="mr-2">Outlet:</label>
+                                        <span class="badge badge-info">{{ Auth::user()->outlet->name }}</span>
+                                        <input type="hidden" name="outlet_id" value="{{ Auth::user()->outlet_id }}">
+                                    </div>
+                                @endif
                                 <button type="submit" class="btn btn-primary">Terapkan</button>
                             </form>
                         </div>
@@ -112,6 +134,107 @@
                 </div>
             </div>
 
+            <!-- Top Selling Items & Customers -->
+            <div class="row">
+                <!-- Top Selling Items (existing) -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>Produk Terlaris</h4>
+                            @if (request('outlet_id'))
+                                <div class="ml-auto">
+                                    <span class="badge badge-primary">{{ $selectedOutlet->name ?? '' }}</span>
+                                </div>
+                            @elseif(Auth::user()->role === 'owner')
+                                <div class="ml-auto">
+                                    <span class="badge badge-primary">Semua Outlet</span>
+                                </div>
+                            @endif
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <canvas id="topItemsChart" height="250"></canvas>
+                            </div>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <tr>
+                                                <th>Produk</th>
+                                                <th>Total Terjual</th>
+                                            </tr>
+                                            @foreach ($topItems as $item)
+                                                <tr>
+                                                    <td>{{ $item->product_name }}</td>
+                                                    <td>{{ number_format($item->total_quantity) }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Customers (new) -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>Pelanggan Terbaik</h4>
+                            @if (request('outlet_id'))
+                                <div class="ml-auto">
+                                    <span class="badge badge-primary">{{ $selectedOutlet->name ?? '' }}</span>
+                                </div>
+                            @elseif(Auth::user()->role === 'owner')
+                                <div class="ml-auto">
+                                    <span class="badge badge-primary">Semua Outlet</span>
+                                </div>
+                            @endif
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Member</th>
+                                            <th>No. Telepon</th>
+                                            <th class="text-right">Total Transaksi</th>
+                                            <th class="text-right">Total Pembelian</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($topCustomers as $customer)
+                                            <tr>
+                                                <td>{{ $customer->member_name }}</td>
+                                                <td>{{ $customer->member_phone }}</td>
+                                                <td class="text-right">{{ number_format($customer->total_transactions) }}x
+                                                </td>
+                                                <td class="text-right">Rp
+                                                    {{ number_format($customer->total_spent, 0, ',', '.') }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-4">
+                                <div class="badges">
+                                    @foreach ($topCustomers as $index => $customer)
+                                        @php
+                                            $colors = ['primary', 'success', 'warning', 'danger', 'info'];
+                                            $badges = ['Diamond', 'Gold', 'Silver', 'Bronze', 'Regular'];
+                                        @endphp
+                                        <div class="badge badge-{{ $colors[$index] }} mt-1">
+                                            {{ $badges[$index] }}: {{ $customer->member_name }}
+                                        </div><br>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Outlet Performance -->
             <div class="row">
                 <div class="col-12">
@@ -127,20 +250,36 @@
                                             <th>Outlet</th>
                                             <th>Total Orders</th>
                                             <th>Total Revenue</th>
-                                            <th>Total Customers</th>
                                             <th>Average Order Value</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach($outletPerformance as $outlet)
-                                            <tr>
-                                                <td>{{ $outlet->outlet_name }}</td>
-                                                <td>{{ number_format($outlet->total_orders) }}</td>
-                                                <td>Rp {{ number_format($outlet->total_revenue, 0, ',', '.') }}</td>
-                                                <td>{{ number_format($outlet->total_customers) }}</td>
-                                                <td>Rp {{ $outlet->total_orders > 0 ? number_format($outlet->total_revenue / $outlet->total_orders, 0, ',', '.') : 0 }}</td>
-                                            </tr>
-                                        @endforeach
+                                        @if (Auth::user()->role === 'owner')
+                                            @foreach ($outletPerformance as $outlet)
+                                                <tr>
+                                                    <td>{{ $outlet->outlet_name }}</td>
+                                                    <td>{{ number_format($outlet->total_orders) }}</td>
+                                                    <td>Rp {{ number_format($outlet->total_revenue, 0, ',', '.') }}</td>
+                                                    <td>Rp
+                                                        {{ $outlet->total_orders > 0 ? number_format($outlet->total_revenue / $outlet->total_orders, 0, ',', '.') : 0 }}
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        @else
+                                            @foreach ($outletPerformance as $outlet)
+                                                @if ($outlet->outlet_id === Auth::user()->outlet_id)
+                                                    <tr>
+                                                        <td>{{ $outlet->outlet_name }}</td>
+                                                        <td>{{ number_format($outlet->total_orders) }}</td>
+                                                        <td>Rp {{ number_format($outlet->total_revenue, 0, ',', '.') }}
+                                                        </td>
+                                                        <td>Rp
+                                                            {{ $outlet->total_orders > 0 ? number_format($outlet->total_revenue / $outlet->total_orders, 0, ',', '.') : 0 }}
+                                                        </td>
+                                                    </tr>
+                                                @endif
+                                            @endforeach
+                                        @endif
                                     </tbody>
                                 </table>
                             </div>
@@ -189,6 +328,53 @@
                     callbacks: {
                         label: function(tooltipItem, data) {
                             return 'Rp ' + tooltipItem.yLabel.toLocaleString('id-ID');
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+
+    <!-- Top Items Pie Chart -->
+    <script>
+        var topItemsCtx = document.getElementById('topItemsChart').getContext('2d');
+        var topItemsData = @json($topItems);
+
+        var colors = [
+            '#6777ef',
+            '#63ed7a',
+            '#ffa426',
+            '#fc544b',
+            '#3abaf4'
+        ];
+
+        new Chart(topItemsCtx, {
+            type: 'pie',
+            data: {
+                labels: topItemsData.map(item => item.product_name),
+                datasets: [{
+                    data: topItemsData.map(item => item.total_quantity),
+                    backgroundColor: colors,
+                    borderWidth: 1,
+                }]
+            },
+            options: {
+                responsive: true,
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 20
+                    }
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            var dataset = data.datasets[0];
+                            var total = dataset.data.reduce((acc, current) => acc + current, 0);
+                            var currentValue = dataset.data[tooltipItem.index];
+                            var percentage = Math.round((currentValue / total * 100));
+                            return data.labels[tooltipItem.index] + ': ' +
+                                currentValue.toLocaleString('id-ID') + ' (' + percentage + '%)';
                         }
                     }
                 }
