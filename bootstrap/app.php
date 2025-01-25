@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\OwnerOnlyMiddleware;
 use App\Http\Middleware\StaffAccessMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'prevent-staff' => StaffAccessMiddleware::class,
+            'owner-only' => OwnerOnlyMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

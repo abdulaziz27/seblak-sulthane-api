@@ -12,9 +12,11 @@
         <section class="section">
             <div class="section-header">
                 <h1>Daftar Outlet</h1>
-                <div class="section-header-button">
-                    <a href="{{ route('outlets.create') }}" class="btn btn-primary">Add New</a>
-                </div>
+                @if (Auth::user()->role === 'owner')
+                    <div class="section-header-button">
+                        <a href="{{ route('outlets.create') }}" class="btn btn-primary">Add New</a>
+                    </div>
+                @endif
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
                     <div class="breadcrumb-item"><a href="#">Outlets</a></div>
@@ -52,9 +54,11 @@
                                             <th>Address</th>
                                             <th>Phone</th>
                                             <th>Created At</th>
-                                            <th>Action</th>
+                                            @if (Auth::user()->role === 'owner')
+                                                <th>Action</th>
+                                            @endif
                                         </tr>
-                                        @foreach($outlets as $outlet)
+                                        @foreach ($outlets as $outlet)
                                             <tr>
                                                 <td>{{ $outlet->name }}</td>
                                                 <td>{{ $outlet->address }}</td>

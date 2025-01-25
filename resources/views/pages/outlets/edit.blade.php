@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Edit Product')
+@section('title', 'Edit Outlet')
 
 @push('style')
     <!-- CSS Libraries -->

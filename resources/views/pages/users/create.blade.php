@@ -83,12 +83,20 @@
                                 @enderror
                             </div>
 
+                            {{-- Form group for outlet selection --}}
                             <div class="form-group">
                                 <label>Outlet</label>
-                                <select name="outlet_id" class="form-control @error('outlet_id') is-invalid @enderror">
+                                <select name="outlet_id" class="form-control @error('outlet_id') is-invalid @enderror"
+                                    {{ Auth::user()->role === 'admin' && (!isset($user) || $user->id !== Auth::id()) ? 'disabled' : '' }}>
                                     <option value="" disabled selected>Choose Outlet</option>
                                     @foreach ($outlets as $outlet)
-                                        <option value="{{ $outlet->id }}">{{ $outlet->name }}</option>
+                                        <option value="{{ $outlet->id }}"
+                                            {{ (isset($user) && $user->outlet_id === $outlet->id) ||
+                                            (Auth::user()->role === 'admin' && Auth::user()->outlet_id === $outlet->id)
+                                                ? 'selected'
+                                                : '' }}>
+                                            {{ $outlet->name }}
+                                        </option>
                                     @endforeach
                                 </select>
                                 @error('outlet_id')
@@ -99,24 +107,34 @@
                             </div>
 
 
+                            {{-- Form group for role selection --}}
                             <div class="form-group">
-                                <label class="form-label">Role</label>
+                                <label class="form-label w-100">Role</label>
                                 <div class="selectgroup w-100">
+                                    @if (Auth::user()->role === 'owner')
+                                        <label class="selectgroup-item">
+                                            <input type="radio" name="role" value="owner" class="selectgroup-input"
+                                                {{ isset($user) && $user->role === 'owner' ? 'checked' : '' }}>
+                                            <span class="selectgroup-button">Owner</span>
+                                        </label>
+                                        <label class="selectgroup-item">
+                                            <input type="radio" name="role" value="admin" class="selectgroup-input"
+                                                {{ isset($user) && $user->role === 'admin' ? 'checked' : '' }}>
+                                            <span class="selectgroup-button">Admin</span>
+                                        </label>
+                                    @endif
                                     <label class="selectgroup-item">
-                                        <input type="radio" name="role" value="admin" class="selectgroup-input"
-                                            checked="">
-                                        <span class="selectgroup-button">Admin</span>
-                                    </label>
-                                    <label class="selectgroup-item">
-                                        <input type="radio" name="role" value="staff" class="selectgroup-input">
+                                        <input type="radio" name="role" value="staff" class="selectgroup-input"
+                                            {{ (isset($user) && $user->role === 'staff') || Auth::user()->role === 'admin' ? 'checked' : '' }}
+                                            {{ Auth::user()->role === 'admin' ? 'disabled' : '' }}>
                                         <span class="selectgroup-button">Staff</span>
                                     </label>
-                                    <label class="selectgroup-item">
-                                        <input type="radio" name="role" value="user" class="selectgroup-input">
-                                        <span class="selectgroup-button">User</span>
-                                    </label>
-
                                 </div>
+                                @error('role')
+                                    <div class="invalid-feedback d-block">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
                             </div>
                         </div>
                         <div class="card-footer text-right">
