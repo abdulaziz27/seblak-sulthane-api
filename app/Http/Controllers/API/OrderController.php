@@ -50,6 +50,9 @@ class OrderController extends Controller
             'outlet_id' => $outletId,
         ]);
 
+        // Load the outlet relationship
+        $order->load('outlet');
+
         //create order items
         foreach ($request->order_items as $item) {
             OrderItem::create([
@@ -74,9 +77,9 @@ class OrderController extends Controller
             $start = Carbon::parse($start_date)->startOfDay();
             $end = Carbon::parse($end_date)->endOfDay();
 
-            $orders = Order::whereBetween('created_at', [$start, $end])->get();
+            $orders = Order::whereBetween('created_at', [$start, $end])->with('outlet')->get();
         } else {
-            $orders = Order::all();
+            $orders = Order::with('outlet')->get();
         }
         return response()->json([
             'status' => 'success',
