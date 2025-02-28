@@ -50,7 +50,6 @@ class OrderController extends Controller
             'outlet_id' => $outletId,
         ]);
 
-        // Load the outlet relationship
         $order->load('outlet');
 
         //create order items
