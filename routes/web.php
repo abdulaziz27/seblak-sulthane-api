@@ -6,9 +6,12 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DiscountController;
+use App\Http\Controllers\MaterialOrderController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OutletController;
+use App\Http\Controllers\RawMaterialController;
+use App\Http\Controllers\ReportController;
 
 Route::get('/', function () {
     return view('pages.auth.login');
@@ -53,4 +56,28 @@ Route::middleware(['auth'])->group(function () {
     Route::get('categories/template', [CategoryController::class, 'template'])->name('categories.template');
     Route::get('categories/export', [CategoryController::class, 'export'])->name('categories.export');
     Route::get('categories/export-update', [CategoryController::class, 'exportForUpdate'])->name('categories.exportForUpdate');
+
+
+    // Raw Materials routes
+    Route::resource('raw-materials', RawMaterialController::class)->except(['show']);
+    Route::post('raw-materials/update-stock/{rawMaterial}', [RawMaterialController::class, 'updateStock'])->name('raw-materials.update-stock');
+    Route::post('raw-materials/import', [RawMaterialController::class, 'import'])->name('raw-materials.import');
+    Route::get('raw-materials/export', [RawMaterialController::class, 'export'])->name('raw-materials.export');
+    Route::get('raw-materials/template', [RawMaterialController::class, 'template'])->name('raw-materials.template');
+
+    // Material Orders routes
+    Route::resource('material-orders', MaterialOrderController::class)->except(['edit', 'update', 'destroy']);
+    Route::post('material-orders/{materialOrder}/update-status', [MaterialOrderController::class, 'updateStatus'])->name('material-orders.update-status');
+    Route::delete('material-orders/{materialOrder}/cancel', [MaterialOrderController::class, 'cancel'])->name('material-orders.cancel');
+
+
+    // Reports
+    Route::middleware('owner-only')->prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('/sales-summary', [ReportController::class, 'salesSummary'])->name('sales-summary');
+        Route::get('/outlet-performance', [ReportController::class, 'outletPerformance'])->name('outlet-performance');
+        Route::get('/product-performance', [ReportController::class, 'productPerformance'])->name('product-performance');
+        Route::get('/customer-insights', [ReportController::class, 'customerInsights'])->name('customer-insights');
+        Route::get('/inventory', [ReportController::class, 'inventoryReport'])->name('inventory');
+    });
 });

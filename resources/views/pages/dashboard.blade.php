@@ -287,6 +287,207 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Inventory Statistics -->
+            <!-- Raw Materials Statistics Section -->
+            <div class="row">
+                <div class="col-12 col-sm-12 col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>Raw Material Orders</h4>
+                            <div class="card-header-action">
+                                <a href="#rm-weekly" data-tab="rm-period-tab" class="btn active">Week</a>
+                                <a href="#rm-monthly" data-tab="rm-period-tab" class="btn">Month</a>
+                                <a href="#rm-yearly" data-tab="rm-period-tab" class="btn">Year</a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Charts will change based on time period -->
+                            <div class="rm-period-tab" id="rm-weekly">
+                                <canvas id="materialOrdersWeeklyChart" height="180"></canvas>
+                            </div>
+                            <div class="rm-period-tab" id="rm-monthly" style="display: none;">
+                                <canvas id="materialOrdersMonthlyChart" height="180"></canvas>
+                            </div>
+                            <div class="rm-period-tab" id="rm-yearly" style="display: none;">
+                                <canvas id="materialOrdersYearlyChart" height="180"></canvas>
+                            </div>
+
+                            <!-- Summary info and statistics -->
+                            <div class="mt-4">
+                                <div class="statistic-details mt-1">
+                                    <div class="statistic-details-item">
+                                        <div class="text-small text-muted">
+                                            <span
+                                                class="{{ $materialOrdersStats->count() > 0 && isset($materialOrdersWeekChange) && $materialOrdersWeekChange > 0 ? 'text-primary' : 'text-danger' }}">
+                                                <i
+                                                    class="fas fa-caret-{{ $materialOrdersStats->count() > 0 && isset($materialOrdersWeekChange) && $materialOrdersWeekChange > 0 ? 'up' : 'down' }}"></i>
+                                            </span>
+                                            {{ $materialOrdersStats->count() > 0 && isset($materialOrdersWeekChange) ? abs($materialOrdersWeekChange) : 0 }}%
+                                        </div>
+                                        <div class="detail-value">
+                                            {{ $materialOrdersStats->count() > 0 ? $materialOrdersStats->sum('total_orders_this_week') : 0 }}
+                                        </div>
+                                        <div class="detail-name">This Week</div>
+                                    </div>
+                                    <div class="statistic-details-item">
+                                        <div class="text-small text-muted">
+                                            <span
+                                                class="{{ $materialOrdersStats->count() > 0 && isset($materialOrdersMonthChange) && $materialOrdersMonthChange > 0 ? 'text-primary' : 'text-danger' }}">
+                                                <i
+                                                    class="fas fa-caret-{{ $materialOrdersStats->count() > 0 && isset($materialOrdersMonthChange) && $materialOrdersMonthChange > 0 ? 'up' : 'down' }}"></i>
+                                            </span>
+                                            {{ $materialOrdersStats->count() > 0 && isset($materialOrdersMonthChange) ? abs($materialOrdersMonthChange) : 0 }}%
+                                        </div>
+                                        <div class="detail-value">
+                                            {{ $materialOrdersStats->count() > 0 ? $materialOrdersStats->sum('total_orders_this_month') : 0 }}
+                                        </div>
+                                        <div class="detail-name">This Month</div>
+                                    </div>
+                                    <div class="statistic-details-item">
+                                        <div class="text-small text-muted">
+                                            <span
+                                                class="{{ $materialOrdersStats->count() > 0 && isset($materialOrdersYearChange) && $materialOrdersYearChange > 0 ? 'text-primary' : 'text-danger' }}">
+                                                <i
+                                                    class="fas fa-caret-{{ $materialOrdersStats->count() > 0 && isset($materialOrdersYearChange) && $materialOrdersYearChange > 0 ? 'up' : 'down' }}"></i>
+                                            </span>
+                                            {{ $materialOrdersStats->count() > 0 && isset($materialOrdersYearChange) ? abs($materialOrdersYearChange) : 0 }}%
+                                        </div>
+                                        <div class="detail-value">
+                                            {{ $materialOrdersStats->count() > 0 ? $materialOrdersStats->sum('total_orders_this_year') : 0 }}
+                                        </div>
+                                        <div class="detail-name">This Year</div>
+                                    </div>
+                                    <div class="statistic-details-item">
+                                        <div class="detail-value">Rp
+                                            {{ $materialOrdersStats->count() > 0 ? number_format($materialOrdersStats->sum('total_amount'), 0, ',', '.') : 0 }}
+                                        </div>
+                                        <div class="detail-name">Total Spending</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-sm-12 col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>Top Ordered Materials</h4>
+                            @if (request('outlet_id'))
+                                <div class="ml-auto">
+                                    <span class="badge badge-primary">{{ $selectedOutlet->name ?? '' }}</span>
+                                </div>
+                            @elseif(Auth::user()->role === 'owner')
+                                <div class="ml-auto">
+                                    <span class="badge badge-primary">Semua Outlet</span>
+                                </div>
+                            @endif
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <canvas id="topMaterialsChart" height="250"></canvas>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Total Quantity</th>
+                                            <th class="text-right">Total Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($topMaterials as $material)
+                                            <tr>
+                                                <td>{{ $material->material_name }}</td>
+                                                <td>{{ number_format($material->total_quantity) }} {{ $material->unit }}
+                                                </td>
+                                                <td class="text-right">Rp
+                                                    {{ number_format($material->total_amount, 0, ',', '.') }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Material Orders by Outlet -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>Material Orders by Outlet</h4>
+                            <div class="card-header-action">
+                                <div class="btn-group">
+                                    <a href="#" class="btn btn-primary">Export Data</a>
+                                    <a href="#" class="btn">Print</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <canvas id="outletMaterialPieChart" height="300"></canvas>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Outlet</th>
+                                                    <th class="text-center">Total Orders</th>
+                                                    <th class="text-right">Total Spending</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($materialOrdersStats as $stat)
+                                                    <tr>
+                                                        <td>{{ $stat->outlet_name }}</td>
+                                                        <td class="text-center">{{ number_format($stat->total_orders) }}
+                                                        </td>
+                                                        <td class="text-right">Rp
+                                                            {{ number_format($stat->total_amount, 0, ',', '.') }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                            <tfoot>
+                                                <tr>
+                                                    <th>Total</th>
+                                                    <th class="text-center">
+                                                        {{ number_format($materialOrdersStats->sum('total_orders')) }}</th>
+                                                    <th class="text-right">Rp
+                                                        {{ number_format($materialOrdersStats->sum('total_amount'), 0, ',', '.') }}
+                                                    </th>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @foreach ($materialOrdersStats as $outlet)
+                                <div class="mb-4 mt-4">
+                                    <div class="text-small font-weight-bold text-muted float-right">Rp
+                                        {{ number_format($outlet->total_amount, 0, ',', '.') }}</div>
+                                    <div class="font-weight-bold mb-1">{{ $outlet->outlet_name }}</div>
+                                    <div class="progress" data-height="5">
+                                        <div class="progress-bar" role="progressbar"
+                                            data-width="{{ ($outlet->total_amount / ($materialOrdersStats->sum('total_amount') ?: 1)) * 100 }}%"
+                                            aria-valuenow="{{ ($outlet->total_amount / ($materialOrdersStats->sum('total_amount') ?: 1)) * 100 }}"
+                                            aria-valuemin="0" aria-valuemax="100"
+                                            style="background-color: {{ $loop->index % 2 == 0 ? '#6777ef' : '#63ed7a' }}">
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
         </section>
     </div>
 @endsection
@@ -332,6 +533,326 @@
                     }
                 }
             }
+        });
+    </script>
+
+    <script>
+        // Add this to your existing dashboard JavaScript code
+        $(document).ready(function() {
+            // Tab switching functionality
+            $("[data-tab]").each(function() {
+                let tab_group = $(this).data("tab");
+                $(this).click(function(e) {
+                    e.preventDefault();
+
+                    // Remove active class from all buttons in this group
+                    $("[data-tab='" + tab_group + "']").removeClass("active");
+
+                    // Add active class to this button
+                    $(this).addClass("active");
+
+                    // Hide all content with this data-tab-group
+                    $("[data-tab-group='" + tab_group + "']").hide();
+
+                    // Show the content this button points to
+                    $($(this).attr("href")).show();
+                });
+            });
+
+            // Material Orders Weekly Chart
+            var materialOrdersWeeklyCtx = document.getElementById('materialOrdersWeeklyChart').getContext('2d');
+            var weeklyOrderData = @json($weeklyOrderData);
+
+            new Chart(materialOrdersWeeklyCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+                    datasets: [{
+                        label: 'Material Orders',
+                        data: weeklyOrderData,
+                        backgroundColor: 'rgba(103, 119, 239, 0.2)',
+                        borderColor: '#6777ef',
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#6777ef',
+                        pointRadius: 5,
+                        pointHoverRadius: 8,
+                        borderWidth: 2,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    legend: {
+                        display: false
+                    },
+                    scales: {
+                        yAxes: [{
+                            gridLines: {
+                                drawBorder: false,
+                                color: '#f2f2f2',
+                            },
+                            ticks: {
+                                beginAtZero: true,
+                                stepSize: 1
+                            }
+                        }],
+                        xAxes: [{
+                            gridLines: {
+                                display: false
+                            }
+                        }]
+                    },
+                    tooltips: {
+                        callbacks: {
+                            label: function(tooltipItem, data) {
+                                return tooltipItem.yLabel + ' orders';
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Material Orders Monthly Chart
+            var materialOrdersMonthlyCtx = document.getElementById('materialOrdersMonthlyChart').getContext('2d');
+            var monthlyOrderData = @json($monthlyOrderData);
+            var monthLabels = @json($monthLabels);
+
+            new Chart(materialOrdersMonthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: monthLabels,
+                    datasets: [{
+                        label: 'Material Orders',
+                        data: monthlyOrderData,
+                        backgroundColor: '#6777ef',
+                        borderWidth: 0,
+                        borderRadius: 4,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    legend: {
+                        display: false
+                    },
+                    scales: {
+                        yAxes: [{
+                            gridLines: {
+                                drawBorder: false,
+                                color: '#f2f2f2',
+                            },
+                            ticks: {
+                                beginAtZero: true,
+                                stepSize: 5
+                            }
+                        }],
+                        xAxes: [{
+                            gridLines: {
+                                display: false
+                            }
+                        }]
+                    },
+                    tooltips: {
+                        callbacks: {
+                            label: function(tooltipItem, data) {
+                                return tooltipItem.yLabel + ' orders';
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Material Orders Yearly Chart
+            var materialOrdersYearlyCtx = document.getElementById('materialOrdersYearlyChart').getContext('2d');
+            var yearlyOrderData = @json($yearlyOrderData);
+            var yearLabels = @json($yearLabels);
+
+            new Chart(materialOrdersYearlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: yearLabels,
+                    datasets: [{
+                        label: 'Material Orders',
+                        data: yearlyOrderData,
+                        backgroundColor: '#63ed7a',
+                        borderWidth: 0,
+                        borderRadius: 4,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    legend: {
+                        display: false
+                    },
+                    scales: {
+                        yAxes: [{
+                            gridLines: {
+                                drawBorder: false,
+                                color: '#f2f2f2',
+                            },
+                            ticks: {
+                                beginAtZero: true,
+                                stepSize: 10
+                            }
+                        }],
+                        xAxes: [{
+                            gridLines: {
+                                display: false
+                            }
+                        }]
+                    },
+                    tooltips: {
+                        callbacks: {
+                            label: function(tooltipItem, data) {
+                                return tooltipItem.yLabel + ' orders';
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Top Materials Pie Chart
+            var topMaterialsCtx = document.getElementById('topMaterialsChart').getContext('2d');
+            var topMaterialsData = @json($topMaterials);
+
+            var materialColors = [
+                '#6777ef',
+                '#63ed7a',
+                '#ffa426',
+                '#fc544b',
+                '#3abaf4'
+            ];
+
+            new Chart(topMaterialsCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: topMaterialsData.map(item => item.material_name),
+                    datasets: [{
+                        data: topMaterialsData.map(item => item.total_amount),
+                        backgroundColor: materialColors,
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutoutPercentage: 70,
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 15
+                        }
+                    },
+                    tooltips: {
+                        callbacks: {
+                            label: function(tooltipItem, data) {
+                                var dataset = data.datasets[0];
+                                var total = dataset.data.reduce((acc, current) => acc + current, 0);
+                                var currentValue = dataset.data[tooltipItem.index];
+                                var percentage = Math.round((currentValue / total * 100));
+                                return data.labels[tooltipItem.index] + ': Rp ' +
+                                    currentValue.toLocaleString('id-ID') + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Progress bar animations
+            $('.progress .progress-bar').each(function() {
+                $(this).css({
+                    width: $(this).attr('data-width') + '%'
+                });
+            });
+
+            // Outlet Material Pie Chart
+            var outletMaterialPieCtx = document.getElementById('outletMaterialPieChart').getContext('2d');
+            var outletData = @json($materialOrdersStats);
+
+            // Generate colors for each outlet
+            var outletColors = [];
+            for (var i = 0; i < outletData.length; i++) {
+                if (i % 2 == 0) {
+                    outletColors.push('#6777ef');
+                } else {
+                    outletColors.push('#63ed7a');
+                }
+            }
+
+            new Chart(outletMaterialPieCtx, {
+                type: 'pie',
+                data: {
+                    labels: outletData.map(item => item.outlet_name),
+                    datasets: [{
+                        data: outletData.map(item => item.total_amount),
+                        backgroundColor: outletColors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 20
+                        }
+                    },
+                    tooltips: {
+                        callbacks: {
+                            label: function(tooltipItem, data) {
+                                var dataset = data.datasets[0];
+                                var total = dataset.data.reduce((acc, current) => acc + current, 0);
+                                var currentValue = dataset.data[tooltipItem.index];
+                                var percentage = Math.round((currentValue / total * 100));
+                                return data.labels[tooltipItem.index] + ': Rp ' +
+                                    currentValue.toLocaleString('id-ID') + ' (' + percentage + '%)';
+                            }
+                        }
+                    },
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
+                    }
+                }
+            });
+
+            // Handle Export and Print Buttons
+            $('.card-header-action .btn-primary').on('click', function(e) {
+                e.preventDefault();
+                // You can implement actual export functionality here
+                alert('Export feature will be implemented soon!');
+            });
+
+            $('.card-header-action .btn:not(.btn-primary)').on('click', function(e) {
+                e.preventDefault();
+                window.print();
+            });
+
+            // Add hover effects on rows
+            $('.table-responsive table tbody tr').hover(
+                function() {
+                    $(this).addClass('bg-light');
+                },
+                function() {
+                    $(this).removeClass('bg-light');
+                }
+            );
+
+            // Auto-refresh data every 5 minutes (300000 ms)
+            // Uncomment this if you want auto-refresh functionality
+
+            setInterval(function() {
+                location.reload();
+            }, 300000);
+
         });
     </script>
 
