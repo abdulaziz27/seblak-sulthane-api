@@ -15,6 +15,16 @@
             </li>
 
 
+            <!-- Place this just after the Dashboard menu item -->
+            @if (Auth::user()->role === 'owner')
+                <li class='nav-item'>
+                    <a class="nav-link" href="{{ route('reports.index') }}">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Reports</span>
+                    </a>
+                </li>
+            @endif
+
 
             <li class='nav-item'>
                 <a class="nav-link" href="{{ route('users.index') }}"><i class="fas fa-house-user"></i>Users</a>
@@ -61,11 +71,12 @@
             </li>
 
             <li class="menu-header">Inventory</li>
-            <li class="nav-item">
-                <a href="#" class="nav-link"><i class="fas fa-boxes"></i><span>Inventories</span></a>
-            </li>
-            <li class="nav-item">
-                <a href="#" class="nav-link"><i class="fas fa-shopping-cart"></i><span>Orders</span></a>
+            <li class="nav-item dropdown">
+                <a href="#" class="nav-link has-dropdown"><i class="fas fa-boxes"></i><span>Inventory</span></a>
+                <ul class="dropdown-menu">
+                    <li><a class="nav-link" href="{{ route('raw-materials.index') }}">Bahan Baku</a></li>
+                    <li><a class="nav-link" href="{{ route('material-orders.index') }}">Pesan Bahan Baku</a></li>
+                </ul>
             </li>
 
         </ul>
