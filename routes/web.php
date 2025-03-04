@@ -108,4 +108,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/customer-insights', [ReportController::class, 'customerInsights'])->name('customer-insights');
         Route::get('/inventory', [ReportController::class, 'inventoryReport'])->name('inventory');
     });
+
+    // Profile
+    Route::get('/profile', [UserController::class, 'profile'])->name('profile');
+    Route::put('/profile', [UserController::class, 'updateProfile'])->name('profile.update');
 });

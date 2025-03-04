@@ -88,15 +88,24 @@
                     <i class="fas fa-user-circle"></i><span>My Account</span>
                 </a>
                 <ul class="dropdown-menu">
+                    <li><a class="nav-link" href="{{ route('profile') }}">
+                        <i class="fas fa-user-edit"></i>My Profile
+                    </a></li>
                     <li><a class="nav-link" href="{{ route('password.change') }}">
                         <i class="fas fa-key"></i>Change Password
                     </a></li>
-                    <li>
-                        <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit()">
-                            <i class="fas fa-sign-out-alt"></i>Logout
-                        </a>
-                    </li>
                 </ul>
+            </li>
+
+            <!-- Standalone Logout Button -->
+            <li class='nav-item'>
+                <a class="nav-link text-danger" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+                <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                    @csrf
+                </form>
             </li>
         </ul>
     </aside>
