@@ -168,4 +168,65 @@ class UserController extends Controller
         $user->delete();
         return redirect()->route('users.index')->with('success', 'User deleted successfully');
     }
+
+    // Profile
+    /**
+     * Display the user's profile.
+     */
+    public function profile()
+    {
+        $user = Auth::user();
+
+        // Include the outlet relation for viewing
+        $user->load('outlet');
+
+        // Get outlets for the dropdown if needed
+        $outlets = [];
+        if ($user->role === 'owner') {
+            $outlets = Outlet::all();
+        } else {
+            $outlets = Outlet::where('id', $user->outlet_id)->get();
+        }
+
+        return view('pages.users.profile', compact('user', 'outlets'));
+    }
+
+    /**
+     * Update the user's profile.
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = Auth::user();
+
+        // Validate request
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'current_password' => 'nullable|required_with:password',
+            'password' => 'nullable|min:8|required_with:current_password|confirmed',
+        ]);
+
+        // Check current password if trying to update password
+        if ($request->filled('current_password')) {
+            if (!Hash::check($request->current_password, $user->password)) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['current_password' => 'Current password is incorrect']);
+            }
+        }
+
+        // Update basic info
+        $user->name = $request->name;
+        $user->email = $request->email;
+
+        // Update password if provided
+        if ($request->filled('password')) {
+            $user->password = Hash::make($request->password);
+        }
+
+        $user->save();
+
+        return redirect()->route('profile')
+            ->with('success', 'Profile updated successfully');
+    }
 }
