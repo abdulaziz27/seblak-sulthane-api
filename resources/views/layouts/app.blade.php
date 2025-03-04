@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no"
         name="viewport">
-    <title>@yield('title') &mdash; Stisla</title>
+    <title>@yield('title') &mdash; SeblakSulthane</title>
 
     <!-- General CSS Files -->
     <link rel="stylesheet"
@@ -24,7 +24,7 @@
     <link rel="stylesheet"
         href="{{ asset('css/components.css') }}">
 
-    
+
 </head>
 </head>
 
