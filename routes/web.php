@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\ForgotPasswordController;
+use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
@@ -10,6 +12,7 @@ use App\Http\Controllers\MaterialOrderController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OutletController;
+use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\RawMaterialController;
 use App\Http\Controllers\ReportController;
 
@@ -17,10 +20,35 @@ Route::get('/', function () {
     return view('pages.auth.login');
 });
 
+// Password Reset Routes
+Route::get('/forgot-password', [PasswordController::class, 'showForgotForm'])
+    ->middleware('guest')
+    ->name('password.request');
+
+Route::post('/forgot-password', [PasswordController::class, 'sendResetLink'])
+    ->middleware('guest')
+    ->name('password.email');
+
+Route::get('/reset-password/{token}', [PasswordController::class, 'showResetForm'])
+    ->middleware('guest')
+    ->name('password.reset');
+
+Route::post('/reset-password', [PasswordController::class, 'resetPassword'])
+    ->middleware('guest')
+    ->name('password.update');
+
 // Authenticated routes
 Route::middleware(['auth'])->group(function () {
     // Dashboard
     Route::get('home', [DashboardController::class, 'index'])->name('home');
+
+    // Change Password Route
+    Route::get('/change-password', [PasswordController::class, 'showChangeForm'])
+        ->name('password.change');
+
+    Route::put('/change-password', [PasswordController::class, 'changePassword'])
+        ->name('password.update.change');
+
 
     // Basic viewing routes for all users
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');

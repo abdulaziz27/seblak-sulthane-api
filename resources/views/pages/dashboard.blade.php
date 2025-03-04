@@ -20,36 +20,44 @@
                 <div class="col-12">
                     <div class="card">
                         <div class="card-body">
-                            <form action="{{ route('home') }}" method="GET" class="form-inline">
-                                <div class="form-group mr-3">
-                                    <label class="mr-2">Periode:</label>
-                                    <input type="date" class="form-control" name="start_date"
-                                        value="{{ request('start_date', now()->startOfMonth()->format('Y-m-d')) }}">
-                                    <span class="mx-2">s/d</span>
-                                    <input type="date" class="form-control" name="end_date"
-                                        value="{{ request('end_date', now()->format('Y-m-d')) }}">
+                            <form action="{{ route('home') }}" method="GET" id="dashboard-filter-form">
+                                <div class="row">
+                                    <div class="form-group col-md-4">
+                                        <label class="d-block">Periode:</label>
+                                        <button type="button" class="btn btn-primary daterange-btn icon-left btn-icon"
+                                            id="daterange-btn">
+                                            <i class="fas fa-calendar"></i>
+                                            <span>Choose Date Range</span>
+                                        </button>
+                                        <input type="hidden" name="start_date" id="start_date"
+                                            value="{{ request('start_date', now()->startOfMonth()->format('Y-m-d')) }}">
+                                        <input type="hidden" name="end_date" id="end_date"
+                                            value="{{ request('end_date', now()->format('Y-m-d')) }}">
+                                    </div>
+                                    @if (Auth::user()->role === 'owner')
+                                        <div class="form-group col-md-4">
+                                            <label class="mr-2">Outlet:</label>
+                                            <select class="form-control selectric" name="outlet_id">
+                                                <option value="">Semua Outlet</option>
+                                                @foreach ($outlets as $outlet)
+                                                    <option value="{{ $outlet->id }}"
+                                                        {{ request('outlet_id') == $outlet->id ? 'selected' : '' }}>
+                                                        {{ $outlet->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    @else
+                                        <div class="form-group col-md-5">
+                                            <label class="mr-2">Outlet:</label>
+                                            <span class="badge badge-info">{{ Auth::user()->outlet->name }}</span>
+                                            <input type="hidden" name="outlet_id" value="{{ Auth::user()->outlet_id }}">
+                                        </div>
+                                    @endif
+                                    <div class="form-group col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary btn-lg btn-block">Terapkan</button>
+                                    </div>
                                 </div>
-                                @if (Auth::user()->role === 'owner')
-                                    <div class="form-group mr-3">
-                                        <label class="mr-2">Outlet:</label>
-                                        <select class="form-control" name="outlet_id">
-                                            <option value="">Semua Outlet</option>
-                                            @foreach ($outlets as $outlet)
-                                                <option value="{{ $outlet->id }}"
-                                                    {{ request('outlet_id') == $outlet->id ? 'selected' : '' }}>
-                                                    {{ $outlet->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                @else
-                                    <div class="form-group mr-3">
-                                        <label class="mr-2">Outlet:</label>
-                                        <span class="badge badge-info">{{ Auth::user()->outlet->name }}</span>
-                                        <input type="hidden" name="outlet_id" value="{{ Auth::user()->outlet_id }}">
-                                    </div>
-                                @endif
-                                <button type="submit" class="btn btn-primary">Terapkan</button>
                             </form>
                         </div>
                     </div>
@@ -492,11 +500,80 @@
     </div>
 @endsection
 
+@push('style')
+    <!-- CSS Libraries -->
+    <link rel="stylesheet" href="{{ asset('library/jqvmap/dist/jqvmap.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('library/summernote/dist/summernote-bs4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('library/bootstrap-daterangepicker/daterangepicker.css') }}">
+    <link rel="stylesheet" href="{{ asset('library/selectric/public/selectric.css') }}">
+@endpush
+
+
 @push('scripts')
     <!-- JS Libraries -->
     <script src="{{ asset('library/chart.js/dist/Chart.min.js') }}"></script>
+    <script src="{{ asset('library/bootstrap-daterangepicker/daterangepicker.js') }}"></script>
+    <script src="{{ asset('library/selectric/public/jquery.selectric.min.js') }}"></script>
 
     <script>
+        // Date range picker initialization
+        $(document).ready(function() {
+            // Initialize selectric
+            $('.selectric').selectric();
+
+            // Custom setup for daterange button
+            $('#daterange-btn').daterangepicker({
+                ranges: {
+                    'Today': [moment(), moment()],
+                    'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+                    'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+                    'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+                    'This Month': [moment().startOf('month'), moment().endOf('month')],
+                    'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1,
+                        'month').endOf('month')]
+                },
+                startDate: moment().subtract(29, 'days'),
+                endDate: moment()
+            }, function(start, end) {
+                $('#daterange-btn span').html(start.format('MMMM D, YYYY') + ' - ' + end.format(
+                    'MMMM D, YYYY'));
+                $('#start_date').val(start.format('YYYY-MM-DD'));
+                $('#end_date').val(end.format('YYYY-MM-DD'));
+            });
+
+            // Set current values if they exist
+            @if (request('start_date') && request('end_date'))
+                $('#daterange-btn span').html(
+                    "{{ \Carbon\Carbon::parse(request('start_date'))->format('MMMM D, YYYY') }} - {{ \Carbon\Carbon::parse(request('end_date'))->format('MMMM D, YYYY') }}"
+                    );
+            @endif
+
+            // Auto-submit when selecting a date range
+            $('#daterange-btn').on('apply.daterangepicker', function(ev, picker) {
+                setTimeout(function() {
+                    $('#filter-form').submit();
+                }, 300);
+            });
+
+            // Confirm delete functionality
+            $('.confirm-delete').click(function(e) {
+                var form = $(this).closest('form');
+                e.preventDefault();
+
+                swal({
+                    title: 'Are you sure?',
+                    text: 'Once cancelled, you will not be able to recover this order!',
+                    icon: 'warning',
+                    buttons: true,
+                    dangerMode: true,
+                }).then((willDelete) => {
+                    if (willDelete) {
+                        form.submit();
+                    }
+                });
+            });
+        });
+
         // Sales Chart
         var salesCtx = document.getElementById('salesChart').getContext('2d');
         var salesData = @json($dailySales);

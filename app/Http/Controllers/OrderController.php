@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Outlet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class OrderController extends Controller
 {
@@ -26,9 +27,21 @@ class OrderController extends Controller
             $query->where('outlet_id', $request->outlet_id);
         }
 
-        // Apply date filter
-        if ($request->date) {
+        // Apply date range filter
+        if ($request->date_start && $request->date_end) {
+            $startDate = Carbon::parse($request->date_start)->startOfDay();
+            $endDate = Carbon::parse($request->date_end)->endOfDay();
+
+            $query->whereBetween('created_at', [$startDate, $endDate]);
+        }
+        // Support for old date parameter (for backward compatibility)
+        elseif ($request->date) {
             $query->whereDate('created_at', $request->date);
+        }
+
+        // Filter by payment method
+        if ($request->payment_method) {
+            $query->where('payment_method', $request->payment_method);
         }
 
         $orders = $query->latest()->paginate(10);

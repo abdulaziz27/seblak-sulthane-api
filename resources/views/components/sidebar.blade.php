@@ -7,78 +7,97 @@
             <a href="#">SS</a>
         </div>
         <ul class="sidebar-menu">
-
-
-
+            <!-- Dashboard Section -->
+            <li class="menu-header">Dashboard</li>
             <li class='nav-item'>
-                <a class="nav-link" href="{{ route('home') }}"><i class="fas fa-columns"></i>General Dashboard</a>
+                <a class="nav-link" href="{{ route('home') }}">
+                    <i class="fas fa-columns"></i><span>Dashboard</span>
+                </a>
             </li>
 
-
-            <!-- Place this just after the Dashboard menu item -->
             @if (Auth::user()->role === 'owner')
-                <li class='nav-item'>
-                    <a class="nav-link" href="{{ route('reports.index') }}">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Reports</span>
-                    </a>
-                </li>
+            <li class='nav-item'>
+                <a class="nav-link" href="{{ route('reports.index') }}">
+                    <i class="fas fa-chart-bar"></i><span>Reports</span>
+                </a>
+            </li>
             @endif
 
-
-            <li class='nav-item'>
-                <a class="nav-link" href="{{ route('users.index') }}"><i class="fas fa-house-user"></i>Users</a>
-            </li>
-
-
-
-
-            <li class='nav-item'>
-                <a class="nav-link" href="{{ route('products.index') }}"><i class="fas fa-product-hunt"></i>Products</a>
-            </li>
-
-
-
-
-            <li class='nav-item'>
-                <a class="nav-link" href="{{ route('categories.index') }}"><i class="fas fa-sitemap"></i>Categories</a>
-            </li>
-
-
-            <li class='nav-item'>
-                <a class="nav-link" href="{{ route('orders.index') }}">
-                    <i class="fas fa-shopping-cart"></i>
-                    <span>Orders</span>
-                </a>
-            </li>
-
-
-
-            <li class='nav-item'>
-                <a class="nav-link" href="{{ route('outlets.index') }}"><i class="fas fa-sitemap"></i>Outlets</a>
-            </li>
-
-
-            <li class='nav-item'>
-                <a class="nav-link" href="{{ route('members.index') }}"><i class="fas fa-sitemap"></i>Members</a>
-            </li>
-
-            <li class="nav-item">
-                <a href="{{ route('discounts.index') }}" class="nav-link">
-                    <i class="fas fa-percentage"></i>
-                    <span>Discounts</span>
-                </a>
-            </li>
-
-            <li class="menu-header">Inventory</li>
+            <!-- Master Data Section -->
+            <li class="menu-header">Master Data</li>
             <li class="nav-item dropdown">
-                <a href="#" class="nav-link has-dropdown"><i class="fas fa-boxes"></i><span>Inventory</span></a>
+                <a href="#" class="nav-link has-dropdown">
+                    <i class="fas fa-database"></i><span>Master Data</span>
+                </a>
                 <ul class="dropdown-menu">
-                    <li><a class="nav-link" href="{{ route('raw-materials.index') }}">Bahan Baku</a></li>
-                    <li><a class="nav-link" href="{{ route('material-orders.index') }}">Pesan Bahan Baku</a></li>
+                    <li><a class="nav-link" href="{{ route('products.index') }}">
+                        <i class="fas fa-utensils"></i>Products
+                    </a></li>
+                    <li><a class="nav-link" href="{{ route('categories.index') }}">
+                        <i class="fas fa-tags"></i>Categories
+                    </a></li>
+                    <li><a class="nav-link" href="{{ route('outlets.index') }}">
+                        <i class="fas fa-store"></i>Outlets
+                    </a></li>
+                    <li><a class="nav-link" href="{{ route('members.index') }}">
+                        <i class="fas fa-users"></i>Members
+                    </a></li>
+                    <li><a class="nav-link" href="{{ route('discounts.index') }}">
+                        <i class="fas fa-percentage"></i>Discounts
+                    </a></li>
                 </ul>
             </li>
 
-        </ul>
+            <!-- User Management Section -->
+            @if (Auth::user()->role === 'owner' || Auth::user()->role === 'admin')
+            <li class="nav-item">
+                <a class="nav-link" href="{{ route('users.index') }}">
+                    <i class="fas fa-user-cog"></i><span>User Management</span>
+                </a>
+            </li>
+            @endif
 
+            <!-- Order Section -->
+            <li class="menu-header">Operations</li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ route('orders.index') }}">
+                    <i class="fas fa-shopping-cart"></i><span>Orders</span>
+                </a>
+            </li>
+
+            <!-- Inventory Section -->
+            <li class="menu-header">Inventory</li>
+            <li class="nav-item dropdown">
+                <a href="#" class="nav-link has-dropdown">
+                    <i class="fas fa-boxes"></i><span>Inventory</span>
+                </a>
+                <ul class="dropdown-menu">
+                    <li><a class="nav-link" href="{{ route('raw-materials.index') }}">
+                        <i class="fas fa-cube"></i>Raw Materials
+                    </a></li>
+                    <li><a class="nav-link" href="{{ route('material-orders.index') }}">
+                        <i class="fas fa-clipboard-list"></i>Material Orders
+                    </a></li>
+                </ul>
+            </li>
+
+            <!-- Account Settings Section -->
+            <li class="menu-header">Account</li>
+            <li class="nav-item dropdown">
+                <a href="#" class="nav-link has-dropdown">
+                    <i class="fas fa-user-circle"></i><span>My Account</span>
+                </a>
+                <ul class="dropdown-menu">
+                    <li><a class="nav-link" href="{{ route('password.change') }}">
+                        <i class="fas fa-key"></i>Change Password
+                    </a></li>
+                    <li>
+                        <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit()">
+                            <i class="fas fa-sign-out-alt"></i>Logout
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </aside>
 </div>

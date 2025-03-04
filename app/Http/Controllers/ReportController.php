@@ -426,13 +426,13 @@ class ReportController extends Controller
         $endDate = Carbon::parse($request->end_date)->endOfDay();
         $outletId = $request->outlet_id;
 
-        // Get product performance data
+        // Get product performance data - FIXED QUERY with price instead of price_per_unit
         $productPerformance = OrderItem::select(
             'products.id as product_id',
             'products.name as product_name',
             'categories.name as category_name',
             DB::raw('SUM(order_items.quantity) as total_quantity'),
-            DB::raw('SUM(order_items.quantity * order_items.price_per_unit) as total_revenue'),
+            DB::raw('SUM(order_items.quantity * order_items.price) as total_revenue'),
             DB::raw('COUNT(DISTINCT orders.id) as order_count')
         )
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -446,11 +446,11 @@ class ReportController extends Controller
             ->orderBy('total_quantity', 'desc')
             ->get();
 
-        // Get category breakdown
+        // Get category breakdown - FIXED QUERY with price instead of price_per_unit
         $categoryBreakdown = OrderItem::select(
             'categories.name as category_name',
             DB::raw('SUM(order_items.quantity) as total_quantity'),
-            DB::raw('SUM(order_items.quantity * order_items.price_per_unit) as total_revenue'),
+            DB::raw('SUM(order_items.quantity * order_items.price) as total_revenue'),
             DB::raw('COUNT(DISTINCT products.id) as product_count')
         )
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -819,6 +819,19 @@ class ReportController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Calculate total spending on material orders for each outlet
+        $outletSpending = MaterialOrder::select(
+            'outlets.id as outlet_id',
+            'outlets.name as outlet_name',
+            DB::raw('SUM(material_orders.total_amount) as total_spending'),
+            DB::raw('COUNT(material_orders.id) as order_count')
+        )
+            ->join('outlets', 'outlets.id', '=', 'material_orders.franchise_id')
+            ->where('material_orders.created_at', '>=', now()->subDays(30))
+            ->groupBy('outlets.id', 'outlets.name')
+            ->orderBy('total_spending', 'desc')
+            ->get();
+
         // Format the report title
         $title = 'Inventory & Raw Materials Report';
         $subtitle = 'Generated on: ' . now()->format('d M Y');
@@ -829,7 +842,8 @@ class ReportController extends Controller
                 'title',
                 'subtitle',
                 'rawMaterials',
-                'materialOrders'
+                'materialOrders',
+                'outletSpending'
             ));
 
             return $pdf->download('inventory_report_' . now()->format('Y-m-d') . '.pdf');
@@ -901,6 +915,38 @@ class ReportController extends Controller
             $sheet->getStyle('A' . $row)->getFont()->setBold(true);
             $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
             $sheet->getStyle('E' . $row)->getFont()->setBold(true);
+
+            // Create a sheet for outlet spending
+            $spendingSheet = $spreadsheet->createSheet();
+            $spendingSheet->setTitle('Outlet Spending');
+
+            // Headers
+            $spendingSheet->setCellValue('A1', 'OUTLET MATERIAL SPENDING SUMMARY');
+            $spendingSheet->mergeCells('A1:C1');
+            $spendingSheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+            $spendingSheet->setCellValue('A3', 'Outlet');
+            $spendingSheet->setCellValue('B3', 'Order Count');
+            $spendingSheet->setCellValue('C3', 'Total Spending');
+            $spendingSheet->getStyle('A3:C3')->getFont()->setBold(true);
+
+            // Data rows
+            $spendingRow = 4;
+            foreach ($outletSpending as $outlet) {
+                $spendingSheet->setCellValue('A' . $spendingRow, $outlet->outlet_name);
+                $spendingSheet->setCellValue('B' . $spendingRow, $outlet->order_count);
+                $spendingSheet->setCellValue('C' . $spendingRow, $outlet->total_spending);
+
+                // Format numbers
+                $spendingSheet->getStyle('C' . $spendingRow)->getNumberFormat()->setFormatCode('#,##0');
+
+                $spendingRow++;
+            }
+
+            // Auto-size columns
+            foreach (range('A', 'C') as $col) {
+                $spendingSheet->getColumnDimension($col)->setAutoSize(true);
+            }
 
             // Create a sheet for recent orders
             $orderSheet = $spreadsheet->createSheet();
