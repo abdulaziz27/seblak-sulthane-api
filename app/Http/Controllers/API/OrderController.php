@@ -30,6 +30,7 @@ class OrderController extends Controller
             'id_kasir' => 'required',
             'nama_kasir' => 'required',
             'transaction_time' => 'required',
+            'order_type' => 'required|in:dine_in,take_away',
             // 'order_items' => 'required'
         ]);
 
@@ -48,6 +49,7 @@ class OrderController extends Controller
             'nama_kasir' => $request->nama_kasir,
             'transaction_time' => $request->transaction_time,
             'outlet_id' => $outletId,
+            'order_type' => $request->order_type,
         ]);
 
         // Load the outlet relationship

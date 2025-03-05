@@ -23,7 +23,8 @@ class Order extends Model
         'nama_kasir',
         'transaction_time',
         'outlet_id',
-        'member_id'
+        'member_id',
+        'order_type'
     ];
 
     public function outlet()
