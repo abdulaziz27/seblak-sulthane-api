@@ -28,7 +28,8 @@
                                             </tr>
                                             <tr>
                                                 <th>Transaction Time</th>
-                                                <td>{{ Carbon\Carbon::parse($order->transaction_time)->format('d M Y H:i') }}</td>
+                                                <td>{{ Carbon\Carbon::parse($order->transaction_time)->format('d M Y H:i') }}
+                                                </td>
                                             </tr>
                                             <tr>
                                                 <th>Outlet</th>
@@ -41,6 +42,10 @@
                                             <tr>
                                                 <th>Payment Method</th>
                                                 <td>{{ strtoupper($order->payment_method) }}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Order Type</th>
+                                                <td>{{ ucfirst(str_replace('_', ' ', $order->order_type)) }}</td>
                                             </tr>
                                         </table>
                                     </div>
@@ -85,13 +90,15 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    @foreach($order->orderItems as $index => $item)
+                                                    @foreach ($order->orderItems as $index => $item)
                                                         <tr>
                                                             <td>{{ $index + 1 }}</td>
                                                             <td>{{ $item->product->name }}</td>
                                                             <td>Rp {{ number_format($item->price, 0, ',', '.') }}</td>
                                                             <td>{{ $item->quantity }}</td>
-                                                            <td>Rp {{ number_format($item->price * $item->quantity, 0, ',', '.') }}</td>
+                                                            <td>Rp
+                                                                {{ number_format($item->price * $item->quantity, 0, ',', '.') }}
+                                                            </td>
                                                         </tr>
                                                     @endforeach
                                                 </tbody>

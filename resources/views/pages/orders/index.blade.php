@@ -89,6 +89,7 @@
                                             <th>Date/Time</th>
                                             <th>Outlet</th>
                                             <th>Kasir</th>
+                                            <th>Order Type</th>
                                             <th>Payment Method</th>
                                             <th>Total Items</th>
                                             <th>Subtotal</th>
@@ -104,6 +105,7 @@
                                                 </td>
                                                 <td>{{ $order->outlet->name }}</td>
                                                 <td>{{ $order->nama_kasir }}</td>
+                                                <td>{{ ucfirst(str_replace('_', ' ', $order->order_type)) }}</td>
                                                 <td>{{ strtoupper($order->payment_method) }}</td>
                                                 <td>{{ $order->total_item }}</td>
                                                 <td>Rp {{ number_format($order->sub_total, 0, ',', '.') }}</td>
