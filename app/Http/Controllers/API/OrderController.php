@@ -53,7 +53,7 @@ class OrderController extends Controller
         ]);
 
         // Load the outlet relationship
-        $order->load('outlet');
+        $savedOrder = Order::with('outlet')->findOrFail($order->id);
 
         //create order items
         foreach ($request->order_items as $item) {
@@ -67,7 +67,7 @@ class OrderController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $order
+            'data' => $savedOrder
         ], 200);
     }
 
