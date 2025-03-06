@@ -55,14 +55,18 @@
                                         <div class="col-sm-12 col-md-7">
                                             <select class="form-control selectric @error('unit') is-invalid @enderror" name="unit" required>
                                                 <option value="" disabled>Select unit</option>
-                                                <option value="kg" {{ old('unit', $rawMaterial->unit) == 'kg' ? 'selected' : '' }}>Kilogram (kg)</option>
-                                                <option value="g" {{ old('unit', $rawMaterial->unit) == 'g' ? 'selected' : '' }}>Gram (g)</option>
-                                                <option value="l" {{ old('unit', $rawMaterial->unit) == 'l' ? 'selected' : '' }}>Liter (l)</option>
-                                                <option value="ml" {{ old('unit', $rawMaterial->unit) == 'ml' ? 'selected' : '' }}>Milliliter (ml)</option>
-                                                <option value="pcs" {{ old('unit', $rawMaterial->unit) == 'pcs' ? 'selected' : '' }}>Pieces (pcs)</option>
-                                                <option value="box" {{ old('unit', $rawMaterial->unit) == 'box' ? 'selected' : '' }}>Box</option>
-                                                <option value="pack" {{ old('unit', $rawMaterial->unit) == 'pack' ? 'selected' : '' }}>Pack</option>
-                                                <option value="sack" {{ old('unit', $rawMaterial->unit) == 'sack' ? 'selected' : '' }}>Sack</option>
+                                                <option value="Ball" {{ old('unit', $rawMaterial->unit) == 'Ball' ? 'selected' : '' }}>Ball</option>
+                                                <option value="Kg" {{ old('unit', $rawMaterial->unit) == 'Kg' ? 'selected' : '' }}>Kg</option>
+                                                <option value="Bks" {{ old('unit', $rawMaterial->unit) == 'Bks' ? 'selected' : '' }}>Bks</option>
+                                                <option value="Ikat" {{ old('unit', $rawMaterial->unit) == 'Ikat' ? 'selected' : '' }}>Ikat</option>
+                                                <option value="Pcs" {{ old('unit', $rawMaterial->unit) == 'Pcs' ? 'selected' : '' }}>Pcs</option>
+                                                <option value="Dus" {{ old('unit', $rawMaterial->unit) == 'Dus' ? 'selected' : '' }}>Dus</option>
+                                                <option value="Pack" {{ old('unit', $rawMaterial->unit) == 'Pack' ? 'selected' : '' }}>Pack</option>
+                                                <option value="Renteng" {{ old('unit', $rawMaterial->unit) == 'Renteng' ? 'selected' : '' }}>Renteng</option>
+                                                <option value="Botol" {{ old('unit', $rawMaterial->unit) == 'Botol' ? 'selected' : '' }}>Botol</option>
+                                                <option value="Slop" {{ old('unit', $rawMaterial->unit) == 'Slop' ? 'selected' : '' }}>Slop</option>
+                                                <option value="Box" {{ old('unit', $rawMaterial->unit) == 'Box' ? 'selected' : '' }}>Box</option>
+                                                <option value="Peti" {{ old('unit', $rawMaterial->unit) == 'Peti' ? 'selected' : '' }}>Peti</option>
                                             </select>
                                             @error('unit')
                                                 <div class="invalid-feedback">{{ $message }}</div>

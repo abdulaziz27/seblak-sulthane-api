@@ -30,7 +30,8 @@
                                 <h4>Order #{{ $materialOrder->id }}</h4>
                                 <div class="card-header-action">
                                     @if ($materialOrder->status === 'pending')
-                                        <form action="{{ route('material-orders.cancel', $materialOrder->id) }}" method="POST" class="d-inline">
+                                        <form action="{{ route('material-orders.cancel', $materialOrder->id) }}"
+                                            method="POST" class="d-inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-danger confirm-delete">
@@ -40,7 +41,8 @@
                                     @endif
 
                                     @if (Auth::user()->role === 'owner' && $materialOrder->status === 'pending')
-                                        <form action="{{ route('material-orders.update-status', $materialOrder->id) }}" method="POST" class="d-inline ml-2">
+                                        <form action="{{ route('material-orders.update-status', $materialOrder->id) }}"
+                                            method="POST" class="d-inline ml-2">
                                             @csrf
                                             <input type="hidden" name="status" value="approved">
                                             <button type="submit" class="btn btn-info">
@@ -50,7 +52,8 @@
                                     @endif
 
                                     @if (Auth::user()->role === 'owner' && $materialOrder->status === 'approved')
-                                        <form action="{{ route('material-orders.update-status', $materialOrder->id) }}" method="POST" class="d-inline">
+                                        <form action="{{ route('material-orders.update-status', $materialOrder->id) }}"
+                                            method="POST" class="d-inline">
                                             @csrf
                                             <input type="hidden" name="status" value="delivered">
                                             <button type="submit" class="btn btn-success">
@@ -88,17 +91,21 @@
                                                 <th>Status</th>
                                                 <td>{!! $materialOrder->status_badge !!}</td>
                                             </tr>
-                                            @if ($materialOrder->approved_at)
                                             <tr>
-                                                <th>Approved At</th>
-                                                <td>{{ $materialOrder->approved_at->format('d M Y H:i') }}</td>
+                                                <th>Payment Method</th>
+                                                <td>{{ $materialOrder->formatted_payment_method }}</td>
                                             </tr>
+                                            @if ($materialOrder->approved_at)
+                                                <tr>
+                                                    <th>Approved At</th>
+                                                    <td>{{ $materialOrder->approved_at->format('d M Y H:i') }}</td>
+                                                </tr>
                                             @endif
                                             @if ($materialOrder->delivered_at)
-                                            <tr>
-                                                <th>Delivered At</th>
-                                                <td>{{ $materialOrder->delivered_at->format('d M Y H:i') }}</td>
-                                            </tr>
+                                                <tr>
+                                                    <th>Delivered At</th>
+                                                    <td>{{ $materialOrder->delivered_at->format('d M Y H:i') }}</td>
+                                                </tr>
                                             @endif
                                             <tr>
                                                 <th>Total Amount</th>
@@ -122,15 +129,15 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @foreach($materialOrder->items as $index => $item)
-                                            <tr>
-                                                <td>{{ $index + 1 }}</td>
-                                                <td>{{ $item->rawMaterial->name }}</td>
-                                                <td>{{ $item->rawMaterial->unit }}</td>
-                                                <td>Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}</td>
-                                                <td>{{ $item->quantity }}</td>
-                                                <td>Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
-                                            </tr>
+                                            @foreach ($materialOrder->items as $index => $item)
+                                                <tr>
+                                                    <td>{{ $index + 1 }}</td>
+                                                    <td>{{ $item->rawMaterial->name }}</td>
+                                                    <td>{{ $item->rawMaterial->unit }}</td>
+                                                    <td>Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}</td>
+                                                    <td>{{ $item->quantity }}</td>
+                                                    <td>Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                                                </tr>
                                             @endforeach
                                         </tbody>
                                         <tfoot>
@@ -167,17 +174,17 @@
             e.preventDefault();
 
             swal({
-                title: 'Are you sure?',
-                text: 'Once cancelled, you will not be able to recover this order!',
-                icon: 'warning',
-                buttons: true,
-                dangerMode: true,
-            })
-            .then((willDelete) => {
-                if (willDelete) {
-                    form.submit();
-                }
-            });
+                    title: 'Are you sure?',
+                    text: 'Once cancelled, you will not be able to recover this order!',
+                    icon: 'warning',
+                    buttons: true,
+                    dangerMode: true,
+                })
+                .then((willDelete) => {
+                    if (willDelete) {
+                        form.submit();
+                    }
+                });
         });
     </script>
 @endpush

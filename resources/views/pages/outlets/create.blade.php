@@ -32,7 +32,7 @@
                     <form action="{{ route('outlets.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
                         <div class="card-header">
-                            <h4>Input Text</h4>
+                            <h4>Add New Outlet</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
@@ -41,38 +41,87 @@
                                     class="form-control @error('name')
                                 is-invalid
                             @enderror"
-                                    name="name">
+                                    name="name" value="{{ old('name') }}">
                                 @error('name')
                                     <div class="invalid-feedback">
                                         {{ $message }}
                                     </div>
                                 @enderror
                             </div>
+
                             <div class="form-group">
-                                <label>Address</label>
+                                <label>Address 1</label>
                                 <input type="text"
-                                    class="form-control @error('address')
+                                    class="form-control @error('address1')
                                 is-invalid
                             @enderror"
-                                    name="address">
-                                @error('address')
+                                    name="address1" value="{{ old('address1') }}">
+                                @error('address1')
                                     <div class="invalid-feedback">
                                         {{ $message }}
                                     </div>
                                 @enderror
                             </div>
+
                             <div class="form-group">
-                                <label for="phone">Telepon</label>
-                                <input type="text" name="phone" id="phone"
-                                    class="form-control @error('phone') is-invalid @enderror" value="{{ old('phone') }}"
-                                    required>
+                                <label>Address 2 (Optional)</label>
+                                <input type="text"
+                                    class="form-control @error('address2')
+                                is-invalid
+                            @enderror"
+                                    name="address2" value="{{ old('address2') }}">
+                                @error('address2')
+                                    <div class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div>
+
+                            <div class="form-group">
+                                <label>Phone (Optional)</label>
+                                <input type="text"
+                                    class="form-control @error('phone')
+                                is-invalid
+                            @enderror"
+                                    name="phone" value="{{ old('phone') }}">
                                 @error('phone')
-                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    <div class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div>
+
+                            <div class="form-group">
+                                <label>Leader (Optional)</label>
+                                <input type="text"
+                                    class="form-control @error('leader')
+                                is-invalid
+                            @enderror"
+                                    name="leader" value="{{ old('leader') }}">
+                                @error('leader')
+                                    <div class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div>
+
+                            <div class="form-group">
+                                <label>Notes (Optional)</label>
+                                <textarea
+                                    class="form-control @error('notes')
+                                is-invalid
+                            @enderror"
+                                    name="notes" rows="3">{{ old('notes') }}</textarea>
+                                @error('notes')
+                                    <div class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
                                 @enderror
                             </div>
 
                         </div>
                         <div class="card-footer text-right">
+                            <a href="{{ route('outlets.index') }}" class="btn btn-secondary mr-2">Cancel</a>
                             <button class="btn btn-primary">Submit</button>
                         </div>
                     </form>

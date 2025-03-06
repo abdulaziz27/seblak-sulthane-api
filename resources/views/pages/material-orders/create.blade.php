@@ -40,22 +40,51 @@
                                 @csrf
                                 <div class="card-body">
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Outlet <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Outlet <span
+                                                class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
-                                            @if(Auth::user()->role === 'owner')
-                                                <select class="form-control select2 @error('franchise_id') is-invalid @enderror" name="franchise_id" required>
+                                            @if (Auth::user()->role === 'owner')
+                                                <select
+                                                    class="form-control select2 @error('franchise_id') is-invalid @enderror"
+                                                    name="franchise_id" required>
                                                     <option value="">Select Outlet</option>
-                                                    @foreach($outlets as $outlet)
-                                                        <option value="{{ $outlet->id }}" {{ old('franchise_id') == $outlet->id ? 'selected' : '' }}>
+                                                    @foreach ($outlets as $outlet)
+                                                        <option value="{{ $outlet->id }}"
+                                                            {{ old('franchise_id') == $outlet->id ? 'selected' : '' }}>
                                                             {{ $outlet->name }}
                                                         </option>
                                                     @endforeach
                                                 </select>
                                             @else
-                                                <input type="text" class="form-control" value="{{ Auth::user()->outlet->name }}" disabled>
-                                                <input type="hidden" name="franchise_id" value="{{ Auth::user()->outlet_id }}">
+                                                <input type="text" class="form-control"
+                                                    value="{{ Auth::user()->outlet->name }}" disabled>
+                                                <input type="hidden" name="franchise_id"
+                                                    value="{{ Auth::user()->outlet_id }}">
                                             @endif
                                             @error('franchise_id')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group row mb-4">
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Payment Method
+                                            <span class="text-danger">*</span></label>
+                                        <div class="col-sm-12 col-md-7">
+                                            <select
+                                                class="form-control selectric @error('payment_method') is-invalid @enderror"
+                                                name="payment_method" required>
+                                                <option value="">Select Payment Method</option>
+                                                <option value="cash"
+                                                    {{ old('payment_method') == 'cash' ? 'selected' : '' }}>Tunai</option>
+                                                <option value="bank_transfer"
+                                                    {{ old('payment_method') == 'bank_transfer' ? 'selected' : '' }}>Bank
+                                                    Transfer</option>
+                                                <option value="e-wallet"
+                                                    {{ old('payment_method') == 'e-wallet' ? 'selected' : '' }}>E-Wallet
+                                                </option>
+                                            </select>
+                                            @error('payment_method')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
                                         </div>
@@ -72,34 +101,49 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Order Items <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Order Items
+                                            <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <div class="materials-container">
-                                                @if(old('materials'))
-                                                    @foreach(old('materials') as $index => $material)
+                                                @if (old('materials'))
+                                                    @foreach (old('materials') as $index => $material)
                                                         <div class="row mb-3 material-row">
                                                             <div class="col-md-6">
-                                                                <select class="form-control select2 material-select @error('materials.'.$index.'.raw_material_id') is-invalid @enderror" name="materials[{{ $index }}][raw_material_id]" required>
+                                                                <select
+                                                                    class="form-control select2 material-select @error('materials.' . $index . '.raw_material_id') is-invalid @enderror"
+                                                                    name="materials[{{ $index }}][raw_material_id]"
+                                                                    required>
                                                                     <option value="">Select Material</option>
-                                                                    @foreach($rawMaterials as $rawMaterial)
-                                                                        <option value="{{ $rawMaterial->id }}" data-price="{{ $rawMaterial->price }}" {{ $material['raw_material_id'] == $rawMaterial->id ? 'selected' : '' }}>
-                                                                            {{ $rawMaterial->name }} ({{ $rawMaterial->unit }}) - Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
+                                                                    @foreach ($rawMaterials as $rawMaterial)
+                                                                        <option value="{{ $rawMaterial->id }}"
+                                                                            data-price="{{ $rawMaterial->price }}"
+                                                                            {{ $material['raw_material_id'] == $rawMaterial->id ? 'selected' : '' }}>
+                                                                            {{ $rawMaterial->name }}
+                                                                            ({{ $rawMaterial->unit }}) - Rp
+                                                                            {{ number_format($rawMaterial->price, 0, ',', '.') }}
                                                                         </option>
                                                                     @endforeach
                                                                 </select>
-                                                                @error('materials.'.$index.'.raw_material_id')
+                                                                @error('materials.' . $index . '.raw_material_id')
                                                                     <div class="invalid-feedback">{{ $message }}</div>
                                                                 @enderror
                                                             </div>
                                                             <div class="col-md-3">
-                                                                <input type="number" class="form-control quantity-input @error('materials.'.$index.'.quantity') is-invalid @enderror" name="materials[{{ $index }}][quantity]" placeholder="Quantity" value="{{ $material['quantity'] }}" min="1" required>
-                                                                @error('materials.'.$index.'.quantity')
+                                                                <input type="number"
+                                                                    class="form-control quantity-input @error('materials.' . $index . '.quantity') is-invalid @enderror"
+                                                                    name="materials[{{ $index }}][quantity]"
+                                                                    placeholder="Quantity"
+                                                                    value="{{ $material['quantity'] }}" min="1"
+                                                                    required>
+                                                                @error('materials.' . $index . '.quantity')
                                                                     <div class="invalid-feedback">{{ $message }}</div>
                                                                 @enderror
                                                             </div>
                                                             <div class="col-md-2">
-                                                                @if($index > 0)
-                                                                    <button type="button" class="btn btn-danger remove-material"><i class="fas fa-times"></i></button>
+                                                                @if ($index > 0)
+                                                                    <button type="button"
+                                                                        class="btn btn-danger remove-material"><i
+                                                                            class="fas fa-times"></i></button>
                                                                 @endif
                                                             </div>
                                                         </div>
@@ -107,17 +151,23 @@
                                                 @else
                                                     <div class="row mb-3 material-row">
                                                         <div class="col-md-6">
-                                                            <select class="form-control select2 material-select" name="materials[0][raw_material_id]" required>
+                                                            <select class="form-control select2 material-select"
+                                                                name="materials[0][raw_material_id]" required>
                                                                 <option value="">Select Material</option>
-                                                                @foreach($rawMaterials as $rawMaterial)
-                                                                    <option value="{{ $rawMaterial->id }}" data-price="{{ $rawMaterial->price }}">
-                                                                        {{ $rawMaterial->name }} ({{ $rawMaterial->unit }}) - Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
+                                                                @foreach ($rawMaterials as $rawMaterial)
+                                                                    <option value="{{ $rawMaterial->id }}"
+                                                                        data-price="{{ $rawMaterial->price }}">
+                                                                        {{ $rawMaterial->name }}
+                                                                        ({{ $rawMaterial->unit }}) - Rp
+                                                                        {{ number_format($rawMaterial->price, 0, ',', '.') }}
                                                                     </option>
                                                                 @endforeach
                                                             </select>
                                                         </div>
                                                         <div class="col-md-3">
-                                                            <input type="number" class="form-control quantity-input" name="materials[0][quantity]" placeholder="Quantity" min="1" required>
+                                                            <input type="number" class="form-control quantity-input"
+                                                                name="materials[0][quantity]" placeholder="Quantity"
+                                                                min="1" required>
                                                         </div>
                                                         <div class="col-md-2">
                                                             <!-- No remove button for first row -->
@@ -132,7 +182,8 @@
                                     </div>
                                 </div>
                                 <div class="card-footer text-right">
-                                    <a href="{{ route('material-orders.index') }}" class="btn btn-secondary mr-2">Cancel</a>
+                                    <a href="{{ route('material-orders.index') }}"
+                                        class="btn btn-secondary mr-2">Cancel</a>
                                     <button type="submit" class="btn btn-primary">Create Order</button>
                                 </div>
                             </form>
@@ -172,7 +223,7 @@
                         <div class="col-md-6">
                             <select class="form-control select2 material-select" name="materials[${index}][raw_material_id]" required>
                                 <option value="">Select Material</option>
-                                @foreach($rawMaterials as $rawMaterial)
+                                @foreach ($rawMaterials as $rawMaterial)
                                     <option value="{{ $rawMaterial->id }}" data-price="{{ $rawMaterial->price }}">
                                         {{ $rawMaterial->name }} ({{ $rawMaterial->unit }}) - Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
                                     </option>
@@ -199,8 +250,10 @@
                 // Reindex the remaining rows
                 $('.material-row').each(function(newIndex) {
                     var row = $(this);
-                    row.find('select.material-select').attr('name', `materials[${newIndex}][raw_material_id]`);
-                    row.find('input.quantity-input').attr('name', `materials[${newIndex}][quantity]`);
+                    row.find('select.material-select').attr('name',
+                        `materials[${newIndex}][raw_material_id]`);
+                    row.find('input.quantity-input').attr('name',
+                        `materials[${newIndex}][quantity]`);
                 });
             });
         });

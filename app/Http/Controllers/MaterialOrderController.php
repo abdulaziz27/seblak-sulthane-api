@@ -32,8 +32,12 @@ class MaterialOrderController extends Controller
             $query->where('status', $request->status);
         }
 
-        // Handle date filtering with multiple options
+        // Filter by payment method
+        if ($request->has('payment_method') && $request->payment_method != '') {
+            $query->where('payment_method', $request->payment_method);
+        }
 
+        // Handle date filtering with multiple options
         // 1. Date Range Button (daterange-btn)
         if ($request->filled('date_start') && $request->filled('date_end')) {
             $startDate = Carbon::parse($request->date_start)->startOfDay();
@@ -84,7 +88,14 @@ class MaterialOrderController extends Controller
             $outlets = Outlet::where('id', Auth::user()->outlet_id)->get();
         }
 
-        return view('pages.material-orders.create', compact('rawMaterials', 'outlets'));
+        // Payment method options
+        $paymentMethods = [
+            'cash' => 'Tunai',
+            'bank_transfer' => 'Bank Transfer',
+            'e-wallet' => 'E-Wallet'
+        ];
+
+        return view('pages.material-orders.create', compact('rawMaterials', 'outlets', 'paymentMethods'));
     }
 
     /**
@@ -94,6 +105,7 @@ class MaterialOrderController extends Controller
     {
         $request->validate([
             'franchise_id' => 'required|exists:outlets,id',
+            'payment_method' => 'required|in:cash,bank_transfer,e-wallet',
             'notes' => 'nullable|string',
             'materials' => 'required|array|min:1',
             'materials.*.raw_material_id' => 'required|exists:raw_materials,id',
@@ -116,6 +128,7 @@ class MaterialOrderController extends Controller
                 'franchise_id' => $request->franchise_id,
                 'user_id' => Auth::id(),
                 'status' => 'pending',
+                'payment_method' => $request->payment_method,
                 'total_amount' => $totalAmount,
                 'notes' => $request->notes,
             ]);
