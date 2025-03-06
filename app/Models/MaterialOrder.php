@@ -14,6 +14,7 @@ class MaterialOrder extends Model
         'user_id',
         'status',
         'total_amount',
+        'payment_method',
         'notes',
         'approved_at',
         'delivered_at'
@@ -72,5 +73,21 @@ class MaterialOrder extends Model
         ];
 
         return '<div class="badge badge-' . $colors[$this->status] . '">' . ucfirst($this->status) . '</div>';
+    }
+
+    /**
+     * Get formatted payment method
+     *
+     * @return string
+     */
+    public function getFormattedPaymentMethodAttribute()
+    {
+        $methods = [
+            'cash' => 'Tunai',
+            'bank_transfer' => 'Bank Transfer',
+            'e-wallet' => 'E-Wallet'
+        ];
+
+        return $methods[$this->payment_method] ?? ucfirst($this->payment_method);
     }
 }

@@ -68,6 +68,22 @@
                                             </select>
                                         </div>
 
+                                        <div class="form-group col-md-3">
+                                            <label>Payment Method</label>
+                                            <select class="form-control selectric" name="payment_method">
+                                                <option value="">All Payment Methods</option>
+                                                <option value="cash"
+                                                    {{ request('payment_method') == 'cash' ? 'selected' : '' }}>Tunai
+                                                </option>
+                                                <option value="bank_transfer"
+                                                    {{ request('payment_method') == 'bank_transfer' ? 'selected' : '' }}>
+                                                    Bank Transfer</option>
+                                                <option value="e-wallet"
+                                                    {{ request('payment_method') == 'e-wallet' ? 'selected' : '' }}>
+                                                    E-Wallet</option>
+                                            </select>
+                                        </div>
+
                                         @if (Auth::user()->role === 'owner')
                                             <div class="form-group col-md-3">
                                                 <label>Outlet</label>
@@ -114,6 +130,7 @@
                                                 <th>Outlet</th>
                                                 <th>Created By</th>
                                                 <th>Date</th>
+                                                <th>Payment Method</th>
                                                 <th>Total</th>
                                                 <th>Status</th>
                                                 <th>Action</th>
@@ -126,6 +143,7 @@
                                                     <td>{{ $order->franchise->name }}</td>
                                                     <td>{{ $order->user->name }}</td>
                                                     <td>{{ $order->created_at->format('d M Y H:i') }}</td>
+                                                    <td>{{ $order->formatted_payment_method }}</td>
                                                     <td>{{ $order->formatted_total }}</td>
                                                     <td>{!! $order->status_badge !!}</td>
                                                     <td>
@@ -203,7 +221,7 @@
             @if (request('date_start') && request('date_end'))
                 $('#daterange-btn span').html(
                     "{{ \Carbon\Carbon::parse(request('date_start'))->format('MMMM D, YYYY') }} - {{ \Carbon\Carbon::parse(request('date_end'))->format('MMMM D, YYYY') }}"
-                    );
+                );
             @endif
 
             // Auto-submit when selecting a date

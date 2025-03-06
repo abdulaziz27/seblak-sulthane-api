@@ -54,14 +54,18 @@
                                         <div class="col-sm-12 col-md-7">
                                             <select class="form-control selectric @error('unit') is-invalid @enderror" name="unit" required>
                                                 <option value="" disabled selected>Select unit</option>
-                                                <option value="kg" {{ old('unit') == 'kg' ? 'selected' : '' }}>Kilogram (kg)</option>
-                                                <option value="g" {{ old('unit') == 'g' ? 'selected' : '' }}>Gram (g)</option>
-                                                <option value="l" {{ old('unit') == 'l' ? 'selected' : '' }}>Liter (l)</option>
-                                                <option value="ml" {{ old('unit') == 'ml' ? 'selected' : '' }}>Milliliter (ml)</option>
-                                                <option value="pcs" {{ old('unit') == 'pcs' ? 'selected' : '' }}>Pieces (pcs)</option>
-                                                <option value="box" {{ old('unit') == 'box' ? 'selected' : '' }}>Box</option>
-                                                <option value="pack" {{ old('unit') == 'pack' ? 'selected' : '' }}>Pack</option>
-                                                <option value="sack" {{ old('unit') == 'sack' ? 'selected' : '' }}>Sack</option>
+                                                <option value="Ball" {{ old('unit') == 'Ball' ? 'selected' : '' }}>Ball</option>
+                                                <option value="Kg" {{ old('unit') == 'Kg' ? 'selected' : '' }}>Kg</option>
+                                                <option value="Bks" {{ old('unit') == 'Bks' ? 'selected' : '' }}>Bks</option>
+                                                <option value="Ikat" {{ old('unit') == 'Ikat' ? 'selected' : '' }}>Ikat</option>
+                                                <option value="Pcs" {{ old('unit') == 'Pcs' ? 'selected' : '' }}>Pcs</option>
+                                                <option value="Dus" {{ old('unit') == 'Dus' ? 'selected' : '' }}>Dus</option>
+                                                <option value="Pack" {{ old('unit') == 'Pack' ? 'selected' : '' }}>Pack</option>
+                                                <option value="Renteng" {{ old('unit') == 'Renteng' ? 'selected' : '' }}>Renteng</option>
+                                                <option value="Botol" {{ old('unit') == 'Botol' ? 'selected' : '' }}>Botol</option>
+                                                <option value="Slop" {{ old('unit') == 'Slop' ? 'selected' : '' }}>Slop</option>
+                                                <option value="Box" {{ old('unit') == 'Box' ? 'selected' : '' }}>Box</option>
+                                                <option value="Peti" {{ old('unit') == 'Peti' ? 'selected' : '' }}>Peti</option>
                                             </select>
                                             @error('unit')
                                                 <div class="invalid-feedback">{{ $message }}</div>

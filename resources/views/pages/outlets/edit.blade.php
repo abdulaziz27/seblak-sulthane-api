@@ -16,25 +16,23 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Advanced Forms</h1>
+                <h1>Edit Outlet</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
                     <div class="breadcrumb-item"><a href="#">Forms</a></div>
-                    <div class="breadcrumb-item">Products</div>
+                    <div class="breadcrumb-item">Outlets</div>
                 </div>
             </div>
 
             <div class="section-body">
-                <h2 class="section-title">Products</h2>
-
-
+                <h2 class="section-title">Edit Outlet: {{ $outlet->name }}</h2>
 
                 <div class="card">
-                    <form action="{{ route('products.newupdate', $product) }}" method="POST" enctype="multipart/form-data">
+                    <form action="{{ route('outlets.update', $outlet) }}" method="POST">
                         @csrf
-                        {{-- @method('PUT') --}}
+                        @method('PUT')
                         <div class="card-header">
-                            <h4>Input Text</h4>
+                            <h4>Edit Outlet Form</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
@@ -43,113 +41,87 @@
                                     class="form-control @error('name')
                                 is-invalid
                             @enderror"
-                                    name="name" value="{{ $product->name }}">
+                                    name="name" value="{{ old('name', $outlet->name) }}">
                                 @error('name')
                                     <div class="invalid-feedback">
                                         {{ $message }}
                                     </div>
                                 @enderror
                             </div>
+
                             <div class="form-group">
-                                <label>Description</label>
+                                <label>Address 1</label>
                                 <input type="text"
-                                    class="form-control @error('description')
+                                    class="form-control @error('address1')
                                 is-invalid
                             @enderror"
-                                    name="description" value="{{ $product->description }}">
-                                @error('description')
+                                    name="address1" value="{{ old('address1', $outlet->address1) }}">
+                                @error('address1')
                                     <div class="invalid-feedback">
                                         {{ $message }}
                                     </div>
                                 @enderror
                             </div>
+
                             <div class="form-group">
-                                <label>Price</label>
-                                <input type="number"
-                                    class="form-control @error('price')
+                                <label>Address 2 (Optional)</label>
+                                <input type="text"
+                                    class="form-control @error('address2')
                                 is-invalid
                             @enderror"
-                                    name="price" value="{{ $product->price }}">
-                                @error('price')
+                                    name="address2" value="{{ old('address2', $outlet->address2) }}">
+                                @error('address2')
                                     <div class="invalid-feedback">
                                         {{ $message }}
                                     </div>
                                 @enderror
                             </div>
+
                             <div class="form-group">
-                                <label>Stock</label>
-                                <input type="number"
-                                    class="form-control @error('stock')
+                                <label>Phone (Optional)</label>
+                                <input type="text"
+                                    class="form-control @error('phone')
                                 is-invalid
                             @enderror"
-                                    name="stock" value="{{ $product->stock }}">
-                                @error('stock')
+                                    name="phone" value="{{ old('phone', $outlet->phone) }}">
+                                @error('phone')
                                     <div class="invalid-feedback">
                                         {{ $message }}
                                     </div>
                                 @enderror
                             </div>
+
                             <div class="form-group">
-                                <label class="form-label">Category</label>
-                                <select
-                                    class="form-control selectric @error('category_id')
-                                    is-invalid
-                                @enderror"
-                                    name="category_id">
-                                    <option value="">Choose Category</option>
-                                    @foreach ($categories as $category)
-                                        <option value="{{ $category->id }}"
-                                            {{ $category->id == $product->category_id ? 'selected' : '' }}>
-                                            {{ $category->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-
-                            </div>
-
-                            <div class="form-group mb-0">
-                                <label class="form-label w-100">Status</label>
-                                <div class="selectgroup selectgroup-pills">
-                                    <label class="selectgroup-item">
-                                        <input type="radio" name="status" value="1" class="selectgroup-input"
-                                            {{ $product->status == 1 ? 'checked' : '' }}>
-                                        <span class="selectgroup-button">Active</span>
-                                    </label>
-                                    <label class="selectgroup-item">
-                                        <input type="radio" name="status" value="0" class="selectgroup-input"
-                                            {{ $product->status == 0 ? 'checked' : '' }}>
-                                        <span class="selectgroup-button">Inactive</span>
-                                    </label>
-                                </div>
+                                <label>Leader (Optional)</label>
+                                <input type="text"
+                                    class="form-control @error('leader')
+                                is-invalid
+                            @enderror"
+                                    name="leader" value="{{ old('leader', $outlet->leader) }}">
+                                @error('leader')
+                                    <div class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label mt-4">Photo Product</label>
-                                <div class="col-sm-9">
-                                    <input type="file" class="form-control" name="image"
-                                        @error('image') is-invalid @enderror>
-                                </div>
-                            </div>
-
-                            {{-- is favorite --}}
-                            <div class="form-group mt-4">
-                                <label class="form-label w-100">Is Favorite</label>
-                                <div class="selectgroup selectgroup-pills">
-                                    <label class="selectgroup-item">
-                                        <input type="radio" name="is_favorite" value="1" class="selectgroup-input"
-                                            {{ $product->is_favorite == 1 ? 'checked' : '' }}>
-                                        <span class="selectgroup-button">Yes</span>
-                                    </label>
-                                    <label class="selectgroup-item">
-                                        <input type="radio" name="is_favorite" value="0" class="selectgroup-input"
-                                            {{ $product->is_favorite == 0 ? 'checked' : '' }}>
-                                        <span class="selectgroup-button">No</span>
-                                    </label>
-                                </div>
+                                <label>Notes (Optional)</label>
+                                <textarea
+                                    class="form-control @error('notes')
+                                is-invalid
+                            @enderror"
+                                    name="notes" rows="3">{{ old('notes', $outlet->notes) }}</textarea>
+                                @error('notes')
+                                    <div class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
                             </div>
                         </div>
                         <div class="card-footer text-right">
-                            <button class="btn btn-primary">Submit</button>
+                            <a href="{{ route('outlets.index') }}" class="btn btn-secondary mr-2">Cancel</a>
+                            <button class="btn btn-primary">Update</button>
                         </div>
                     </form>
                 </div>

@@ -73,6 +73,13 @@ Route::middleware(['auth'])->group(function () {
     // Owner only routes
     Route::middleware('owner-only')->group(function () {
         Route::resource('outlets', OutletController::class)->except(['index', 'show']);
+        Route::post('outlets/import', [OutletController::class, 'import'])->name('outlets.import');
+        Route::get('outlets/template', [OutletController::class, 'template'])->name('outlets.template');
+        Route::get('outlets/export', [OutletController::class, 'export'])->name('outlets.export');
+        Route::get('outlets/export-update', [OutletController::class, 'exportForUpdate'])->name('outlets.exportForUpdate');
+        Route::post('outlets/bulk-update', [OutletController::class, 'bulkUpdate'])->name('outlets.bulkUpdate');
+        Route::delete('outlets/delete-all', [OutletController::class, 'deleteAll'])->name('outlets.deleteAll');
+
         Route::delete('products/delete-all', [ProductController::class, 'deleteAll'])->name('products.deleteAll');
         Route::delete('categories/delete-all', [CategoryController::class, 'deleteAll'])->name('categories.deleteAll');
     });
