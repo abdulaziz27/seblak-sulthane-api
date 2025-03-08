@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DailyCash;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Outlet;
@@ -62,12 +63,10 @@ class ReportController extends Controller
             $query->where('outlet_id', $outletId);
         }
 
-        // Data penjualan yang sudah ada
         $totalRevenue = $query->sum('total');
         $totalOrders = $query->count();
         $avgOrderValue = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
 
-        // Tambahkan data modal dan pengeluaran
         $dailyCashQuery = DailyCash::whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
         if ($outletId) {
             $dailyCashQuery->where('outlet_id', $outletId);
@@ -179,12 +178,12 @@ class ReportController extends Controller
                 'avgOrderValue',
                 'dailySales',
                 'paymentMethods',
-                'totalOpeningBalance',  // Tambahan
-                'totalExpenses',       // Tambahan
-                'totalCashSales',      // Tambahan
-                'closingBalance',      // Tambahan
-                'beverageSales',       // Tambahan
-                'dailyData',           // Data harian yang sudah diformat
+                'totalOpeningBalance',
+                'totalExpenses',
+                'totalCashSales',
+                'closingBalance',
+                'beverageSales',
+                'dailyData',
                 'taxTotal',
                 'discountTotal',
                 'startDate',
@@ -193,11 +192,67 @@ class ReportController extends Controller
 
             return $pdf->download('sales_summary_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.pdf');
         } else {
-            // Create Excel for report
+            // Create an Excel spreadsheet
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
 
-            // ... Kode Excel yang sudah ada
+            // Set spreadsheet metadata
+            $spreadsheet->getProperties()
+                ->setCreator('Seblak Sulthane')
+                ->setLastModifiedBy('Seblak Sulthane')
+                ->setTitle($title)
+                ->setSubject($subtitle)
+                ->setDescription('Sales Summary Report for Seblak Sulthane');
+
+            // Format the header
+            $sheet->setCellValue('A1', $title);
+            $sheet->setCellValue('A2', $subtitle);
+            $sheet->mergeCells('A1:F1');
+            $sheet->mergeCells('A2:F2');
+
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+            $sheet->getStyle('A2')->getFont()->setSize(12);
+
+            // Summary section
+            $sheet->setCellValue('A4', 'SUMMARY');
+            $sheet->getStyle('A4')->getFont()->setBold(true);
+
+            $sheet->setCellValue('A5', 'Total Revenue:');
+            $sheet->setCellValue('B5', $totalRevenue);
+            $sheet->getStyle('B5')->getNumberFormat()->setFormatCode('#,##0');
+
+            $sheet->setCellValue('A6', 'Total Orders:');
+            $sheet->setCellValue('B6', $totalOrders);
+
+            $sheet->setCellValue('A7', 'Average Order Value:');
+            $sheet->setCellValue('B7', $avgOrderValue);
+            $sheet->getStyle('B7')->getNumberFormat()->setFormatCode('#,##0');
+
+            $sheet->setCellValue('A8', 'Total Tax:');
+            $sheet->setCellValue('B8', $taxTotal);
+            $sheet->getStyle('B8')->getNumberFormat()->setFormatCode('#,##0');
+
+            $sheet->setCellValue('A9', 'Total Discounts:');
+            $sheet->setCellValue('B9', $discountTotal);
+            $sheet->getStyle('B9')->getNumberFormat()->setFormatCode('#,##0');
+
+            // Daily sales section
+            $sheet->setCellValue('A11', 'DAILY SALES');
+            $sheet->getStyle('A11')->getFont()->setBold(true);
+
+            $sheet->setCellValue('A12', 'Date');
+            $sheet->setCellValue('B12', 'Total Sales');
+            $sheet->setCellValue('C12', 'Order Count');
+            $sheet->getStyle('A12:C12')->getFont()->setBold(true);
+
+            $row = 13;
+            foreach ($dailySales as $sale) {
+                $sheet->setCellValue('A' . $row, $sale->date);
+                $sheet->setCellValue('B' . $row, $sale->total_sales);
+                $sheet->setCellValue('C' . $row, $sale->order_count);
+                $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                $row++;
+            }
 
             // Tambahkan bagian untuk cash flow
             $sheet->setCellValue('A' . ($row + 2), 'CASH FLOW SUMMARY');
@@ -255,7 +310,10 @@ class ReportController extends Controller
             $dailySheet->setTitle('Daily Breakdown');
 
             // Headers for daily sheet
-            $dailySheet->setCellValue('A1', 'Date');
+            $dailySheet->setCellValue(
+                'A1',
+                'Date'
+            );
             $dailySheet->setCellValue('B1', 'Opening Balance');
             $dailySheet->setCellValue('C1', 'Cash Sales');
             $dailySheet->setCellValue('D1', 'QRIS Sales');
@@ -289,13 +347,54 @@ class ReportController extends Controller
                 $dailySheet->getColumnDimension($col)->setAutoSize(true);
             }
 
-            // ... (Lanjutan kode Excel yang sudah ada)
+            // Auto-size columns on main sheet
+            foreach (range('A', 'C') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            // Add export info on the right side
+            $sheet->setCellValue('E1', 'Exported on: ' . now()->format('d M Y H:i:s'));
+            $sheet->setCellValue('E2', 'Total Orders: ' . $totalOrders);
+
+            $exportInfoStyle = [
+                'font' => [
+                    'bold' => true,
+                    'size' => 12,
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DDEBF7'] // Light blue background
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                    ],
+                ],
+            ];
+            $sheet->getStyle('E1:E2')->applyFromArray($exportInfoStyle);
+
+            // Set column width for export info
+            $sheet->getColumnDimension('E')->setWidth(35);
+
+            // Freeze the header row
+            $sheet->freezePane('A2');
+
+            // Set the auto-filter
+            $sheet->setAutoFilter('A12:C' . ($row - 1));
+
+            // Set first sheet as active
+            $spreadsheet->setActiveSheetIndex(0);
+
+            // Set filename and headers
+            $filename = 'sales_summary_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.xlsx';
+
+            // Create the writer and output the file
+            $writer = new Xlsx($spreadsheet);
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="sales_summary_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.xlsx"');
+            header('Content-Disposition: attachment;filename="' . $filename . '"');
             header('Cache-Control: max-age=0');
 
-            $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
             exit;
         }
