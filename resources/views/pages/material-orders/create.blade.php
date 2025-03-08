@@ -10,6 +10,38 @@
     <link rel="stylesheet" href="{{ asset('library/selectric/public/selectric.css') }}">
     <link rel="stylesheet" href="{{ asset('library/bootstrap-timepicker/css/bootstrap-timepicker.min.css') }}">
     <link rel="stylesheet" href="{{ asset('library/bootstrap-tagsinput/dist/bootstrap-tagsinput.css') }}">
+    <style>
+        .stock-normal {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .stock-medium {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        .stock-low {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .select2-container--default .select2-results__option {
+            padding: 8px 12px;
+        }
+        .stock-indicator {
+            display: inline-block;
+            padding: 2px 6px;
+            margin-left: 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+        .material-details-container {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            display: none;
+        }
+    </style>
 @endpush
 
 @section('main')
@@ -27,7 +59,7 @@
             <div class="section-body">
                 <h2 class="section-title">Create Material Order</h2>
                 <p class="section-lead">
-                    Create a new order for raw materials.
+                    Create a new order for raw materials. Current stock levels are displayed to help with ordering decisions.
                 </p>
 
                 <div class="row">
@@ -115,18 +147,35 @@
                                                                     required>
                                                                     <option value="">Select Material</option>
                                                                     @foreach ($rawMaterials as $rawMaterial)
+                                                                        @php
+                                                                            $stockClass = '';
+                                                                            if ($rawMaterial->stock <= 5) {
+                                                                                $stockClass = 'stock-low';
+                                                                            } elseif ($rawMaterial->stock <= 15) {
+                                                                                $stockClass = 'stock-medium';
+                                                                            } else {
+                                                                                $stockClass = 'stock-normal';
+                                                                            }
+                                                                        @endphp
                                                                         <option value="{{ $rawMaterial->id }}"
                                                                             data-price="{{ $rawMaterial->price }}"
+                                                                            data-stock="{{ $rawMaterial->stock }}"
+                                                                            data-unit="{{ $rawMaterial->unit }}"
+                                                                            data-stock-class="{{ $stockClass }}"
                                                                             {{ $material['raw_material_id'] == $rawMaterial->id ? 'selected' : '' }}>
-                                                                            {{ $rawMaterial->name }}
-                                                                            ({{ $rawMaterial->unit }}) - Rp
-                                                                            {{ number_format($rawMaterial->price, 0, ',', '.') }}
+                                                                            {{ $rawMaterial->name }} -
+                                                                            Stock: {{ $rawMaterial->stock }} {{ $rawMaterial->unit }} -
+                                                                            Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
                                                                         </option>
                                                                     @endforeach
                                                                 </select>
                                                                 @error('materials.' . $index . '.raw_material_id')
                                                                     <div class="invalid-feedback">{{ $message }}</div>
                                                                 @enderror
+                                                                <div class="material-details-container" id="material-details-{{ $index }}">
+                                                                    <div class="stock-info"></div>
+                                                                    <div class="price-info"></div>
+                                                                </div>
                                                             </div>
                                                             <div class="col-md-3">
                                                                 <input type="number"
@@ -155,14 +204,31 @@
                                                                 name="materials[0][raw_material_id]" required>
                                                                 <option value="">Select Material</option>
                                                                 @foreach ($rawMaterials as $rawMaterial)
+                                                                    @php
+                                                                        $stockClass = '';
+                                                                        if ($rawMaterial->stock <= 5) {
+                                                                            $stockClass = 'stock-low';
+                                                                        } elseif ($rawMaterial->stock <= 15) {
+                                                                            $stockClass = 'stock-medium';
+                                                                        } else {
+                                                                            $stockClass = 'stock-normal';
+                                                                        }
+                                                                    @endphp
                                                                     <option value="{{ $rawMaterial->id }}"
-                                                                        data-price="{{ $rawMaterial->price }}">
-                                                                        {{ $rawMaterial->name }}
-                                                                        ({{ $rawMaterial->unit }}) - Rp
-                                                                        {{ number_format($rawMaterial->price, 0, ',', '.') }}
+                                                                        data-price="{{ $rawMaterial->price }}"
+                                                                        data-stock="{{ $rawMaterial->stock }}"
+                                                                        data-unit="{{ $rawMaterial->unit }}"
+                                                                        data-stock-class="{{ $stockClass }}">
+                                                                        {{ $rawMaterial->name }} -
+                                                                        Stock: {{ $rawMaterial->stock }} {{ $rawMaterial->unit }} -
+                                                                        Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
                                                                     </option>
                                                                 @endforeach
                                                             </select>
+                                                            <div class="material-details-container" id="material-details-0">
+                                                                <div class="stock-info"></div>
+                                                                <div class="price-info"></div>
+                                                            </div>
                                                         </div>
                                                         <div class="col-md-3">
                                                             <input type="number" class="form-control quantity-input"
@@ -196,7 +262,7 @@
 @endsection
 
 @push('scripts')
-    <!-- JS Libraies -->
+    <!-- JS Libraries -->
     <script src="{{ asset('library/cleave.js/dist/cleave.min.js') }}"></script>
     <script src="{{ asset('library/cleave.js/dist/addons/cleave-phone.us.js') }}"></script>
     <script src="{{ asset('library/bootstrap-daterangepicker/daterangepicker.js') }}"></script>
@@ -211,8 +277,70 @@
 
     <script>
         $(document).ready(function() {
-            // Initialize select2
-            $('.select2').select2();
+            // Initialize select2 with custom template
+            $('.select2').select2({
+                templateResult: formatMaterial,
+                templateSelection: formatMaterialSelection
+            });
+
+            // Format material options in dropdown
+            function formatMaterial(material) {
+                if (!material.id) {
+                    return material.text;
+                }
+
+                var $material = $(material.element);
+                var stock = $material.data('stock');
+                var stockClass = $material.data('stock-class');
+                var unit = $material.data('unit');
+
+                var $materialOption = $(
+                    '<div class="material-option">' +
+                        '<div>' + material.text + '</div>' +
+                        '<div class="' + stockClass + '">Current Stock: ' + stock + ' ' + unit + '</div>' +
+                    '</div>'
+                );
+
+                return $materialOption;
+            }
+
+            // Format selected material
+            function formatMaterialSelection(material) {
+                if (!material.id) {
+                    return material.text;
+                }
+
+                var $material = $(material.element);
+                var materialName = $material.text().split(' - ')[0];
+
+                return materialName;
+            }
+
+            // Update material details when selection changes
+            $(document).on('change', '.material-select', function() {
+                var selectedOption = $(this).find('option:selected');
+                var rowIndex = $(this).closest('.material-row').index();
+                var detailsContainer = $('#material-details-' + rowIndex);
+
+                if (selectedOption.val()) {
+                    var stock = selectedOption.data('stock');
+                    var unit = selectedOption.data('unit');
+                    var price = selectedOption.data('price');
+                    var stockClass = selectedOption.data('stock-class');
+
+                    // Set content and show details container
+                    detailsContainer.find('.stock-info').html('<strong>Current Stock:</strong> <span class="' + stockClass + '">' + stock + ' ' + unit + '</span>');
+                    detailsContainer.find('.price-info').html('<strong>Price:</strong> Rp ' + price.toLocaleString('id-ID'));
+                    detailsContainer.show();
+                } else {
+                    detailsContainer.hide();
+                }
+            });
+
+            // Trigger change event on page load for any pre-selected materials
+            $('.material-select').each(function() {
+                $(this).trigger('change');
+            });
 
             // Add material row
             $('#add-material').click(function() {
@@ -224,11 +352,31 @@
                             <select class="form-control select2 material-select" name="materials[${index}][raw_material_id]" required>
                                 <option value="">Select Material</option>
                                 @foreach ($rawMaterials as $rawMaterial)
-                                    <option value="{{ $rawMaterial->id }}" data-price="{{ $rawMaterial->price }}">
-                                        {{ $rawMaterial->name }} ({{ $rawMaterial->unit }}) - Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
+                                    @php
+                                        $stockClass = '';
+                                        if ($rawMaterial->stock <= 5) {
+                                            $stockClass = 'stock-low';
+                                        } elseif ($rawMaterial->stock <= 15) {
+                                            $stockClass = 'stock-medium';
+                                        } else {
+                                            $stockClass = 'stock-normal';
+                                        }
+                                    @endphp
+                                    <option value="{{ $rawMaterial->id }}"
+                                        data-price="{{ $rawMaterial->price }}"
+                                        data-stock="{{ $rawMaterial->stock }}"
+                                        data-unit="{{ $rawMaterial->unit }}"
+                                        data-stock-class="{{ $stockClass }}">
+                                        {{ $rawMaterial->name }} -
+                                        Stock: {{ $rawMaterial->stock }} {{ $rawMaterial->unit }} -
+                                        Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
                                     </option>
                                 @endforeach
                             </select>
+                            <div class="material-details-container" id="material-details-${index}">
+                                <div class="stock-info"></div>
+                                <div class="price-info"></div>
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <input type="number" class="form-control quantity-input" name="materials[${index}][quantity]" placeholder="Quantity" min="1" required>
@@ -240,7 +388,12 @@
                 `;
 
                 $('.materials-container').append(newRow);
-                $('.select2').select2();
+
+                // Initialize select2 for the new row
+                $('.material-select').last().select2({
+                    templateResult: formatMaterial,
+                    templateSelection: formatMaterialSelection
+                });
             });
 
             // Remove material row
@@ -250,11 +403,33 @@
                 // Reindex the remaining rows
                 $('.material-row').each(function(newIndex) {
                     var row = $(this);
-                    row.find('select.material-select').attr('name',
-                        `materials[${newIndex}][raw_material_id]`);
-                    row.find('input.quantity-input').attr('name',
-                        `materials[${newIndex}][quantity]`);
+                    row.find('select.material-select').attr('name', `materials[${newIndex}][raw_material_id]`);
+                    row.find('input.quantity-input').attr('name', `materials[${newIndex}][quantity]`);
+                    row.find('.material-details-container').attr('id', `material-details-${newIndex}`);
                 });
+            });
+
+            // Quantity validation - prevent ordering more than available stock
+            $(document).on('input', '.quantity-input', function() {
+                var row = $(this).closest('.material-row');
+                var selectedOption = row.find('.material-select option:selected');
+
+                if (selectedOption.val()) {
+                    var currentStock = parseInt(selectedOption.data('stock'));
+                    var requestedQuantity = parseInt($(this).val());
+
+                    if (requestedQuantity > currentStock) {
+                        $(this).addClass('is-invalid');
+
+                        // Add warning if not already present
+                        if (row.find('.stock-warning').length === 0) {
+                            row.append('<div class="col-12 mt-2 stock-warning text-danger">Warning: Requested quantity exceeds current stock!</div>');
+                        }
+                    } else {
+                        $(this).removeClass('is-invalid');
+                        row.find('.stock-warning').remove();
+                    }
+                }
             });
         });
     </script>

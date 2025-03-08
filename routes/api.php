@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderItemController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\DiscountController;
+use App\Http\Controllers\Api\DailyCashController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -52,4 +53,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/members/{id}', [MemberController::class, 'update']);
     Route::delete('/members/{id}', [MemberController::class, 'destroy']);
     Route::get('/members/search/phone', [MemberController::class, 'getMemberByPhone']);
+
+    // Daily Cash Management
+    Route::post('/daily-cash/opening', [DailyCashController::class, 'setOpeningBalance']);
+    Route::post('/daily-cash/expense', [DailyCashController::class, 'addExpense']);
+    Route::get('/daily-cash/{date?}', [DailyCashController::class, 'getDailyCash']);
 });

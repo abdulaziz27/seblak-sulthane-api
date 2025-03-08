@@ -30,6 +30,9 @@
                                 <h4>Order #{{ $materialOrder->id }}</h4>
                                 <div class="card-header-action">
                                     @if ($materialOrder->status === 'pending')
+                                        <a href="{{ route('material-orders.edit', $materialOrder->id) }}" class="btn btn-primary mr-2">
+                                            <i class="fas fa-edit"></i> Edit Order
+                                        </a>
                                         <form action="{{ route('material-orders.cancel', $materialOrder->id) }}"
                                             method="POST" class="d-inline">
                                             @csrf

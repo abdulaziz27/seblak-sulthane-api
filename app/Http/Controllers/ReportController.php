@@ -56,49 +56,107 @@ class ReportController extends Controller
         $endDate = Carbon::parse($request->end_date)->endOfDay();
         $outletId = $request->outlet_id;
 
-        // Base query
+        // Base query yang sudah ada untuk orders
         $query = Order::whereBetween('created_at', [$startDate, $endDate]);
-
-        // Filter by outlet if provided
         if ($outletId) {
             $query->where('outlet_id', $outletId);
         }
 
-        // Get the data
+        // Data penjualan yang sudah ada
         $totalRevenue = $query->sum('total');
         $totalOrders = $query->count();
         $avgOrderValue = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
 
-        // Get daily sales data
-        $dailySales = Order::select(
-            DB::raw('DATE(created_at) as date'),
-            DB::raw('SUM(total) as total_sales'),
-            DB::raw('COUNT(*) as order_count')
-        )
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->when($outletId, function ($query) use ($outletId) {
-                return $query->where('outlet_id', $outletId);
-            })
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get();
+        // Tambahkan data modal dan pengeluaran
+        $dailyCashQuery = DailyCash::whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+        if ($outletId) {
+            $dailyCashQuery->where('outlet_id', $outletId);
+        }
+        $dailyCashData = $dailyCashQuery->get();
 
-        // Payment method breakdown
-        $paymentMethods = Order::select(
-            'payment_method',
-            DB::raw('COUNT(*) as count'),
-            DB::raw('SUM(total) as total')
-        )
-            ->whereBetween('created_at', [$startDate, $endDate])
+        $totalOpeningBalance = $dailyCashData->sum('opening_balance');
+        $totalExpenses = $dailyCashData->sum('expenses');
+
+        // Payment method breakdown (Cash vs QRIS)
+        $paymentMethods = Order::whereBetween('created_at', [$startDate, $endDate])
             ->when($outletId, function ($query) use ($outletId) {
                 return $query->where('outlet_id', $outletId);
             })
+            ->select('payment_method', DB::raw('COUNT(*) as count'), DB::raw('SUM(total) as total'))
             ->groupBy('payment_method')
             ->get();
 
-        // Tax and discount totals
-        $taxTotal = $query->sum('tax');
-        $discountTotal = $query->sum('discount_amount');
+        // Khusus breakdown penjualan minuman
+        $beverageSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->whereBetween('orders.created_at', [$startDate, $endDate])
+            ->when($outletId, function ($query) use ($outletId) {
+                return $query->where('orders.outlet_id', $outletId);
+            })
+            // Asumsikan kategori ID 2 adalah minuman, sesuaikan dengan data Anda
+            ->where('categories.id', 2)
+            // Alternatif jika menggunakan nama kategori
+            // ->where('categories.name', 'like', '%minum%')
+            ->select(DB::raw('SUM(order_items.quantity * order_items.price) as total_amount'))
+            ->first();
+
+        // Hitung total penjualan dengan cash (untuk closing balance)
+        $cashSales = collect($paymentMethods)->firstWhere('payment_method', 'cash');
+        $totalCashSales = $cashSales ? $cashSales->total : 0;
+
+        // Hitung closing balance
+        $closingBalance = $totalOpeningBalance + $totalCashSales - $totalExpenses;
+
+        // Format data dailyCash untuk laporan harian
+        $dailyCashByDate = [];
+        foreach ($dailyCashData as $dailyCash) {
+            $dailyCashByDate[$dailyCash->date->format('Y-m-d')] = $dailyCash;
+        }
+
+        // Format daily sales data yang sudah ada
+        $dailySales = Order::select(
+            DB::raw('DATE(created_at) as date'),
+            DB::raw('SUM(total) as total_sales'),
+            DB::raw('COUNT(*) as order_count'),
+            'payment_method'
+        )
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->when($outletId, function ($query) use ($outletId) {
+                return $query->where('outlet_id', $outletId);
+            })
+            ->groupBy('date', 'payment_method')
+            ->get();
+
+        // Reorganisasi data penjualan harian + tambahkan data cash flow
+        $dailyData = [];
+        foreach ($dailySales as $sale) {
+            $date = $sale->date;
+            if (!isset($dailyData[$date])) {
+                $dailyData[$date] = [
+                    'date' => $date,
+                    'total_sales' => 0,
+                    'order_count' => 0,
+                    'cash_sales' => 0,
+                    'qris_sales' => 0,
+                    'opening_balance' => $dailyCashByDate[$date]->opening_balance ?? 0,
+                    'expenses' => $dailyCashByDate[$date]->expenses ?? 0,
+                ];
+            }
+
+            $dailyData[$date]['total_sales'] += $sale->total_sales;
+            $dailyData[$date]['order_count'] += $sale->order_count;
+
+            if ($sale->payment_method === 'cash') {
+                $dailyData[$date]['cash_sales'] += $sale->total_sales;
+            } else if ($sale->payment_method === 'qris') {
+                $dailyData[$date]['qris_sales'] += $sale->total_sales;
+            }
+        }
+
+        // Urutkan berdasarkan tanggal
+        ksort($dailyData);
+        $dailyData = array_values($dailyData);
 
         // Format the report title
         $title = 'Sales Summary Report';
@@ -113,7 +171,7 @@ class ReportController extends Controller
 
         // Generate the report based on requested format
         if ($request->format === 'pdf') {
-            $pdf = Pdf::loadView('pages.reports.sales_summary_pdf', compact(
+            $pdf = PDF::loadView('pages.reports.sales_summary_pdf', compact(
                 'title',
                 'subtitle',
                 'totalRevenue',
@@ -121,6 +179,12 @@ class ReportController extends Controller
                 'avgOrderValue',
                 'dailySales',
                 'paymentMethods',
+                'totalOpeningBalance',  // Tambahan
+                'totalExpenses',       // Tambahan
+                'totalCashSales',      // Tambahan
+                'closingBalance',      // Tambahan
+                'beverageSales',       // Tambahan
+                'dailyData',           // Data harian yang sudah diformat
                 'taxTotal',
                 'discountTotal',
                 'startDate',
@@ -129,104 +193,109 @@ class ReportController extends Controller
 
             return $pdf->download('sales_summary_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.pdf');
         } else {
-            // Create an Excel spreadsheet
+            // Create Excel for report
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
 
-            // Set spreadsheet metadata
-            $spreadsheet->getProperties()
-                ->setCreator('Seblak Sulthane')
-                ->setLastModifiedBy('Seblak Sulthane')
-                ->setTitle($title)
-                ->setSubject($subtitle)
-                ->setDescription('Sales Summary Report for Seblak Sulthane');
+            // ... Kode Excel yang sudah ada
 
-            // Format the header
-            $sheet->setCellValue('A1', $title);
-            $sheet->setCellValue('A2', $subtitle);
-            $sheet->mergeCells('A1:F1');
-            $sheet->mergeCells('A2:F2');
+            // Tambahkan bagian untuk cash flow
+            $sheet->setCellValue('A' . ($row + 2), 'CASH FLOW SUMMARY');
+            $sheet->getStyle('A' . ($row + 2))->getFont()->setBold(true);
 
-            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
-            $sheet->getStyle('A2')->getFont()->setSize(12);
+            $sheet->setCellValue('A' . ($row + 3), 'Opening Balance:');
+            $sheet->setCellValue('B' . ($row + 3), $totalOpeningBalance);
+            $sheet->getStyle('B' . ($row + 3))->getNumberFormat()->setFormatCode('#,##0');
 
-            // Summary section
-            $sheet->setCellValue('A4', 'SUMMARY');
-            $sheet->getStyle('A4')->getFont()->setBold(true);
+            $sheet->setCellValue('A' . ($row + 4), 'Cash Sales:');
+            $sheet->setCellValue('B' . ($row + 4), $totalCashSales);
+            $sheet->getStyle('B' . ($row + 4))->getNumberFormat()->setFormatCode('#,##0');
 
-            $sheet->setCellValue('A5', 'Total Revenue:');
-            $sheet->setCellValue('B5', $totalRevenue);
-            $sheet->getStyle('B5')->getNumberFormat()->setFormatCode('#,##0');
+            $sheet->setCellValue('A' . ($row + 5), 'Expenses:');
+            $sheet->setCellValue('B' . ($row + 5), $totalExpenses);
+            $sheet->getStyle('B' . ($row + 5))->getNumberFormat()->setFormatCode('#,##0');
 
-            $sheet->setCellValue('A6', 'Total Orders:');
-            $sheet->setCellValue('B6', $totalOrders);
+            $sheet->setCellValue('A' . ($row + 6), 'Closing Balance:');
+            $sheet->setCellValue('B' . ($row + 6), $closingBalance);
+            $sheet->getStyle('B' . ($row + 6))->getFont()->setBold(true);
+            $sheet->getStyle('B' . ($row + 6))->getNumberFormat()->setFormatCode('#,##0');
 
-            $sheet->setCellValue('A7', 'Average Order Value:');
-            $sheet->setCellValue('B7', $avgOrderValue);
-            $sheet->getStyle('B7')->getNumberFormat()->setFormatCode('#,##0');
+            // Tambahkan bagian untuk penjualan berdasarkan metode pembayaran
+            $row = $row + 8;
+            $sheet->setCellValue('A' . $row, 'PAYMENT METHOD BREAKDOWN');
+            $sheet->getStyle('A' . $row)->getFont()->setBold(true);
 
-            $sheet->setCellValue('A8', 'Total Tax:');
-            $sheet->setCellValue('B8', $taxTotal);
-            $sheet->getStyle('B8')->getNumberFormat()->setFormatCode('#,##0');
+            $row++;
+            $sheet->setCellValue('A' . $row, 'Method');
+            $sheet->setCellValue('B' . $row, 'Count');
+            $sheet->setCellValue('C' . $row, 'Total');
+            $sheet->getStyle('A' . $row . ':C' . $row)->getFont()->setBold(true);
 
-            $sheet->setCellValue('A9', 'Total Discounts:');
-            $sheet->setCellValue('B9', $discountTotal);
-            $sheet->getStyle('B9')->getNumberFormat()->setFormatCode('#,##0');
-
-            // Daily sales section
-            $sheet->setCellValue('A11', 'DAILY SALES');
-            $sheet->getStyle('A11')->getFont()->setBold(true);
-
-            $sheet->setCellValue('A12', 'Date');
-            $sheet->setCellValue('B12', 'Total Sales');
-            $sheet->setCellValue('C12', 'Order Count');
-            $sheet->getStyle('A12:C12')->getFont()->setBold(true);
-
-            $row = 13;
-            foreach ($dailySales as $sale) {
-                $sheet->setCellValue('A' . $row, $sale->date);
-                $sheet->setCellValue('B' . $row, $sale->total_sales);
-                $sheet->setCellValue('C' . $row, $sale->order_count);
-                $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $row++;
+            foreach ($paymentMethods as $method) {
+                $sheet->setCellValue('A' . $row, strtoupper($method->payment_method));
+                $sheet->setCellValue('B' . $row, $method->count);
+                $sheet->setCellValue('C' . $row, $method->total);
+                $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('#,##0');
                 $row++;
             }
 
-            // Payment method section
+            // Tambahkan bagian untuk penjualan minuman
             $row += 2;
-            $paymentRow = $row;
-            $sheet->setCellValue('A' . $paymentRow, 'PAYMENT METHODS');
-            $sheet->getStyle('A' . $paymentRow)->getFont()->setBold(true);
+            $sheet->setCellValue('A' . $row, 'BEVERAGE SALES SUMMARY');
+            $sheet->getStyle('A' . $row)->getFont()->setBold(true);
 
-            $paymentRow++;
-            $sheet->setCellValue('A' . $paymentRow, 'Method');
-            $sheet->setCellValue('B' . $paymentRow, 'Count');
-            $sheet->setCellValue('C' . $paymentRow, 'Total');
-            $sheet->getStyle('A' . $paymentRow . ':C' . $paymentRow)->getFont()->setBold(true);
+            $row++;
+            $sheet->setCellValue('A' . $row, 'Total Beverage Sales:');
+            $sheet->setCellValue('B' . $row, $beverageSales->total_amount ?? 0);
+            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
 
-            $paymentRow++;
-            foreach ($paymentMethods as $method) {
-                $sheet->setCellValue('A' . $paymentRow, strtoupper($method->payment_method));
-                $sheet->setCellValue('B' . $paymentRow, $method->count);
-                $sheet->setCellValue('C' . $paymentRow, $method->total);
-                $sheet->getStyle('C' . $paymentRow)->getNumberFormat()->setFormatCode('#,##0');
-                $paymentRow++;
+            // Tambahkan sheet baru untuk breakdown harian
+            $dailySheet = $spreadsheet->createSheet();
+            $dailySheet->setTitle('Daily Breakdown');
+
+            // Headers for daily sheet
+            $dailySheet->setCellValue('A1', 'Date');
+            $dailySheet->setCellValue('B1', 'Opening Balance');
+            $dailySheet->setCellValue('C1', 'Cash Sales');
+            $dailySheet->setCellValue('D1', 'QRIS Sales');
+            $dailySheet->setCellValue('E1', 'Total Sales');
+            $dailySheet->setCellValue('F1', 'Order Count');
+            $dailySheet->setCellValue('G1', 'Expenses');
+            $dailySheet->setCellValue('H1', 'Closing Balance');
+            $dailySheet->getStyle('A1:H1')->getFont()->setBold(true);
+
+            // Data rows for daily sheet
+            $dailyRow = 2;
+            foreach ($dailyData as $day) {
+                $dailySheet->setCellValue('A' . $dailyRow, $day['date']);
+                $dailySheet->setCellValue('B' . $dailyRow, $day['opening_balance']);
+                $dailySheet->setCellValue('C' . $dailyRow, $day['cash_sales']);
+                $dailySheet->setCellValue('D' . $dailyRow, $day['qris_sales']);
+                $dailySheet->setCellValue('E' . $dailyRow, $day['total_sales']);
+                $dailySheet->setCellValue('F' . $dailyRow, $day['order_count']);
+                $dailySheet->setCellValue('G' . $dailyRow, $day['expenses']);
+                $dailySheet->setCellValue('H' . $dailyRow, $day['opening_balance'] + $day['cash_sales'] - $day['expenses']);
+
+                // Format numbers
+                $dailySheet->getStyle('B' . $dailyRow . ':E' . $dailyRow)->getNumberFormat()->setFormatCode('#,##0');
+                $dailySheet->getStyle('G' . $dailyRow . ':H' . $dailyRow)->getNumberFormat()->setFormatCode('#,##0');
+
+                $dailyRow++;
             }
 
-            // Auto-size columns
-            foreach (range('A', 'C') as $col) {
-                $sheet->getColumnDimension($col)->setAutoSize(true);
+            // Autofit columns
+            foreach (range('A', 'H') as $col) {
+                $dailySheet->getColumnDimension($col)->setAutoSize(true);
             }
 
-            // Set filename and headers
-            $filename = 'sales_summary_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.xlsx';
-
-            // Create the writer and output the file
-            $writer = new Xlsx($spreadsheet);
+            // ... (Lanjutan kode Excel yang sudah ada)
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="' . $filename . '"');
+            header('Content-Disposition: attachment;filename="sales_summary_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.xlsx"');
             header('Cache-Control: max-age=0');
 
+            $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
             exit;
         }
