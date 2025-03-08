@@ -63,10 +63,16 @@ class ReportController extends Controller
             $query->where('outlet_id', $outletId);
         }
 
+        // Data penjualan yang sudah ada
         $totalRevenue = $query->sum('total');
         $totalOrders = $query->count();
         $avgOrderValue = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
 
+        // Tambahkan tax dan discount total yang sebelumnya belum didefinisikan
+        $taxTotal = $query->sum('tax');
+        $discountTotal = $query->sum('discount_amount');
+
+        // Tambahkan data modal dan pengeluaran
         $dailyCashQuery = DailyCash::whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
         if ($outletId) {
             $dailyCashQuery->where('outlet_id', $outletId);
@@ -138,8 +144,8 @@ class ReportController extends Controller
                     'order_count' => 0,
                     'cash_sales' => 0,
                     'qris_sales' => 0,
-                    'opening_balance' => $dailyCashByDate[$date]->opening_balance ?? 0,
-                    'expenses' => $dailyCashByDate[$date]->expenses ?? 0,
+                    'opening_balance' => isset($dailyCashByDate[$date]) ? $dailyCashByDate[$date]->opening_balance : 0,
+                    'expenses' => isset($dailyCashByDate[$date]) ? $dailyCashByDate[$date]->expenses : 0,
                 ];
             }
 
@@ -310,10 +316,7 @@ class ReportController extends Controller
             $dailySheet->setTitle('Daily Breakdown');
 
             // Headers for daily sheet
-            $dailySheet->setCellValue(
-                'A1',
-                'Date'
-            );
+            $dailySheet->setCellValue('A1', 'Date');
             $dailySheet->setCellValue('B1', 'Opening Balance');
             $dailySheet->setCellValue('C1', 'Cash Sales');
             $dailySheet->setCellValue('D1', 'QRIS Sales');
@@ -362,12 +365,12 @@ class ReportController extends Controller
                     'size' => 12,
                 ],
                 'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
+                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
                     'startColor' => ['rgb' => 'DDEBF7'] // Light blue background
                 ],
                 'borders' => [
                     'allBorders' => [
-                        'borderStyle' => Border::BORDER_THIN,
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
                     ],
                 ],
             ];
@@ -389,7 +392,7 @@ class ReportController extends Controller
             $filename = 'sales_summary_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.xlsx';
 
             // Create the writer and output the file
-            $writer = new Xlsx($spreadsheet);
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             header('Content-Disposition: attachment;filename="' . $filename . '"');
