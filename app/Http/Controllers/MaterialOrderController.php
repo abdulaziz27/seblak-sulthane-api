@@ -175,6 +175,117 @@ class MaterialOrderController extends Controller
     }
 
     /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(MaterialOrder $materialOrder)
+    {
+        // Authorize that the user can edit this order
+        if (Auth::user()->role !== 'owner' && $materialOrder->franchise_id !== Auth::user()->outlet_id) {
+            return redirect()->route('material-orders.index')
+                ->with('error', 'You do not have permission to edit this order');
+        }
+
+        // Only pending orders can be edited
+        if ($materialOrder->status !== 'pending') {
+            return redirect()->route('material-orders.show', $materialOrder)
+                ->with('error', 'Only pending orders can be edited');
+        }
+
+        $rawMaterials = RawMaterial::where('is_active', true)->get();
+
+        // For owner, show all outlets; for others, just their own outlet
+        if (Auth::user()->role === 'owner') {
+            $outlets = Outlet::all();
+        } else {
+            $outlets = Outlet::where('id', Auth::user()->outlet_id)->get();
+        }
+
+        // Payment method options
+        $paymentMethods = [
+            'cash' => 'Tunai',
+            'bank_transfer' => 'Bank Transfer',
+            'e-wallet' => 'E-Wallet'
+        ];
+
+        $materialOrder->load(['items.rawMaterial', 'franchise', 'user']);
+
+        return view('pages.material-orders.edit', compact('materialOrder', 'rawMaterials', 'outlets', 'paymentMethods'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, MaterialOrder $materialOrder)
+    {
+        // Authorize that the user can update this order
+        if (Auth::user()->role !== 'owner' && $materialOrder->franchise_id !== Auth::user()->outlet_id) {
+            return redirect()->route('material-orders.index')
+                ->with('error', 'You do not have permission to update this order');
+        }
+
+        // Only pending orders can be updated
+        if ($materialOrder->status !== 'pending') {
+            return redirect()->route('material-orders.show', $materialOrder)
+                ->with('error', 'Only pending orders can be updated');
+        }
+
+        $request->validate([
+            'franchise_id' => 'required|exists:outlets,id',
+            'payment_method' => 'required|in:cash,bank_transfer,e-wallet',
+            'notes' => 'nullable|string',
+            'materials' => 'required|array|min:1',
+            'materials.*.raw_material_id' => 'required|exists:raw_materials,id',
+            'materials.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $totalAmount = 0;
+
+            // Calculate total amount and validate each item
+            foreach ($request->materials as $item) {
+                $rawMaterial = RawMaterial::findOrFail($item['raw_material_id']);
+                $subtotal = $rawMaterial->price * $item['quantity'];
+                $totalAmount += $subtotal;
+            }
+
+            // Update material order
+            $materialOrder->update([
+                'franchise_id' => $request->franchise_id,
+                'payment_method' => $request->payment_method,
+                'total_amount' => $totalAmount,
+                'notes' => $request->notes,
+            ]);
+
+            // Delete existing order items
+            $materialOrder->items()->delete();
+
+            // Create new order items
+            foreach ($request->materials as $item) {
+                $rawMaterial = RawMaterial::findOrFail($item['raw_material_id']);
+                $subtotal = $rawMaterial->price * $item['quantity'];
+
+                MaterialOrderItem::create([
+                    'material_order_id' => $materialOrder->id,
+                    'raw_material_id' => $item['raw_material_id'],
+                    'quantity' => $item['quantity'],
+                    'price_per_unit' => $rawMaterial->price,
+                    'subtotal' => $subtotal,
+                ]);
+            }
+
+            DB::commit();
+            return redirect()->route('material-orders.show', $materialOrder)
+                ->with('success', 'Material order updated successfully');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()
+                ->with('error', 'Failed to update material order: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    /**
      * Update the status of material order
      */
     public function updateStatus(Request $request, MaterialOrder $materialOrder)

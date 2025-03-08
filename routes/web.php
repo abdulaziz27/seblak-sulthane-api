@@ -101,10 +101,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('raw-materials/template', [RawMaterialController::class, 'template'])->name('raw-materials.template');
 
     // Material Orders routes
-    Route::resource('material-orders', MaterialOrderController::class)->except(['edit', 'update', 'destroy']);
+    Route::resource('material-orders', MaterialOrderController::class)->except(['destroy']);
     Route::post('material-orders/{materialOrder}/update-status', [MaterialOrderController::class, 'updateStatus'])->name('material-orders.update-status');
     Route::delete('material-orders/{materialOrder}/cancel', [MaterialOrderController::class, 'cancel'])->name('material-orders.cancel');
-
 
     // Reports
     Route::middleware('owner-only')->prefix('reports')->name('reports.')->group(function () {

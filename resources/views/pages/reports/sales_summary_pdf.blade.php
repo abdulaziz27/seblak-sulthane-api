@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>{{ $title }}</title>
@@ -75,6 +76,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h1>{{ $title }}</h1>
@@ -114,13 +116,34 @@
             <th>Number of Orders</th>
             <th>Total Amount</th>
         </tr>
-        @foreach($paymentMethods as $method)
-        <tr>
-            <td>{{ strtoupper($method->payment_method) }}</td>
-            <td>{{ number_format($method->count, 0, ',', '.') }}</td>
-            <td>Rp {{ number_format($method->total, 0, ',', '.') }}</td>
-        </tr>
+        @foreach ($paymentMethods as $method)
+            <tr>
+                <td>{{ strtoupper($method->payment_method) }}</td>
+                <td>{{ number_format($method->count, 0, ',', '.') }}</td>
+                <td>Rp {{ number_format($method->total, 0, ',', '.') }}</td>
+            </tr>
         @endforeach
+    </table>
+
+    <div class="section-title">Cash Flow Summary</div>
+
+    <table class="summary-table">
+        <tr>
+            <th width="30%">Opening Balance</th>
+            <td>Rp {{ number_format($totalOpeningBalance, 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th>Cash Sales</th>
+            <td>Rp {{ number_format($totalCashSales, 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th>Expenses</th>
+            <td>Rp {{ number_format($totalExpenses, 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th>Closing Balance</th>
+            <td>Rp {{ number_format($closingBalance, 0, ',', '.') }}</td>
+        </tr>
     </table>
 
     <div class="section-title">Daily Sales</div>
@@ -132,18 +155,29 @@
             <th>Number of Orders</th>
             <th>Average Order Value</th>
         </tr>
-        @foreach($dailySales as $sale)
-        <tr>
-            <td>{{ \Carbon\Carbon::parse($sale->date)->format('d M Y') }}</td>
-            <td>Rp {{ number_format($sale->total_sales, 0, ',', '.') }}</td>
-            <td>{{ $sale->order_count }}</td>
-            <td>Rp {{ number_format($sale->order_count > 0 ? $sale->total_sales / $sale->order_count : 0, 0, ',', '.') }}</td>
-        </tr>
+        @foreach ($dailySales as $sale)
+            <tr>
+                <td>{{ \Carbon\Carbon::parse($sale->date)->format('d M Y') }}</td>
+                <td>Rp {{ number_format($sale->total_sales, 0, ',', '.') }}</td>
+                <td>{{ $sale->order_count }}</td>
+                <td>Rp
+                    {{ number_format($sale->order_count > 0 ? $sale->total_sales / $sale->order_count : 0, 0, ',', '.') }}
+                </td>
+            </tr>
         @endforeach
+    </table>
+
+    <div class="section-title">Beverage Sales Summary</div>
+    <table class="summary-table">
+        <tr>
+            <th width="30%">Total Beverage Sales</th>
+            <td>Rp {{ number_format($beverageSales->total_amount ?? 0, 0, ',', '.') }}</td>
+        </tr>
     </table>
 
     <div class="footer">
         <p>Generated on {{ now()->format('d M Y H:i') }} | Seblak Sulthane Management System</p>
     </div>
 </body>
+
 </html>

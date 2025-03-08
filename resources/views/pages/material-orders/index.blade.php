@@ -153,6 +153,11 @@
                                                         </a>
 
                                                         @if ($order->status === 'pending')
+                                                            <a href="{{ route('material-orders.edit', $order->id) }}"
+                                                                class="btn btn-primary btn-sm">
+                                                                <i class="fas fa-edit"></i>
+                                                            </a>
+
                                                             <form
                                                                 action="{{ route('material-orders.cancel', $order->id) }}"
                                                                 method="POST" class="d-inline">

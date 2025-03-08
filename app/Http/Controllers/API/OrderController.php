@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\DailyCash;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
@@ -89,38 +91,169 @@ class OrderController extends Controller
         ], 200);
     }
 
+    /**
+     * Modified summary method to include cash flow data
+     */
     public function summary(Request $request)
     {
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
         $outletId = $request->input('outlet_id');
 
+        // Base query for orders
         $query = Order::query();
+
         if ($startDate && $endDate) {
             $start = Carbon::parse($startDate)->startOfDay();
             $end = Carbon::parse($endDate)->endOfDay();
-
             $query->whereBetween('created_at', [$start, $end]);
         }
+
         if ($outletId) {
             $query->where('outlet_id', $outletId);
         }
 
-        $totalRevenue = $query->sum('payment_amount');
+        // Existing summary calculations
+        $totalRevenue = $query->sum('total');
         $totalDiscount = $query->sum('discount_amount');
         $totalTax = $query->sum('tax');
         $totalServiceCharge = $query->sum('service_charge');
         $totalSubtotal = $query->sum('sub_total');
-        $total = $totalSubtotal - $totalDiscount - $totalTax + $totalServiceCharge;
+
+        // Get daily cash data for the period
+        $dailyCashQuery = DailyCash::query();
+
+        if ($startDate && $endDate) {
+            $dailyCashQuery->whereBetween('date', [$startDate, $endDate]);
+        } elseif ($startDate) {
+            $dailyCashQuery->where('date', $startDate);
+        } else {
+            $dailyCashQuery->where('date', Carbon::today()->format('Y-m-d'));
+        }
+
+        if ($outletId) {
+            $dailyCashQuery->where('outlet_id', $outletId);
+        }
+
+        $dailyCashData = $dailyCashQuery->get();
+
+        // Calculate totals from daily cash
+        $totalOpeningBalance = $dailyCashData->sum('opening_balance');
+        $totalExpenses = $dailyCashData->sum('expenses');
+
+        // Payment method breakdown
+        $paymentMethods = clone $query;
+        $paymentMethodSummary = $paymentMethods->select(
+            'payment_method',
+            DB::raw('COUNT(*) as count'),
+            DB::raw('SUM(total) as total_amount')
+        )
+            ->groupBy('payment_method')
+            ->get();
+
+        // Convert to a more usable format
+        $paymentMethodData = [];
+        foreach ($paymentMethodSummary as $method) {
+            $paymentMethodData[$method->payment_method] = [
+                'count' => $method->count,
+                'total' => $method->total_amount
+            ];
+        }
+
+        // Total cash sales
+        $cashSales = $paymentMethodData['cash']['total'] ?? 0;
+
+        // Total QRIS sales
+        $qrisSales = $paymentMethodData['qris']['total'] ?? 0;
+
+        // Beverage sales calculation
+        // Assuming we have a category_id for beverages (e.g., 2)
+        $beverageQuery = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->where('products.category_id', 2); // Adjust category ID as needed
+
+        if ($startDate && $endDate) {
+            $start = Carbon::parse($startDate)->startOfDay();
+            $end = Carbon::parse($endDate)->endOfDay();
+            $beverageQuery->whereBetween('orders.created_at', [$start, $end]);
+        }
+
+        if ($outletId) {
+            $beverageQuery->where('orders.outlet_id', $outletId);
+        }
+
+        $beverageSales = $beverageQuery->sum(DB::raw('order_items.quantity * order_items.price'));
+
+        // Calculate closing balance
+        $closingBalance = $totalOpeningBalance + $cashSales - $totalExpenses;
+
+        // Prepare daily breakdown data if date range is provided
+        $dailyBreakdown = [];
+
+        if ($startDate && $endDate) {
+            $currentDate = Carbon::parse($startDate);
+            $lastDate = Carbon::parse($endDate);
+
+            while ($currentDate <= $lastDate) {
+                $currentDateStr = $currentDate->format('Y-m-d');
+
+                // Get daily orders
+                $dailyOrders = Order::when($outletId, function ($q) use ($outletId) {
+                    return $q->where('outlet_id', $outletId);
+                })
+                    ->whereDate('created_at', $currentDateStr);
+
+                // Get daily cash record
+                $dailyCash = DailyCash::when($outletId, function ($q) use ($outletId) {
+                    return $q->where('outlet_id', $outletId);
+                })
+                    ->where('date', $currentDateStr)
+                    ->first();
+
+                // Calculate daily cash sales
+                $dailyCashSales = $dailyOrders->where('payment_method', 'cash')->sum('total');
+
+                // Calculate daily QRIS sales
+                $dailyQrisSales = $dailyOrders->where('payment_method', 'qris')->sum('total');
+
+                // Daily totals
+                $dailyBreakdown[] = [
+                    'date' => $currentDateStr,
+                    'opening_balance' => $dailyCash ? $dailyCash->opening_balance : 0,
+                    'expenses' => $dailyCash ? $dailyCash->expenses : 0,
+                    'cash_sales' => $dailyCashSales,
+                    'qris_sales' => $dailyQrisSales,
+                    'total_sales' => $dailyCashSales + $dailyQrisSales,
+                    'closing_balance' => ($dailyCash ? $dailyCash->opening_balance : 0) + $dailyCashSales - ($dailyCash ? $dailyCash->expenses : 0)
+                ];
+
+                $currentDate->addDay();
+            }
+        }
+
         return response()->json([
             'status' => 'success',
             'data' => [
+                // Original summary data
                 'total_revenue' => $totalRevenue,
                 'total_discount' => $totalDiscount,
                 'total_tax' => $totalTax,
-                'total_subtotal' => $totalSubtotal,
                 'total_service_charge' => $totalServiceCharge,
-                'total' => $total,
+                'total_subtotal' => $totalSubtotal,
+
+                // New cash flow data
+                'opening_balance' => $totalOpeningBalance,
+                'expenses' => $totalExpenses,
+                'cash_sales' => $cashSales,
+                'qris_sales' => $qrisSales,
+                'beverage_sales' => $beverageSales,
+                'closing_balance' => $closingBalance,
+
+                // Payment methods breakdown
+                'payment_methods' => $paymentMethodData,
+
+                // Daily breakdown for date ranges
+                'daily_breakdown' => $dailyBreakdown
             ]
         ], 200);
     }
