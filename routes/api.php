@@ -4,12 +4,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\DailyCashController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderItemController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\DiscountController;
-use App\Http\Controllers\Api\DailyCashController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
