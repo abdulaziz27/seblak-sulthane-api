@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Material Orders')
+@section('title', 'Pesanan Material')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -13,14 +13,14 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Material Orders</h1>
+                <h1>Pesanan Material</h1>
                 <div class="section-header-button">
-                    <a href="{{ route('material-orders.create') }}" class="btn btn-primary">Create Order</a>
+                    <a href="{{ route('material-orders.create') }}" class="btn btn-primary">Buat Pesanan</a>
                 </div>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Inventory</a></div>
-                    <div class="breadcrumb-item">Material Orders</div>
+                    <div class="breadcrumb-item"><a href="#">Inventori</a></div>
+                    <div class="breadcrumb-item">Pesanan Material</div>
                 </div>
             </div>
 
@@ -31,17 +31,17 @@
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Filter Orders</h4>
+                                <h4>Filter Pesanan</h4>
                             </div>
                             <div class="card-body">
                                 <form method="GET" action="{{ route('material-orders.index') }}" id="filter-form">
                                     <div class="row">
                                         <div class="form-group col-md-3">
-                                            <label class="d-block">Date Range</label>
+                                            <label class="d-block">Rentang Tanggal</label>
                                             <a href="javascript:;" class="btn btn-primary daterange-btn icon-left btn-icon"
                                                 id="daterange-btn">
                                                 <i class="fas fa-calendar"></i>
-                                                <span>Choose Date Range</span>
+                                                <span>Pilih Rentang Tanggal</span>
                                             </a>
                                             <input type="hidden" name="date_start" id="date_start"
                                                 value="{{ request('date_start') }}">
@@ -52,32 +52,32 @@
                                         <div class="form-group col-md-3">
                                             <label>Status</label>
                                             <select class="form-control selectric" name="status">
-                                                <option value="">All Statuses</option>
+                                                <option value="">Semua Status</option>
                                                 <option value="pending"
                                                     {{ request('status') == 'pending' ? 'selected' : '' }}>
                                                     Pending
                                                 </option>
                                                 <option value="approved"
                                                     {{ request('status') == 'approved' ? 'selected' : '' }}>
-                                                    Approved
+                                                    Disetujui
                                                 </option>
                                                 <option value="delivered"
                                                     {{ request('status') == 'delivered' ? 'selected' : '' }}>
-                                                    Delivered
+                                                    Dikirim
                                                 </option>
                                             </select>
                                         </div>
 
                                         <div class="form-group col-md-3">
-                                            <label>Payment Method</label>
+                                            <label>Metode Pembayaran</label>
                                             <select class="form-control selectric" name="payment_method">
-                                                <option value="">All Payment Methods</option>
+                                                <option value="">Semua Metode Pembayaran</option>
                                                 <option value="cash"
                                                     {{ request('payment_method') == 'cash' ? 'selected' : '' }}>Tunai
                                                 </option>
                                                 <option value="bank_transfer"
                                                     {{ request('payment_method') == 'bank_transfer' ? 'selected' : '' }}>
-                                                    Bank Transfer</option>
+                                                    Transfer Bank</option>
                                                 <option value="e-wallet"
                                                     {{ request('payment_method') == 'e-wallet' ? 'selected' : '' }}>
                                                     E-Wallet</option>
@@ -88,7 +88,7 @@
                                             <div class="form-group col-md-3">
                                                 <label>Outlet</label>
                                                 <select class="form-control selectric" name="franchise_id">
-                                                    <option value="">All Outlets</option>
+                                                    <option value="">Semua Outlet</option>
                                                     @foreach ($outlets as $outlet)
                                                         <option value="{{ $outlet->id }}"
                                                             {{ request('franchise_id') == $outlet->id ? 'selected' : '' }}>
@@ -119,21 +119,21 @@
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Material Orders List</h4>
+                                <h4>Daftar Pesanan Material</h4>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-striped">
                                         <thead>
                                             <tr>
-                                                <th>Order ID</th>
+                                                <th>ID Pesanan</th>
                                                 <th>Outlet</th>
-                                                <th>Created By</th>
-                                                <th>Date</th>
-                                                <th>Payment Method</th>
+                                                <th>Dibuat Oleh</th>
+                                                <th>Tanggal</th>
+                                                <th>Metode Pembayaran</th>
                                                 <th>Total</th>
                                                 <th>Status</th>
-                                                <th>Action</th>
+                                                <th>Aksi</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -205,12 +205,12 @@
             // Custom setup for daterange button
             $('#daterange-btn').daterangepicker({
                 ranges: {
-                    'Today': [moment(), moment()],
-                    'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-                    'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-                    'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-                    'This Month': [moment().startOf('month'), moment().endOf('month')],
-                    'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1,
+                    'Hari Ini': [moment(), moment()],
+                    'Kemarin': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+                    '7 Hari Terakhir': [moment().subtract(6, 'days'), moment()],
+                    '30 Hari Terakhir': [moment().subtract(29, 'days'), moment()],
+                    'Bulan Ini': [moment().startOf('month'), moment().endOf('month')],
+                    'Bulan Lalu': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1,
                         'month').endOf('month')]
                 },
                 startDate: moment().subtract(29, 'days'),
@@ -246,8 +246,8 @@
                 e.preventDefault();
 
                 swal({
-                    title: 'Are you sure?',
-                    text: 'Once cancelled, you will not be able to recover this order!',
+                    title: 'Apakah Anda yakin?',
+                    text: 'Setelah dibatalkan, Anda tidak dapat memulihkan pesanan ini!',
                     icon: 'warning',
                     buttons: true,
                     dangerMode: true,

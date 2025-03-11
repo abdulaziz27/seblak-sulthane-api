@@ -72,7 +72,7 @@
                                             <th>Order ID</th>
                                             <th>Date</th>
                                             <th>Total Items</th>
-                                            <th>Total Amount</th>
+                                            <th>Total Spending</th>
                                             <th>Status</th>
                                             <th>Action</th>
                                         </tr>
@@ -81,7 +81,7 @@
                                                 <td>#{{ $order->id }}</td>
                                                 <td>{{ $order->created_at->format('d M Y H:i') }}</td>
                                                 <td>{{ $order->total_item }}</td>
-                                                <td>Rp {{ number_format($order->total_amount, 0, ',', '.') }}</td>
+                                                <td>Rp {{ number_format($order->total_spending, 0, ',', '.') }}</td>
                                                 <td>
                                                     <div class="badge badge-{{ $order->status === 'completed' ? 'success' : ($order->status === 'pending' ? 'warning' : 'danger') }}">
                                                         {{ ucfirst($order->status) }}

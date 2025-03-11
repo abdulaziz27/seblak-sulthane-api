@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Discounts')
+@section('title', 'Diskon')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -11,9 +11,9 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Discounts</h1>
+                <h1>Diskon</h1>
                 {{-- <div class="section-header-button">
-                    <a href="{{ route('discounts.create') }}" class="btn btn-primary">Add New</a>
+                    <a href="{{ route('discounts.create') }}" class="btn btn-primary">Tambah Baru</a>
                 </div> --}}
             </div>
 
@@ -27,13 +27,13 @@
                                 <div class="table-responsive">
                                     <table class="table-striped table">
                                         <tr>
-                                            <th>Name</th>
-                                            <th>Type</th>
-                                            <th>Value</th>
-                                            <th>Category</th>
-                                            <th>Expired Date</th>
+                                            <th>Nama</th>
+                                            <th>Tipe</th>
+                                            <th>Nilai</th>
+                                            <th>Kategori</th>
+                                            <th>Tanggal Kedaluwarsa</th>
                                             {{-- <th>Status</th>
-                                            <th>Action</th> --}}
+                                            <th>Aksi</th> --}}
                                         </tr>
                                         @foreach ($discounts as $discount)
                                             <tr>
@@ -41,7 +41,7 @@
                                                 <td>{{ ucfirst($discount->type) }}</td>
                                                 <td>{{ $discount->type === 'percentage' ? $discount->value . '%' : 'Rp ' . number_format($discount->value) }}</td>
                                                 <td>{{ ucfirst($discount->category) }}</td>
-                                                <td>{{ $discount->expired_date ? date('d M Y', strtotime($discount->expired_date)) : 'No Expiry' }}</td>
+                                                <td>{{ $discount->expired_date ? date('d M Y', strtotime($discount->expired_date)) : 'Tidak Ada Kedaluwarsa' }}</td>
                                                 {{-- <td>
                                                     <div class="badge badge-{{ $discount->status === 'active' ? 'success' : 'danger' }}">
                                                         {{ ucfirst($discount->status) }}
@@ -60,7 +60,7 @@
                                                             <input type="hidden" name="_method" value="DELETE" />
                                                             <input type="hidden" name="_token" value="{{ csrf_token() }}" />
                                                             <button class="btn btn-sm btn-danger btn-icon confirm-delete">
-                                                                <i class="fas fa-times"></i> Delete
+                                                                <i class="fas fa-times"></i> Hapus
                                                             </button>
                                                         </form>
                                                     </div>

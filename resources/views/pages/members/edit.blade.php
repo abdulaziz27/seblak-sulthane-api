@@ -19,7 +19,7 @@
                 <h1>Edit Member</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Members</a></div>
+                    <div class="breadcrumb-item"><a href="#">Member</a></div>
                     <div class="breadcrumb-item">Edit Member</div>
                 </div>
             </div>
@@ -30,11 +30,11 @@
                         @csrf
                         @method('PUT')
                         <div class="card-header">
-                            <h4>Edit Member Form</h4>
+                            <h4>Form Edit Member</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label>Name</label>
+                                <label>Nama</label>
                                 <input type="text"
                                     class="form-control @error('name') is-invalid @enderror"
                                     name="name"
@@ -47,7 +47,7 @@
                                 @enderror
                             </div>
                             <div class="form-group">
-                                <label>Phone Number</label>
+                                <label>Nomor Telepon</label>
                                 <div class="input-group">
                                     <div class="input-group-prepend">
                                         <div class="input-group-text">
@@ -68,7 +68,7 @@
                             </div>
                         </div>
                         <div class="card-footer text-right">
-                            <button class="btn btn-primary">Update</button>
+                            <button class="btn btn-primary">Perbarui</button>
                         </div>
                     </form>
                 </div>

@@ -19,8 +19,8 @@
                 <h1>Edit Outlet</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Forms</a></div>
-                    <div class="breadcrumb-item">Outlets</div>
+                    <div class="breadcrumb-item"><a href="#">Formulir</a></div>
+                    <div class="breadcrumb-item">Outlet</div>
                 </div>
             </div>
 
@@ -32,11 +32,11 @@
                         @csrf
                         @method('PUT')
                         <div class="card-header">
-                            <h4>Edit Outlet Form</h4>
+                            <h4>Formulir Edit Outlet</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label>Name</label>
+                                <label>Nama</label>
                                 <input type="text"
                                     class="form-control @error('name')
                                 is-invalid
@@ -50,7 +50,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Address 1</label>
+                                <label>Alamat 1</label>
                                 <input type="text"
                                     class="form-control @error('address1')
                                 is-invalid
@@ -64,7 +64,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Address 2 (Optional)</label>
+                                <label>Alamat 2 (Opsional)</label>
                                 <input type="text"
                                     class="form-control @error('address2')
                                 is-invalid
@@ -78,7 +78,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Phone (Optional)</label>
+                                <label>Telepon (Opsional)</label>
                                 <input type="text"
                                     class="form-control @error('phone')
                                 is-invalid
@@ -92,7 +92,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Leader (Optional)</label>
+                                <label>Pimpinan (Opsional)</label>
                                 <input type="text"
                                     class="form-control @error('leader')
                                 is-invalid
@@ -106,7 +106,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Notes (Optional)</label>
+                                <label>Catatan (Opsional)</label>
                                 <textarea
                                     class="form-control @error('notes')
                                 is-invalid
@@ -120,8 +120,8 @@
                             </div>
                         </div>
                         <div class="card-footer text-right">
-                            <a href="{{ route('outlets.index') }}" class="btn btn-secondary mr-2">Cancel</a>
-                            <button class="btn btn-primary">Update</button>
+                            <a href="{{ route('outlets.index') }}" class="btn btn-secondary mr-2">Batal</a>
+                            <button class="btn btn-primary">Perbarui</button>
                         </div>
                     </form>
                 </div>

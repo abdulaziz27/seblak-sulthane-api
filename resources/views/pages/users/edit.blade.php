@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Edit User')
+@section('title', 'Edit Pengguna')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -16,29 +16,27 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Advanced Forms</h1>
+                <h1>Form Lanjutan</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Forms</a></div>
-                    <div class="breadcrumb-item">Users</div>
+                    <div class="breadcrumb-item"><a href="#">Formulir</a></div>
+                    <div class="breadcrumb-item">Pengguna</div>
                 </div>
             </div>
 
             <div class="section-body">
-                <h2 class="section-title">Users</h2>
-
-
+                <h2 class="section-title">Pengguna</h2>
 
                 <div class="card">
                     <form action="{{ route('users.update', $user) }}" method="POST">
                         @csrf
                         @method('PUT')
                         <div class="card-header">
-                            <h4>Input Text</h4>
+                            <h4>Edit Data</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label>Name</label>
+                                <label>Nama</label>
                                 <input type="text"
                                     class="form-control @error('name')
                                 is-invalid
@@ -64,7 +62,7 @@
                                 @enderror
                             </div>
                             <div class="form-group">
-                                <label>Password</label>
+                                <label>Kata Sandi</label>
                                 <div class="input-group">
                                     <div class="input-group-prepend">
                                         <div class="input-group-text">
@@ -89,7 +87,8 @@
                                 <label>Outlet</label>
                                 <select name="outlet_id" class="form-control @error('outlet_id') is-invalid @enderror"
                                     {{ Auth::user()->role === 'admin' && (!isset($user) || $user->id !== Auth::id()) ? 'disabled' : '' }}>
-                                    <option value="" disabled selected>Choose Outlet</option>
+                                    <option value="" disabled selected>Pilih Outlet</option>
+                                    <option value="null" {{ $user->outlet_id === null ? 'selected' : '' }}>None (Tidak Ada)</option>
                                     @foreach ($outlets as $outlet)
                                         <option value="{{ $outlet->id }}"
                                             {{ (isset($user) && $user->outlet_id === $outlet->id) ||
@@ -110,7 +109,7 @@
 
                             {{-- Form group for role selection --}}
                             <div class="form-group">
-                                <label class="form-label w-100">Role</label>
+                                <label class="form-label w-100">Peran</label>
                                 <div class="selectgroup w-100">
                                     @if (Auth::user()->role === 'owner')
                                         <label class="selectgroup-item">
@@ -139,7 +138,7 @@
                             </div>
                         </div>
                         <div class="card-footer text-right">
-                            <button class="btn btn-primary">Submit</button>
+                            <button class="btn btn-primary">Perbarui</button>
                         </div>
                     </form>
                 </div>

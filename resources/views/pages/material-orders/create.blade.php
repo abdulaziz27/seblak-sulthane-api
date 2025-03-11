@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Create Material Order')
+@section('title', 'Tambah Pesanan Bahan')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -48,25 +48,25 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Create Material Order</h1>
+                <h1>Tambah Pesanan Bahan</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Inventory</a></div>
-                    <div class="breadcrumb-item">Create Material Order</div>
+                    <div class="breadcrumb-item"><a href="#">Inventaris</a></div>
+                    <div class="breadcrumb-item">Tambah Pesanan Bahan</div>
                 </div>
             </div>
 
             <div class="section-body">
-                <h2 class="section-title">Create Material Order</h2>
+                <h2 class="section-title">Tambah Pesanan Bahan</h2>
                 <p class="section-lead">
-                    Create a new order for raw materials. Current stock levels are displayed to help with ordering decisions.
+                    Buat pesanan bahan baru. Level stok saat ini ditampilkan untuk membantu keputusan pemesanan.
                 </p>
 
                 <div class="row">
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Order Information</h4>
+                                <h4>Informasi Pesanan</h4>
                             </div>
                             <form action="{{ route('material-orders.store') }}" method="POST">
                                 @csrf
@@ -79,7 +79,7 @@
                                                 <select
                                                     class="form-control select2 @error('franchise_id') is-invalid @enderror"
                                                     name="franchise_id" required>
-                                                    <option value="">Select Outlet</option>
+                                                    <option value="">Pilih Outlet</option>
                                                     @foreach ($outlets as $outlet)
                                                         <option value="{{ $outlet->id }}"
                                                             {{ old('franchise_id') == $outlet->id ? 'selected' : '' }}>
@@ -100,18 +100,17 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Payment Method
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Metode Pembayaran
                                             <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <select
                                                 class="form-control selectric @error('payment_method') is-invalid @enderror"
                                                 name="payment_method" required>
-                                                <option value="">Select Payment Method</option>
+                                                <option value="">Pilih Metode Pembayaran</option>
                                                 <option value="cash"
                                                     {{ old('payment_method') == 'cash' ? 'selected' : '' }}>Tunai</option>
                                                 <option value="bank_transfer"
-                                                    {{ old('payment_method') == 'bank_transfer' ? 'selected' : '' }}>Bank
-                                                    Transfer</option>
+                                                    {{ old('payment_method') == 'bank_transfer' ? 'selected' : '' }}>Transfer Bank</option>
                                                 <option value="e-wallet"
                                                     {{ old('payment_method') == 'e-wallet' ? 'selected' : '' }}>E-Wallet
                                                 </option>
@@ -123,7 +122,7 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Notes</label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Catatan</label>
                                         <div class="col-sm-12 col-md-7">
                                             <textarea class="form-control @error('notes') is-invalid @enderror" name="notes" rows="3">{{ old('notes') }}</textarea>
                                             @error('notes')
@@ -133,7 +132,7 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Order Items
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Item Pesanan
                                             <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <div class="materials-container">
@@ -145,7 +144,7 @@
                                                                     class="form-control select2 material-select @error('materials.' . $index . '.raw_material_id') is-invalid @enderror"
                                                                     name="materials[{{ $index }}][raw_material_id]"
                                                                     required>
-                                                                    <option value="">Select Material</option>
+                                                                    <option value="">Pilih Bahan</option>
                                                                     @foreach ($rawMaterials as $rawMaterial)
                                                                         @php
                                                                             $stockClass = '';
@@ -164,7 +163,7 @@
                                                                             data-stock-class="{{ $stockClass }}"
                                                                             {{ $material['raw_material_id'] == $rawMaterial->id ? 'selected' : '' }}>
                                                                             {{ $rawMaterial->name }} -
-                                                                            Stock: {{ $rawMaterial->stock }} {{ $rawMaterial->unit }} -
+                                                                            Stok: {{ $rawMaterial->stock }} {{ $rawMaterial->unit }} -
                                                                             Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
                                                                         </option>
                                                                     @endforeach
@@ -181,7 +180,7 @@
                                                                 <input type="number"
                                                                     class="form-control quantity-input @error('materials.' . $index . '.quantity') is-invalid @enderror"
                                                                     name="materials[{{ $index }}][quantity]"
-                                                                    placeholder="Quantity"
+                                                                    placeholder="Jumlah"
                                                                     value="{{ $material['quantity'] }}" min="1"
                                                                     required>
                                                                 @error('materials.' . $index . '.quantity')
@@ -202,7 +201,7 @@
                                                         <div class="col-md-6">
                                                             <select class="form-control select2 material-select"
                                                                 name="materials[0][raw_material_id]" required>
-                                                                <option value="">Select Material</option>
+                                                                <option value="">Pilih Bahan</option>
                                                                 @foreach ($rawMaterials as $rawMaterial)
                                                                     @php
                                                                         $stockClass = '';
@@ -220,7 +219,7 @@
                                                                         data-unit="{{ $rawMaterial->unit }}"
                                                                         data-stock-class="{{ $stockClass }}">
                                                                         {{ $rawMaterial->name }} -
-                                                                        Stock: {{ $rawMaterial->stock }} {{ $rawMaterial->unit }} -
+                                                                        Stok: {{ $rawMaterial->stock }} {{ $rawMaterial->unit }} -
                                                                         Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
                                                                     </option>
                                                                 @endforeach
@@ -232,7 +231,7 @@
                                                         </div>
                                                         <div class="col-md-3">
                                                             <input type="number" class="form-control quantity-input"
-                                                                name="materials[0][quantity]" placeholder="Quantity"
+                                                                name="materials[0][quantity]" placeholder="Jumlah"
                                                                 min="1" required>
                                                         </div>
                                                         <div class="col-md-2">
@@ -242,15 +241,15 @@
                                                 @endif
                                             </div>
                                             <button type="button" class="btn btn-info btn-sm mt-2" id="add-material">
-                                                <i class="fas fa-plus"></i> Add Material
+                                                <i class="fas fa-plus"></i> Tambah Bahan
                                             </button>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="card-footer text-right">
                                     <a href="{{ route('material-orders.index') }}"
-                                        class="btn btn-secondary mr-2">Cancel</a>
-                                    <button type="submit" class="btn btn-primary">Create Order</button>
+                                        class="btn btn-secondary mr-2">Batal</a>
+                                    <button type="submit" class="btn btn-primary">Buat Pesanan</button>
                                 </div>
                             </form>
                         </div>
@@ -297,7 +296,7 @@
                 var $materialOption = $(
                     '<div class="material-option">' +
                         '<div>' + material.text + '</div>' +
-                        '<div class="' + stockClass + '">Current Stock: ' + stock + ' ' + unit + '</div>' +
+                        '<div class="' + stockClass + '">Stok Saat Ini: ' + stock + ' ' + unit + '</div>' +
                     '</div>'
                 );
 
@@ -329,8 +328,8 @@
                     var stockClass = selectedOption.data('stock-class');
 
                     // Set content and show details container
-                    detailsContainer.find('.stock-info').html('<strong>Current Stock:</strong> <span class="' + stockClass + '">' + stock + ' ' + unit + '</span>');
-                    detailsContainer.find('.price-info').html('<strong>Price:</strong> Rp ' + price.toLocaleString('id-ID'));
+                    detailsContainer.find('.stock-info').html('<strong>Stok Saat Ini:</strong> <span class="' + stockClass + '">' + stock + ' ' + unit + '</span>');
+                    detailsContainer.find('.price-info').html('<strong>Harga:</strong> Rp ' + price.toLocaleString('id-ID'));
                     detailsContainer.show();
                 } else {
                     detailsContainer.hide();
@@ -350,7 +349,7 @@
                     <div class="row mb-3 material-row">
                         <div class="col-md-6">
                             <select class="form-control select2 material-select" name="materials[${index}][raw_material_id]" required>
-                                <option value="">Select Material</option>
+                                <option value="">Pilih Bahan</option>
                                 @foreach ($rawMaterials as $rawMaterial)
                                     @php
                                         $stockClass = '';
@@ -368,7 +367,7 @@
                                         data-unit="{{ $rawMaterial->unit }}"
                                         data-stock-class="{{ $stockClass }}">
                                         {{ $rawMaterial->name }} -
-                                        Stock: {{ $rawMaterial->stock }} {{ $rawMaterial->unit }} -
+                                        Stok: {{ $rawMaterial->stock }} {{ $rawMaterial->unit }} -
                                         Rp {{ number_format($rawMaterial->price, 0, ',', '.') }}
                                     </option>
                                 @endforeach
@@ -379,7 +378,7 @@
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <input type="number" class="form-control quantity-input" name="materials[${index}][quantity]" placeholder="Quantity" min="1" required>
+                            <input type="number" class="form-control quantity-input" name="materials[${index}][quantity]" placeholder="Jumlah" min="1" required>
                         </div>
                         <div class="col-md-2">
                             <button type="button" class="btn btn-danger remove-material"><i class="fas fa-times"></i></button>
@@ -423,7 +422,7 @@
 
                         // Add warning if not already present
                         if (row.find('.stock-warning').length === 0) {
-                            row.append('<div class="col-12 mt-2 stock-warning text-danger">Warning: Requested quantity exceeds current stock!</div>');
+                            row.append('<div class="col-12 mt-2 stock-warning text-danger">Peringatan: Jumlah yang diminta melebihi stok saat ini!</div>');
                         }
                     } else {
                         $(this).removeClass('is-invalid');
