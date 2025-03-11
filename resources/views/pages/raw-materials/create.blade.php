@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Add Raw Material')
+@section('title', 'Tambah Bahan Baku')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -16,18 +16,18 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Add Raw Material</h1>
+                <h1>Tambah Bahan Baku</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Inventory</a></div>
-                    <div class="breadcrumb-item">Add Raw Material</div>
+                    <div class="breadcrumb-item"><a href="#">Inventaris</a></div>
+                    <div class="breadcrumb-item">Tambah Bahan Baku</div>
                 </div>
             </div>
 
             <div class="section-body">
-                <h2 class="section-title">Add Raw Material Form</h2>
+                <h2 class="section-title">Form Tambah Bahan Baku</h2>
                 <p class="section-lead">
-                    Fill all the required fields below to add a new raw material to the inventory.
+                    Isi semua kolom yang diperlukan di bawah ini untuk menambahkan bahan baku baru ke inventaris.
                 </p>
 
                 <div class="row">
@@ -36,11 +36,11 @@
                             <form action="{{ route('raw-materials.store') }}" method="POST">
                                 @csrf
                                 <div class="card-header">
-                                    <h4>Raw Material Information</h4>
+                                    <h4>Informasi Bahan Baku</h4>
                                 </div>
                                 <div class="card-body">
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Name <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Nama <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <input type="text" class="form-control @error('name') is-invalid @enderror" name="name" value="{{ old('name') }}" required>
                                             @error('name')
@@ -50,10 +50,10 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Unit <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Satuan <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <select class="form-control selectric @error('unit') is-invalid @enderror" name="unit" required>
-                                                <option value="" disabled selected>Select unit</option>
+                                                <option value="" disabled selected>Pilih satuan</option>
                                                 <option value="Ball" {{ old('unit') == 'Ball' ? 'selected' : '' }}>Ball</option>
                                                 <option value="Kg" {{ old('unit') == 'Kg' ? 'selected' : '' }}>Kg</option>
                                                 <option value="Bks" {{ old('unit') == 'Bks' ? 'selected' : '' }}>Bks</option>
@@ -74,18 +74,18 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Price (Rp) <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Harga (Rp) <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <input type="number" class="form-control @error('price') is-invalid @enderror" name="price" value="{{ old('price') }}" required>
                                             @error('price')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
-                                            <small class="form-text text-muted">Price per unit in Rupiah (Rp).</small>
+                                            <small class="form-text text-muted">Harga per satuan dalam Rupiah (Rp).</small>
                                         </div>
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Initial Stock <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Stok Awal <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <input type="number" class="form-control @error('stock') is-invalid @enderror" name="stock" value="{{ old('stock', 0) }}" required>
                                             @error('stock')
@@ -95,7 +95,7 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Description</label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Deskripsi</label>
                                         <div class="col-sm-12 col-md-7">
                                             <textarea class="form-control @error('description') is-invalid @enderror" name="description" rows="4">{{ old('description') }}</textarea>
                                             @error('description')
@@ -110,19 +110,19 @@
                                             <div class="selectgroup w-100">
                                                 <label class="selectgroup-item">
                                                     <input type="radio" name="is_active" value="1" class="selectgroup-input" {{ old('is_active', '1') == '1' ? 'checked' : '' }}>
-                                                    <span class="selectgroup-button">Active</span>
+                                                    <span class="selectgroup-button">Aktif</span>
                                                 </label>
                                                 <label class="selectgroup-item">
                                                     <input type="radio" name="is_active" value="0" class="selectgroup-input" {{ old('is_active') == '0' ? 'checked' : '' }}>
-                                                    <span class="selectgroup-button">Inactive</span>
+                                                    <span class="selectgroup-button">Tidak Aktif</span>
                                                 </label>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="card-footer text-right">
-                                    <a href="{{ route('raw-materials.index') }}" class="btn btn-secondary mr-2">Cancel</a>
-                                    <button type="submit" class="btn btn-primary">Submit</button>
+                                    <a href="{{ route('raw-materials.index') }}" class="btn btn-secondary mr-2">Batal</a>
+                                    <button type="submit" class="btn btn-primary">Simpan</button>
                                 </div>
                             </form>
                         </div>

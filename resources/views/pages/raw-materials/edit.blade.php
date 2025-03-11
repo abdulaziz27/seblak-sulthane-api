@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Edit Raw Material')
+@section('title', 'Edit Bahan Baku')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -16,18 +16,18 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Edit Raw Material</h1>
+                <h1>Edit Bahan Baku</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Inventory</a></div>
-                    <div class="breadcrumb-item">Edit Raw Material</div>
+                    <div class="breadcrumb-item"><a href="#">Inventaris</a></div>
+                    <div class="breadcrumb-item">Edit Bahan Baku</div>
                 </div>
             </div>
 
             <div class="section-body">
-                <h2 class="section-title">Edit Raw Material</h2>
+                <h2 class="section-title">Edit Bahan Baku</h2>
                 <p class="section-lead">
-                    Update information for raw material: {{ $rawMaterial->name }}
+                    Perbarui informasi untuk bahan baku: {{ $rawMaterial->name }}
                 </p>
 
                 <div class="row">
@@ -37,11 +37,11 @@
                                 @csrf
                                 @method('PUT')
                                 <div class="card-header">
-                                    <h4>Raw Material Information</h4>
+                                    <h4>Informasi Bahan Baku</h4>
                                 </div>
                                 <div class="card-body">
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Name <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Nama <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <input type="text" class="form-control @error('name') is-invalid @enderror" name="name" value="{{ old('name', $rawMaterial->name) }}" required>
                                             @error('name')
@@ -51,10 +51,10 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Unit <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Satuan <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <select class="form-control selectric @error('unit') is-invalid @enderror" name="unit" required>
-                                                <option value="" disabled>Select unit</option>
+                                                <option value="" disabled>Pilih satuan</option>
                                                 <option value="Ball" {{ old('unit', $rawMaterial->unit) == 'Ball' ? 'selected' : '' }}>Ball</option>
                                                 <option value="Kg" {{ old('unit', $rawMaterial->unit) == 'Kg' ? 'selected' : '' }}>Kg</option>
                                                 <option value="Bks" {{ old('unit', $rawMaterial->unit) == 'Bks' ? 'selected' : '' }}>Bks</option>
@@ -75,29 +75,29 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Price (Rp) <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Harga (Rp) <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <input type="number" class="form-control @error('price') is-invalid @enderror" name="price" value="{{ old('price', $rawMaterial->price) }}" required>
                                             @error('price')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
-                                            <small class="form-text text-muted">Price per unit in Rupiah (Rp).</small>
+                                            <small class="form-text text-muted">Harga per satuan dalam Rupiah (Rp).</small>
                                         </div>
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Current Stock <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Stok Saat Ini <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
                                             <input type="number" class="form-control @error('stock') is-invalid @enderror" name="stock" value="{{ old('stock', $rawMaterial->stock) }}" required>
                                             @error('stock')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
-                                            <small class="form-text text-muted">You can also adjust stock from the list page.</small>
+                                            <small class="form-text text-muted">Anda juga dapat menyesuaikan stok dari halaman daftar.</small>
                                         </div>
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Description</label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Deskripsi</label>
                                         <div class="col-sm-12 col-md-7">
                                             <textarea class="form-control @error('description') is-invalid @enderror" name="description" rows="4">{{ old('description', $rawMaterial->description) }}</textarea>
                                             @error('description')
@@ -112,19 +112,19 @@
                                             <div class="selectgroup w-100">
                                                 <label class="selectgroup-item">
                                                     <input type="radio" name="is_active" value="1" class="selectgroup-input" {{ old('is_active', $rawMaterial->is_active) == 1 ? 'checked' : '' }}>
-                                                    <span class="selectgroup-button">Active</span>
+                                                    <span class="selectgroup-button">Aktif</span>
                                                 </label>
                                                 <label class="selectgroup-item">
                                                     <input type="radio" name="is_active" value="0" class="selectgroup-input" {{ old('is_active', $rawMaterial->is_active) == 0 ? 'checked' : '' }}>
-                                                    <span class="selectgroup-button">Inactive</span>
+                                                    <span class="selectgroup-button">Tidak Aktif</span>
                                                 </label>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="card-footer text-right">
-                                    <a href="{{ route('raw-materials.index') }}" class="btn btn-secondary mr-2">Cancel</a>
-                                    <button type="submit" class="btn btn-primary">Update</button>
+                                    <a href="{{ route('raw-materials.index') }}" class="btn btn-secondary mr-2">Batal</a>
+                                    <button type="submit" class="btn btn-primary">Perbarui</button>
                                 </div>
                             </form>
                         </div>

@@ -7,23 +7,23 @@
             <a href="#">SS</a>
         </div>
         <ul class="sidebar-menu">
-            <!-- Dashboard Section -->
-            <li class="menu-header">Dashboard</li>
+            <!-- Bagian Dashboard -->
+            <li class="menu-header">Dasbor</li>
             <li class='nav-item'>
                 <a class="nav-link" href="{{ route('home') }}">
-                    <i class="fas fa-columns"></i><span>Dashboard</span>
+                    <i class="fas fa-columns"></i><span>Dasbor</span>
                 </a>
             </li>
 
             @if (Auth::user()->role === 'owner')
             <li class='nav-item'>
                 <a class="nav-link" href="{{ route('reports.index') }}">
-                    <i class="fas fa-chart-bar"></i><span>Reports</span>
+                    <i class="fas fa-chart-bar"></i><span>Laporan</span>
                 </a>
             </li>
             @endif
 
-            <!-- Master Data Section -->
+            <!-- Bagian Master Data -->
             <li class="menu-header">Master Data</li>
             <li class="nav-item dropdown">
                 <a href="#" class="nav-link has-dropdown">
@@ -31,77 +31,77 @@
                 </a>
                 <ul class="dropdown-menu">
                     <li><a class="nav-link" href="{{ route('products.index') }}">
-                        <i class="fas fa-utensils"></i>Products
+                        <i class="fas fa-utensils"></i>Produk
                     </a></li>
                     <li><a class="nav-link" href="{{ route('categories.index') }}">
-                        <i class="fas fa-tags"></i>Categories
+                        <i class="fas fa-tags"></i>Kategori
                     </a></li>
                     <li><a class="nav-link" href="{{ route('outlets.index') }}">
-                        <i class="fas fa-store"></i>Outlets
+                        <i class="fas fa-store"></i>Outlet
                     </a></li>
                     <li><a class="nav-link" href="{{ route('members.index') }}">
-                        <i class="fas fa-users"></i>Members
+                        <i class="fas fa-users"></i>Member
                     </a></li>
                     <li><a class="nav-link" href="{{ route('discounts.index') }}">
-                        <i class="fas fa-percentage"></i>Discounts
+                        <i class="fas fa-percentage"></i>Diskon
                     </a></li>
                 </ul>
             </li>
 
-            <!-- User Management Section -->
+            <!-- Bagian Manajemen Pengguna -->
             @if (Auth::user()->role === 'owner' || Auth::user()->role === 'admin')
             <li class="nav-item">
                 <a class="nav-link" href="{{ route('users.index') }}">
-                    <i class="fas fa-user-cog"></i><span>User Management</span>
+                    <i class="fas fa-user-cog"></i><span>Manajemen Pengguna</span>
                 </a>
             </li>
             @endif
 
-            <!-- Order Section -->
-            <li class="menu-header">Operations</li>
+            <!-- Bagian Pesanan -->
+            <li class="menu-header">Operasional</li>
             <li class="nav-item">
                 <a class="nav-link" href="{{ route('orders.index') }}">
-                    <i class="fas fa-shopping-cart"></i><span>Orders</span>
+                    <i class="fas fa-shopping-cart"></i><span>Pesanan POS</span>
                 </a>
             </li>
 
-            <!-- Inventory Section -->
-            <li class="menu-header">Inventory</li>
+            <!-- Bagian Inventaris -->
+            <li class="menu-header">Inventaris</li>
             <li class="nav-item dropdown">
                 <a href="#" class="nav-link has-dropdown">
-                    <i class="fas fa-boxes"></i><span>Inventory</span>
+                    <i class="fas fa-boxes"></i><span>Inventaris</span>
                 </a>
                 <ul class="dropdown-menu">
                     <li><a class="nav-link" href="{{ route('raw-materials.index') }}">
-                        <i class="fas fa-cube"></i>Raw Materials
+                        <i class="fas fa-cube"></i>Bahan Baku
                     </a></li>
                     <li><a class="nav-link" href="{{ route('material-orders.index') }}">
-                        <i class="fas fa-clipboard-list"></i>Material Orders
+                        <i class="fas fa-clipboard-list"></i>Pemesanan Bahan
                     </a></li>
                 </ul>
             </li>
 
-            <!-- Account Settings Section -->
-            <li class="menu-header">Account</li>
+            <!-- Bagian Akun -->
+            <li class="menu-header">Akun</li>
             <li class="nav-item dropdown">
                 <a href="#" class="nav-link has-dropdown">
-                    <i class="fas fa-user-circle"></i><span>My Account</span>
+                    <i class="fas fa-user-circle"></i><span>Akun Saya</span>
                 </a>
                 <ul class="dropdown-menu">
                     <li><a class="nav-link" href="{{ route('profile') }}">
-                        <i class="fas fa-user-edit"></i>My Profile
+                        <i class="fas fa-user-edit"></i>Profil Saya
                     </a></li>
                     <li><a class="nav-link" href="{{ route('password.change') }}">
-                        <i class="fas fa-key"></i>Change Password
+                        <i class="fas fa-key"></i>Ubah Kata Sandi
                     </a></li>
                 </ul>
             </li>
 
-            <!-- Standalone Logout Button -->
+            <!-- Tombol Logout -->
             <li class='nav-item'>
                 <a class="nav-link text-danger" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit()">
                     <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
+                    <span>Keluar</span>
                 </a>
                 <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
                     @csrf

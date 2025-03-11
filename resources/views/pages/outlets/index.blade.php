@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Outlets')
+@section('title', 'Outlet')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -14,7 +14,7 @@
                 <h1>Daftar Outlet</h1>
                 @if (Auth::user()->role === 'owner')
                     <div class="section-header-button">
-                        <a href="{{ route('outlets.create') }}" class="btn btn-primary">Add New</a>
+                        <a href="{{ route('outlets.create') }}" class="btn btn-primary">Tambah Baru</a>
                         <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
                             Import Excel
                         </button>
@@ -22,17 +22,17 @@
                             Export Excel
                         </a>
                         <button type="button" class="btn btn-warning ml-2" data-toggle="modal" data-target="#bulkUpdateModal">
-                            Bulk Update
+                            Update Massal
                         </button>
                         <button type="button" class="btn btn-danger ml-2" data-toggle="modal" data-target="#deleteAllModal">
-                            Delete All
+                            Hapus Semua
                         </button>
                     </div>
                 @endif
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Outlets</a></div>
-                    <div class="breadcrumb-item">All Outlets</div>
+                    <div class="breadcrumb-item"><a href="#">Outlet</a></div>
+                    <div class="breadcrumb-item">Semua Outlet</div>
                 </div>
             </div>
             <div class="section-body">
@@ -49,7 +49,7 @@
                                 <div class="float-right">
                                     <form method="GET" action="{{ route('outlets.index') }}">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" placeholder="Search" name="name">
+                                            <input type="text" class="form-control" placeholder="Cari" name="name">
                                             <div class="input-group-append">
                                                 <button class="btn btn-primary"><i class="fas fa-search"></i></button>
                                             </div>
@@ -62,13 +62,13 @@
                                 <div class="table-responsive">
                                     <table class="table-striped table">
                                         <tr>
-                                            <th>Name</th>
-                                            <th>Address</th>
-                                            <th>Phone</th>
-                                            <th>Leader</th>
-                                            <th>Created At</th>
+                                            <th>Nama</th>
+                                            <th>Alamat</th>
+                                            <th>Telepon</th>
+                                            <th>Pimpinan</th>
+                                            <th>Dibuat Pada</th>
                                             @if (Auth::user()->role === 'owner')
-                                                <th>Action</th>
+                                                <th>Aksi</th>
                                             @endif
                                         </tr>
                                         @foreach ($outlets as $outlet)
@@ -98,7 +98,7 @@
                                                                 <input type="hidden" name="_token"
                                                                     value="{{ csrf_token() }}" />
                                                                 <button class="btn btn-sm btn-danger btn-icon confirm-delete">
-                                                                    <i class="fas fa-times"></i> Delete
+                                                                    <i class="fas fa-times"></i> Hapus
                                                                 </button>
                                                             </form>
                                                         </div>
@@ -125,7 +125,7 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="importModalLabel">Import Outlets</h5>
+                    <h5 class="modal-title" id="importModalLabel">Import Outlet</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -134,21 +134,21 @@
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
-                            <label>Excel File</label>
+                            <label>File Excel</label>
                             <input type="file" class="form-control" name="file" accept=".xlsx, .xls" required>
                         </div>
                         <div class="alert alert-info">
-                            <h6>Instructions:</h6>
+                            <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Download template <a href="{{ route('outlets.template') }}">here</a></li>
-                                <li>Fill in the data according to the template</li>
-                                <li>Save and upload the file</li>
+                                <li>Unduh template <a href="{{ route('outlets.template') }}">di sini</a></li>
+                                <li>Isi data sesuai dengan template</li>
+                                <li>Simpan dan unggah filenya</li>
                             </ol>
-                            <p>Column order: NAMA OUTLET, ALAMAT 1, ALAMAT 2, NO. TELP, PIMPINAN, KET</p>
+                            <p>Urutan kolom: NAMA OUTLET, ALAMAT 1, ALAMAT 2, NO. TELP, PIMPINAN, KET</p>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
                         <button type="submit" class="btn btn-primary">Import</button>
                     </div>
                 </form>
@@ -162,7 +162,7 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="bulkUpdateModalLabel">Bulk Update Outlets</h5>
+                    <h5 class="modal-title" id="bulkUpdateModalLabel">Update Massal Outlet</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -171,23 +171,23 @@
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
-                            <label>Excel File</label>
+                            <label>File Excel</label>
                             <input type="file" class="form-control" name="file" accept=".xlsx, .xls" required>
                         </div>
                         <div class="alert alert-info">
-                            <h6>Instructions:</h6>
+                            <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Download the update template <a href="{{ route('outlets.exportForUpdate') }}">here</a></li>
-                                <li>Update the data as needed</li>
-                                <li>Save and upload the file</li>
+                                <li>Unduh template update <a href="{{ route('outlets.exportForUpdate') }}">di sini</a></li>
+                                <li>Perbarui data sesuai kebutuhan</li>
+                                <li>Simpan dan unggah filenya</li>
                             </ol>
-                            <p>Column order: ID, NAMA OUTLET, ALAMAT 1, ALAMAT 2, NO. TELP, PIMPINAN, KET</p>
-                            <p class="text-warning"><strong>Note:</strong> Do not modify the ID column as it's used as a reference for updates.</p>
+                            <p>Urutan kolom: ID, NAMA OUTLET, ALAMAT 1, ALAMAT 2, NO. TELP, PIMPINAN, KET</p>
+                            <p class="text-warning"><strong>Catatan:</strong> Jangan mengubah kolom ID karena akan digunakan sebagai referensi untuk pembaruan.</p>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Update Outlets</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                        <button type="submit" class="btn btn-primary">Update Outlet</button>
                     </div>
                 </form>
             </div>
@@ -200,21 +200,21 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title text-danger" id="deleteAllModalLabel">Delete All Outlets</h5>
+                    <h5 class="modal-title text-danger" id="deleteAllModalLabel">Hapus Semua Outlet</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure you want to delete all outlets? This action cannot be undone.</p>
-                    <p class="text-danger"><strong>Warning:</strong> This will permanently delete all outlets that don't have associated users or orders.</p>
+                    <p>Apakah Anda yakin ingin menghapus semua outlet? Tindakan ini tidak dapat dibatalkan.</p>
+                    <p class="text-danger"><strong>Peringatan:</strong> Ini akan secara permanen menghapus semua outlet yang tidak memiliki user atau order terkait.</p>
                 </div>
                 <div class="modal-footer">
                     <form action="{{ route('outlets.deleteAll') }}" method="POST">
                         @csrf
                         @method('DELETE')
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger">Delete All Outlets</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-danger">Hapus Semua Outlet</button>
                     </form>
                 </div>
             </div>
@@ -237,8 +237,8 @@
             event.preventDefault();
 
             swal({
-                title: 'Are you sure?',
-                text: 'This action cannot be undone',
+                title: 'Apakah Anda yakin?',
+                text: 'Tindakan ini tidak dapat dibatalkan',
                 icon: 'warning',
                 buttons: true,
                 dangerMode: true,

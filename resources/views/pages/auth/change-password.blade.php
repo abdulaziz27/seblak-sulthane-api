@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Change Password')
+@section('title', 'Ubah Kata Sandi')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -11,10 +11,10 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Change Password</h1>
+                <h1>Ubah Kata Sandi</h1>
                 <div class="section-header-breadcrumb">
-                    <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item">Change Password</div>
+                    <div class="breadcrumb-item active"><a href="#">Dasbor</a></div>
+                    <div class="breadcrumb-item">Ubah Kata Sandi</div>
                 </div>
             </div>
 
@@ -23,7 +23,7 @@
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Change Your Password</h4>
+                                <h4>Ubah Kata Sandi Anda</h4>
                             </div>
                             <div class="card-body">
                                 @if (session('success'))
@@ -37,7 +37,7 @@
                                     @method('PUT')
 
                                     <div class="form-group">
-                                        <label for="current_password">Current Password</label>
+                                        <label for="current_password">Kata Sandi Saat Ini</label>
                                         <input id="current_password"
                                             type="password"
                                             class="form-control @error('current_password') is-invalid @enderror"
@@ -52,7 +52,7 @@
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="password">New Password</label>
+                                        <label for="password">Kata Sandi Baru</label>
                                         <input id="password"
                                             type="password"
                                             class="form-control pwstrength @error('password') is-invalid @enderror"
@@ -73,7 +73,7 @@
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="password-confirm">Confirm Password</label>
+                                        <label for="password-confirm">Konfirmasi Kata Sandi</label>
                                         <input id="password-confirm"
                                             type="password"
                                             class="form-control"
@@ -86,9 +86,9 @@
                                         <button type="submit"
                                             class="btn btn-primary"
                                             tabindex="4">
-                                            Change Password
+                                            Ubah Kata Sandi
                                         </button>
-                                        <a href="{{ route('home') }}" class="btn btn-secondary ml-2">Cancel</a>
+                                        <a href="{{ route('home') }}" class="btn btn-secondary ml-2">Batal</a>
                                     </div>
                                 </form>
                             </div>

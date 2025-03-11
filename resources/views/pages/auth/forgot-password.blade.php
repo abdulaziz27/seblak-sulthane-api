@@ -1,6 +1,6 @@
 @extends('layouts.auth')
 
-@section('title', 'Forgot Password')
+@section('title', 'Lupa Kata Sandi')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -9,11 +9,11 @@
 @section('main')
     <div class="card card-primary">
         <div class="card-header">
-            <h4>Forgot Password</h4>
+            <h4>Lupa Kata Sandi</h4>
         </div>
 
         <div class="card-body">
-            <p class="text-muted">We will send a link to reset your password</p>
+            <p class="text-muted">Kami akan mengirimkan tautan untuk mengatur ulang kata sandi Anda</p>
 
             @if (session('status'))
                 <div class="alert alert-success">
@@ -45,13 +45,13 @@
                     <button type="submit"
                         class="btn btn-primary btn-lg btn-block"
                         tabindex="4">
-                        Send Password Reset Link
+                        Kirim Tautan Reset Kata Sandi
                     </button>
                 </div>
             </form>
 
             <div class="mt-5 text-center">
-                <a href="{{ route('login') }}">Back to login</a>
+                <a href="{{ route('login') }}">Kembali ke login</a>
             </div>
         </div>
     </div>

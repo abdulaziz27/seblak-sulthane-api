@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Edit Category')
+@section('title', 'Edit Kategori')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -18,7 +18,7 @@
 
 
             <div class="section-body">
-                <h2 class="section-title">Category</h2>
+                <h2 class="section-title">Kategori</h2>
 
 
 
@@ -27,11 +27,11 @@
                         @csrf
                         @method('PUT')
                         <div class="card-header">
-                            <h4>Input Text</h4>
+                            <h4>Masukkan Teks</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label>Name</label>
+                                <label>Nama</label>
                                 <input type="text"
                                     class="form-control @error('name')
                                 is-invalid
@@ -44,7 +44,7 @@
                                 @enderror
                             </div>
                             <div class="form-group">
-                                <label>Description</label>
+                                <label>Deskripsi</label>
                                 <input type="text"
                                     class="form-control @error('description')
                                 is-invalid
@@ -59,7 +59,7 @@
 
 
                             <div class="form-group">
-                                <label class="form-label mt-4">Photo Product</label>
+                                <label class="form-label mt-4">Foto Produk</label>
                                 <div class="col-sm-9">
                                     <input type="file" class="form-control" name="image"
                                         @error('image') is-invalid @enderror>
@@ -69,7 +69,7 @@
 
                         </div>
                         <div class="card-footer text-right">
-                            <button class="btn btn-primary">Submit</button>
+                            <button class="btn btn-primary">Simpan</button>
                         </div>
                     </form>
                 </div>

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Add Member')
+@section('title', 'Tambah Member')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -16,11 +16,11 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Add New Member</h1>
+                <h1>Tambah Member Baru</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Members</a></div>
-                    <div class="breadcrumb-item">Add Member</div>
+                    <div class="breadcrumb-item"><a href="#">Member</a></div>
+                    <div class="breadcrumb-item">Tambah Member</div>
                 </div>
             </div>
 
@@ -29,11 +29,11 @@
                     <form action="{{ route('members.store') }}" method="POST">
                         @csrf
                         <div class="card-header">
-                            <h4>Member Form</h4>
+                            <h4>Form Member</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label>Name</label>
+                                <label>Nama</label>
                                 <input type="text"
                                     class="form-control @error('name') is-invalid @enderror"
                                     name="name"
@@ -46,7 +46,7 @@
                                 @enderror
                             </div>
                             <div class="form-group">
-                                <label>Phone Number</label>
+                                <label>Nomor Telepon</label>
                                 <div class="input-group">
                                     <div class="input-group-prepend">
                                         <div class="input-group-text">
@@ -67,7 +67,7 @@
                             </div>
                         </div>
                         <div class="card-footer text-right">
-                            <button class="btn btn-primary">Submit</button>
+                            <button class="btn btn-primary">Simpan</button>
                         </div>
                     </form>
                 </div>

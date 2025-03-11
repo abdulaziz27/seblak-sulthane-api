@@ -1,16 +1,16 @@
 @component('mail::message')
-# Reset Password Notification
+# Notifikasi Reset Password
 
-You are receiving this email because we received a password reset request for your account.
+Anda menerima email ini karena kami menerima permintaan reset password untuk akun Anda.
 
 @component('mail::button', ['url' => $url])
 Reset Password
 @endcomponent
 
-This password reset link will expire in {{ config('auth.passwords.users.expire') }} minutes.
+Tautan reset password ini akan kedaluwarsa dalam {{ config('auth.passwords.users.expire') }} menit.
 
-If you did not request a password reset, no further action is required.
+Jika Anda tidak meminta reset password, tidak ada tindakan lebih lanjut yang diperlukan.
 
-Thanks,<br>
+Terima kasih,<br>
 {{ config('app.name') }}
 @endcomponent

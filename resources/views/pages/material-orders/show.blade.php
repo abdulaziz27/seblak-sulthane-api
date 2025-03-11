@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Order Details')
+@section('title', 'Detail Pesanan')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -11,12 +11,12 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Material Order Details</h1>
+                <h1>Detail Pesanan Bahan</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Inventory</a></div>
-                    <div class="breadcrumb-item"><a href="{{ route('material-orders.index') }}">Material Orders</a></div>
-                    <div class="breadcrumb-item">Details</div>
+                    <div class="breadcrumb-item"><a href="#">Inventaris</a></div>
+                    <div class="breadcrumb-item"><a href="{{ route('material-orders.index') }}">Pesanan Bahan</a></div>
+                    <div class="breadcrumb-item">Detail</div>
                 </div>
             </div>
 
@@ -27,18 +27,18 @@
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Order #{{ $materialOrder->id }}</h4>
+                                <h4>Pesanan #{{ $materialOrder->id }}</h4>
                                 <div class="card-header-action">
                                     @if ($materialOrder->status === 'pending')
                                         <a href="{{ route('material-orders.edit', $materialOrder->id) }}" class="btn btn-primary mr-2">
-                                            <i class="fas fa-edit"></i> Edit Order
+                                            <i class="fas fa-edit"></i> Edit Pesanan
                                         </a>
                                         <form action="{{ route('material-orders.cancel', $materialOrder->id) }}"
                                             method="POST" class="d-inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-danger confirm-delete">
-                                                <i class="fas fa-times"></i> Cancel Order
+                                                <i class="fas fa-times"></i> Batalkan Pesanan
                                             </button>
                                         </form>
                                     @endif
@@ -49,7 +49,7 @@
                                             @csrf
                                             <input type="hidden" name="status" value="approved">
                                             <button type="submit" class="btn btn-info">
-                                                <i class="fas fa-check"></i> Approve
+                                                <i class="fas fa-check"></i> Setujui
                                             </button>
                                         </form>
                                     @endif
@@ -60,7 +60,7 @@
                                             @csrf
                                             <input type="hidden" name="status" value="delivered">
                                             <button type="submit" class="btn btn-success">
-                                                <i class="fas fa-truck"></i> Mark as Delivered
+                                                <i class="fas fa-truck"></i> Tandai Telah Diterima
                                             </button>
                                         </form>
                                     @endif
@@ -75,16 +75,16 @@
                                                 <td>{{ $materialOrder->franchise->name }}</td>
                                             </tr>
                                             <tr>
-                                                <th>Created By</th>
+                                                <th>Dibuat Oleh</th>
                                                 <td>{{ $materialOrder->user->name }}</td>
                                             </tr>
                                             <tr>
-                                                <th>Order Date</th>
+                                                <th>Tanggal Pesanan</th>
                                                 <td>{{ $materialOrder->created_at->format('d M Y H:i') }}</td>
                                             </tr>
                                             <tr>
-                                                <th>Notes</th>
-                                                <td>{{ $materialOrder->notes ?? 'No notes' }}</td>
+                                                <th>Catatan</th>
+                                                <td>{{ $materialOrder->notes ?? 'Tidak ada catatan' }}</td>
                                             </tr>
                                         </table>
                                     </div>
@@ -95,39 +95,39 @@
                                                 <td>{!! $materialOrder->status_badge !!}</td>
                                             </tr>
                                             <tr>
-                                                <th>Payment Method</th>
+                                                <th>Metode Pembayaran</th>
                                                 <td>{{ $materialOrder->formatted_payment_method }}</td>
                                             </tr>
                                             @if ($materialOrder->approved_at)
                                                 <tr>
-                                                    <th>Approved At</th>
+                                                    <th>Disetujui Pada</th>
                                                     <td>{{ $materialOrder->approved_at->format('d M Y H:i') }}</td>
                                                 </tr>
                                             @endif
                                             @if ($materialOrder->delivered_at)
                                                 <tr>
-                                                    <th>Delivered At</th>
+                                                    <th>Diterima Pada</th>
                                                     <td>{{ $materialOrder->delivered_at->format('d M Y H:i') }}</td>
                                                 </tr>
                                             @endif
                                             <tr>
-                                                <th>Total Amount</th>
+                                                <th>Total Jumlah</th>
                                                 <td>{{ $materialOrder->formatted_total }}</td>
                                             </tr>
                                         </table>
                                     </div>
                                 </div>
 
-                                <h5 class="mt-4">Order Items</h5>
+                                <h5 class="mt-4">Item Pesanan</h5>
                                 <div class="table-responsive">
                                     <table class="table table-striped">
                                         <thead>
                                             <tr>
                                                 <th>#</th>
-                                                <th>Material</th>
-                                                <th>Unit</th>
-                                                <th>Price per Unit</th>
-                                                <th>Quantity</th>
+                                                <th>Bahan</th>
+                                                <th>Satuan</th>
+                                                <th>Harga per Satuan</th>
+                                                <th>Jumlah</th>
                                                 <th>Subtotal</th>
                                             </tr>
                                         </thead>
@@ -154,7 +154,7 @@
                             </div>
                             <div class="card-footer text-right">
                                 <a href="{{ route('material-orders.index') }}" class="btn btn-primary">
-                                    <i class="fas fa-arrow-left"></i> Back to List
+                                    <i class="fas fa-arrow-left"></i> Kembali ke Daftar
                                 </a>
                             </div>
                         </div>
@@ -177,8 +177,8 @@
             e.preventDefault();
 
             swal({
-                    title: 'Are you sure?',
-                    text: 'Once cancelled, you will not be able to recover this order!',
+                    title: 'Apakah Anda yakin?',
+                    text: 'Setelah dibatalkan, Anda tidak dapat memulihkan pesanan ini!',
                     icon: 'warning',
                     buttons: true,
                     dangerMode: true,
