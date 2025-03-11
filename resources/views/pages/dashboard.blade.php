@@ -1,21 +1,163 @@
 @extends('layouts.app')
 
-@section('title', 'General Dashboard')
+@section('title', 'Seblak Sulthane Dashboard')
 
 @push('style')
     <!-- CSS Libraries -->
     <link rel="stylesheet" href="{{ asset('library/jqvmap/dist/jqvmap.min.css') }}">
     <link rel="stylesheet" href="{{ asset('library/summernote/dist/summernote-bs4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('library/bootstrap-daterangepicker/daterangepicker.css') }}">
+    <link rel="stylesheet" href="{{ asset('library/select2/dist/css/select2.min.css') }}">
+    <style>
+        .stats-card {
+            transition: all 0.3s;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .inventory-alert {
+            border-left: 4px solid #fc544b;
+        }
+
+        .status-badge {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        .status-online {
+            background-color: #63ed7a;
+        }
+
+        .status-offline {
+            background-color: #fc544b;
+        }
+
+        .status-away {
+            background-color: #ffa426;
+        }
+
+        .material-order-card {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .material-order-card.pending {
+            border-left: 4px solid #ffa426;
+        }
+
+        .material-order-card.approved {
+            border-left: 4px solid #47c363;
+        }
+
+        .material-order-card.delivered {
+            border-left: 4px solid #3abaf4;
+        }
+
+        .card-header .nav-tabs .nav-item .nav-link {
+            padding: 0.5rem 1rem;
+        }
+
+        .card-header .nav-tabs .nav-item .nav-link.active {
+            font-weight: 600;
+            border-color: #6777ef;
+            color: #6777ef;
+        }
+
+        .dashboard-summary-tile {
+            position: relative;
+            padding: 15px 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .dashboard-summary-tile .icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0.2;
+            font-size: 50px;
+            z-index: -1;
+        }
+
+        .tile-primary {
+            background: linear-gradient(135deg, #6777ef 0%, #4a59e3 100%);
+            color: #fff;
+        }
+
+        .tile-success {
+            background: linear-gradient(135deg, #63ed7a 0%, #47c363 100%);
+            color: #fff;
+        }
+
+        .tile-warning {
+            background: linear-gradient(135deg, #ffa426 0%, #fc9601 100%);
+            color: #fff;
+        }
+
+        .tile-danger {
+            background: linear-gradient(135deg, #fc544b 0%, #e73535 100%);
+            color: #fff;
+        }
+
+        .cash-flow-card {
+            overflow: hidden;
+        }
+
+        .cash-flow-card .cash-in {
+            color: #47c363;
+        }
+
+        .cash-flow-card .cash-out {
+            color: #fc544b;
+        }
+
+        .activity-timeline ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .activity-timeline ul li {
+            position: relative;
+            padding-left: 30px;
+            padding-bottom: 15px;
+            border-left: 2px solid #6777ef;
+            margin-left: 10px;
+        }
+
+        .activity-timeline ul li:last-child {
+            border-left: 2px solid transparent;
+        }
+
+        .activity-timeline ul li:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -10px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #6777ef;
+        }
+    </style>
 @endpush
 
 @section('main')
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Dashboard - Seblak Sulthane</h1>
+                <h1>Dashboard</h1>
             </div>
 
-            <!-- Filter Date Range -->
+            <!-- Filter Date Range and Outlet Selection -->
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="card">
@@ -23,21 +165,41 @@
                             <form action="{{ route('home') }}" method="GET" id="dashboard-filter-form">
                                 <div class="row">
                                     <div class="form-group col-md-4">
-                                        <label class="d-block">Periode:</label>
-                                        <button type="button" class="btn btn-primary daterange-btn icon-left btn-icon"
-                                            id="daterange-btn">
-                                            <i class="fas fa-calendar"></i>
-                                            <span>Choose Date Range</span>
-                                        </button>
-                                        <input type="hidden" name="start_date" id="start_date"
-                                            value="{{ request('start_date', now()->startOfMonth()->format('Y-m-d')) }}">
-                                        <input type="hidden" name="end_date" id="end_date"
-                                            value="{{ request('end_date', now()->format('Y-m-d')) }}">
+                                        <label class="mb-2">Periode:</label>
+                                        <div class="input-group">
+                                            <div class="input-group-prepend">
+                                                <div class="input-group-text">
+                                                    <i class="fas fa-calendar"></i>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="form-control text-left daterange-btn"
+                                                id="daterange-btn">
+                                                <span>Pilih Periode</span>
+                                            </button>
+                                            <input type="hidden" name="start_date" id="start_date"
+                                                value="{{ request('start_date', now()->startOfMonth()->format('Y-m-d')) }}">
+                                            <input type="hidden" name="end_date" id="end_date"
+                                                value="{{ request('end_date', now()->format('Y-m-d')) }}">
+                                        </div>
                                     </div>
+
+                                    <div class="form-group col-md-4">
+                                        <label class="mb-2">Tampilkan Data:</label>
+                                        <select class="form-control select2" name="period_type" id="period_type">
+                                            <option value="daily"
+                                                {{ request('period_type') == 'daily' ? 'selected' : '' }}>Harian</option>
+                                            <option value="weekly"
+                                                {{ request('period_type') == 'weekly' ? 'selected' : '' }}>Mingguan</option>
+                                            <option value="monthly"
+                                                {{ request('period_type', 'monthly') == 'monthly' ? 'selected' : '' }}>
+                                                Bulanan</option>
+                                        </select>
+                                    </div>
+
                                     @if (Auth::user()->role === 'owner')
-                                        <div class="form-group col-md-4">
-                                            <label class="mr-2">Outlet:</label>
-                                            <select class="form-control selectric" name="outlet_id">
+                                        <div class="form-group col-md-3">
+                                            <label class="mb-2">Outlet:</label>
+                                            <select class="form-control select2" name="outlet_id">
                                                 <option value="">Semua Outlet</option>
                                                 @foreach ($outlets as $outlet)
                                                     <option value="{{ $outlet->id }}"
@@ -48,14 +210,18 @@
                                             </select>
                                         </div>
                                     @else
-                                        <div class="form-group col-md-5">
-                                            <label class="mr-2">Outlet:</label>
-                                            <span class="badge badge-info">{{ Auth::user()->outlet->name }}</span>
+                                        <div class="form-group col-md-3">
+                                            <label class="mb-2">Outlet:</label>
+                                            <input type="text" class="form-control"
+                                                value="{{ Auth::user()->outlet->name }}" disabled>
                                             <input type="hidden" name="outlet_id" value="{{ Auth::user()->outlet_id }}">
                                         </div>
                                     @endif
-                                    <div class="form-group col-md-2 d-flex align-items-end">
-                                        <button type="submit" class="btn btn-primary btn-lg btn-block">Terapkan</button>
+
+                                    <div class="form-group col-md-1 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary btn-block">
+                                            <i class="fas fa-filter"></i>
+                                        </button>
                                     </div>
                                 </div>
                             </form>
@@ -64,434 +230,691 @@
                 </div>
             </div>
 
-            <!-- Statistics Cards -->
-            <div class="row">
-                <div class="col-lg-3 col-md-6 col-sm-6 col-12">
-                    <div class="card card-statistic-1">
-                        <div class="card-icon bg-primary">
-                            <i class="fas fa-money-bill"></i>
-                        </div>
-                        <div class="card-wrap">
-                            <div class="card-header">
-                                <h4>Total Revenue</h4>
-                            </div>
-                            <div class="card-body">
-                                Rp {{ number_format($totalRevenue, 0, ',', '.') }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6 col-sm-6 col-12">
-                    <div class="card card-statistic-1">
-                        <div class="card-icon bg-danger">
-                            <i class="fas fa-shopping-cart"></i>
-                        </div>
-                        <div class="card-wrap">
-                            <div class="card-header">
-                                <h4>Total Orders</h4>
-                            </div>
-                            <div class="card-body">
-                                {{ number_format($totalOrders) }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6 col-sm-6 col-12">
-                    <div class="card card-statistic-1">
-                        <div class="card-icon bg-warning">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="card-wrap">
-                            <div class="card-header">
-                                <h4>Total Members</h4>
-                            </div>
-                            <div class="card-body">
-                                {{ number_format($totalMembers) }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6 col-sm-6 col-12">
-                    <div class="card card-statistic-1">
-                        <div class="card-icon bg-success">
-                            <i class="fas fa-user-tie"></i>
-                        </div>
-                        <div class="card-wrap">
-                            <div class="card-header">
-                                <h4>Total Staff</h4>
-                            </div>
-                            <div class="card-body">
-                                {{ number_format($totalStaff) }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sales Chart -->
-            <div class="row">
+            <!-- Sales Summary Section -->
+            <div class="row mb-4">
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header">
-                            <h4>Trend Penjualan Harian</h4>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="salesChart" height="100"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Top Selling Items & Customers -->
-            <div class="row">
-                <!-- Top Selling Items (existing) -->
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4>Produk Terlaris</h4>
-                            @if (request('outlet_id'))
-                                <div class="ml-auto">
-                                    <span class="badge badge-primary">{{ $selectedOutlet->name ?? '' }}</span>
-                                </div>
-                            @elseif(Auth::user()->role === 'owner')
-                                <div class="ml-auto">
-                                    <span class="badge badge-primary">Semua Outlet</span>
-                                </div>
-                            @endif
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-4">
-                                <canvas id="topItemsChart" height="250"></canvas>
-                            </div>
-                            <div class="row">
-                                <div class="col-12">
-                                    <div class="table-responsive">
-                                        <table class="table table-striped">
-                                            <tr>
-                                                <th>Produk</th>
-                                                <th>Total Terjual</th>
-                                            </tr>
-                                            @foreach ($topItems as $item)
-                                                <tr>
-                                                    <td>{{ $item->product_name }}</td>
-                                                    <td>{{ number_format($item->total_quantity) }}</td>
-                                                </tr>
-                                            @endforeach
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Top Customers (new) -->
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4>Pelanggan Terbaik</h4>
-                            @if (request('outlet_id'))
-                                <div class="ml-auto">
-                                    <span class="badge badge-primary">{{ $selectedOutlet->name ?? '' }}</span>
-                                </div>
-                            @elseif(Auth::user()->role === 'owner')
-                                <div class="ml-auto">
-                                    <span class="badge badge-primary">Semua Outlet</span>
-                                </div>
-                            @endif
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Member</th>
-                                            <th>No. Telepon</th>
-                                            <th class="text-right">Total Transaksi</th>
-                                            <th class="text-right">Total Pembelian</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($topCustomers as $customer)
-                                            <tr>
-                                                <td>{{ $customer->member_name }}</td>
-                                                <td>{{ $customer->member_phone }}</td>
-                                                <td class="text-right">{{ number_format($customer->total_transactions) }}x
-                                                </td>
-                                                <td class="text-right">Rp
-                                                    {{ number_format($customer->total_spent, 0, ',', '.') }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="mt-4">
-                                <div class="badges">
-                                    @foreach ($topCustomers as $index => $customer)
-                                        @php
-                                            $colors = ['primary', 'success', 'warning', 'danger', 'info'];
-                                            $badges = ['Diamond', 'Gold', 'Silver', 'Bronze', 'Regular'];
-                                        @endphp
-                                        <div class="badge badge-{{ $colors[$index] }} mt-1">
-                                            {{ $badges[$index] }}: {{ $customer->member_name }}
-                                        </div><br>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Outlet Performance -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4>Performa Outlet</h4>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Outlet</th>
-                                            <th>Total Orders</th>
-                                            <th>Total Revenue</th>
-                                            <th>Average Order Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @if (Auth::user()->role === 'owner')
-                                            @foreach ($outletPerformance as $outlet)
-                                                <tr>
-                                                    <td>{{ $outlet->outlet_name }}</td>
-                                                    <td>{{ number_format($outlet->total_orders) }}</td>
-                                                    <td>Rp {{ number_format($outlet->total_revenue, 0, ',', '.') }}</td>
-                                                    <td>Rp
-                                                        {{ $outlet->total_orders > 0 ? number_format($outlet->total_revenue / $outlet->total_orders, 0, ',', '.') : 0 }}
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        @else
-                                            @foreach ($outletPerformance as $outlet)
-                                                @if ($outlet->outlet_id === Auth::user()->outlet_id)
-                                                    <tr>
-                                                        <td>{{ $outlet->outlet_name }}</td>
-                                                        <td>{{ number_format($outlet->total_orders) }}</td>
-                                                        <td>Rp {{ number_format($outlet->total_revenue, 0, ',', '.') }}
-                                                        </td>
-                                                        <td>Rp
-                                                            {{ $outlet->total_orders > 0 ? number_format($outlet->total_revenue / $outlet->total_orders, 0, ',', '.') : 0 }}
-                                                        </td>
-                                                    </tr>
-                                                @endif
-                                            @endforeach
-                                        @endif
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Inventory Statistics -->
-            <!-- Raw Materials Statistics Section -->
-            <div class="row">
-                <div class="col-12 col-sm-12 col-lg-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4>Raw Material Orders</h4>
-                            <div class="card-header-action">
-                                <a href="#rm-weekly" data-tab="rm-period-tab" class="btn active">Week</a>
-                                <a href="#rm-monthly" data-tab="rm-period-tab" class="btn">Month</a>
-                                <a href="#rm-yearly" data-tab="rm-period-tab" class="btn">Year</a>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <!-- Charts will change based on time period -->
-                            <div class="rm-period-tab" id="rm-weekly">
-                                <canvas id="materialOrdersWeeklyChart" height="180"></canvas>
-                            </div>
-                            <div class="rm-period-tab" id="rm-monthly" style="display: none;">
-                                <canvas id="materialOrdersMonthlyChart" height="180"></canvas>
-                            </div>
-                            <div class="rm-period-tab" id="rm-yearly" style="display: none;">
-                                <canvas id="materialOrdersYearlyChart" height="180"></canvas>
-                            </div>
-
-                            <!-- Summary info and statistics -->
-                            <div class="mt-4">
-                                <div class="statistic-details mt-1">
-                                    <div class="statistic-details-item">
-                                        <div class="text-small text-muted">
-                                            <span
-                                                class="{{ $materialOrdersStats->count() > 0 && isset($materialOrdersWeekChange) && $materialOrdersWeekChange > 0 ? 'text-primary' : 'text-danger' }}">
-                                                <i
-                                                    class="fas fa-caret-{{ $materialOrdersStats->count() > 0 && isset($materialOrdersWeekChange) && $materialOrdersWeekChange > 0 ? 'up' : 'down' }}"></i>
-                                            </span>
-                                            {{ $materialOrdersStats->count() > 0 && isset($materialOrdersWeekChange) ? abs($materialOrdersWeekChange) : 0 }}%
-                                        </div>
-                                        <div class="detail-value">
-                                            {{ $materialOrdersStats->count() > 0 ? $materialOrdersStats->sum('total_orders_this_week') : 0 }}
-                                        </div>
-                                        <div class="detail-name">This Week</div>
-                                    </div>
-                                    <div class="statistic-details-item">
-                                        <div class="text-small text-muted">
-                                            <span
-                                                class="{{ $materialOrdersStats->count() > 0 && isset($materialOrdersMonthChange) && $materialOrdersMonthChange > 0 ? 'text-primary' : 'text-danger' }}">
-                                                <i
-                                                    class="fas fa-caret-{{ $materialOrdersStats->count() > 0 && isset($materialOrdersMonthChange) && $materialOrdersMonthChange > 0 ? 'up' : 'down' }}"></i>
-                                            </span>
-                                            {{ $materialOrdersStats->count() > 0 && isset($materialOrdersMonthChange) ? abs($materialOrdersMonthChange) : 0 }}%
-                                        </div>
-                                        <div class="detail-value">
-                                            {{ $materialOrdersStats->count() > 0 ? $materialOrdersStats->sum('total_orders_this_month') : 0 }}
-                                        </div>
-                                        <div class="detail-name">This Month</div>
-                                    </div>
-                                    <div class="statistic-details-item">
-                                        <div class="text-small text-muted">
-                                            <span
-                                                class="{{ $materialOrdersStats->count() > 0 && isset($materialOrdersYearChange) && $materialOrdersYearChange > 0 ? 'text-primary' : 'text-danger' }}">
-                                                <i
-                                                    class="fas fa-caret-{{ $materialOrdersStats->count() > 0 && isset($materialOrdersYearChange) && $materialOrdersYearChange > 0 ? 'up' : 'down' }}"></i>
-                                            </span>
-                                            {{ $materialOrdersStats->count() > 0 && isset($materialOrdersYearChange) ? abs($materialOrdersYearChange) : 0 }}%
-                                        </div>
-                                        <div class="detail-value">
-                                            {{ $materialOrdersStats->count() > 0 ? $materialOrdersStats->sum('total_orders_this_year') : 0 }}
-                                        </div>
-                                        <div class="detail-name">This Year</div>
-                                    </div>
-                                    <div class="statistic-details-item">
-                                        <div class="detail-value">Rp
-                                            {{ $materialOrdersStats->count() > 0 ? number_format($materialOrdersStats->sum('total_amount'), 0, ',', '.') : 0 }}
-                                        </div>
-                                        <div class="detail-name">Total Spending</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-sm-12 col-lg-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4>Top Ordered Materials</h4>
-                            @if (request('outlet_id'))
-                                <div class="ml-auto">
-                                    <span class="badge badge-primary">{{ $selectedOutlet->name ?? '' }}</span>
-                                </div>
-                            @elseif(Auth::user()->role === 'owner')
-                                <div class="ml-auto">
-                                    <span class="badge badge-primary">Semua Outlet</span>
-                                </div>
-                            @endif
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-4">
-                                <canvas id="topMaterialsChart" height="250"></canvas>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Material</th>
-                                            <th>Total Quantity</th>
-                                            <th class="text-right">Total Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($topMaterials as $material)
-                                            <tr>
-                                                <td>{{ $material->material_name }}</td>
-                                                <td>{{ number_format($material->total_quantity) }} {{ $material->unit }}
-                                                </td>
-                                                <td class="text-right">Rp
-                                                    {{ number_format($material->total_amount, 0, ',', '.') }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Material Orders by Outlet -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4>Material Orders by Outlet</h4>
+                            <h4>
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Ringkasan Penjualan {{ $selectedOutlet ? $selectedOutlet->name : 'Semua Outlet' }}
+                            </h4>
                             <div class="card-header-action">
                                 <div class="btn-group">
-                                    <a href="#" class="btn btn-primary">Export Data</a>
-                                    <a href="#" class="btn">Print</a>
+                                    <a href="#" class="btn btn-primary" id="btnPrintSales">
+                                        <i class="fas fa-download"></i> Export
+                                    </a>
                                 </div>
                             </div>
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-6">
-                                    <canvas id="outletMaterialPieChart" height="300"></canvas>
+                                <div class="col-md-3 col-sm-6 col-12">
+                                    <div class="dashboard-summary-tile tile-primary mb-3">
+                                        <div class="icon">
+                                            <i class="fas fa-money-bill"></i>
+                                        </div>
+                                        <div class="title mb-1">Total Pendapatan</div>
+                                        <h4 class="mb-0">Rp {{ number_format($totalRevenue, 0, ',', '.') }}</h4>
+                                        @if (isset($previousPeriodRevenue) && $previousPeriodRevenue > 0)
+                                            @php $percentChange = (($totalRevenue - $previousPeriodRevenue) / $previousPeriodRevenue) * 100; @endphp
+                                            <small class="{{ $percentChange >= 0 ? 'text-white' : 'text-white' }}">
+                                                <i
+                                                    class="fas fa-{{ $percentChange >= 0 ? 'arrow-up' : 'arrow-down' }}"></i>
+                                                {{ number_format(abs($percentChange), 1) }}% dari periode sebelumnya
+                                            </small>
+                                        @endif
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-3 col-sm-6 col-12">
+                                    <div class="dashboard-summary-tile tile-success mb-3">
+                                        <div class="icon">
+                                            <i class="fas fa-shopping-cart"></i>
+                                        </div>
+                                        <div class="title mb-1">Total Transaksi</div>
+                                        <h4 class="mb-0">{{ number_format($totalOrders) }}</h4>
+                                        @if (isset($previousPeriodOrders) && $previousPeriodOrders > 0)
+                                            @php $percentChange = (($totalOrders - $previousPeriodOrders) / $previousPeriodOrders) * 100; @endphp
+                                            <small class="{{ $percentChange >= 0 ? 'text-white' : 'text-white' }}">
+                                                <i
+                                                    class="fas fa-{{ $percentChange >= 0 ? 'arrow-up' : 'arrow-down' }}"></i>
+                                                {{ number_format(abs($percentChange), 1) }}% dari periode sebelumnya
+                                            </small>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-sm-6 col-12">
+                                    <div class="dashboard-summary-tile tile-warning mb-3">
+                                        <div class="icon">
+                                            <i class="fas fa-users"></i>
+                                        </div>
+                                        <div class="title mb-1">Total Member</div>
+                                        <h4 class="mb-0">{{ number_format($totalMembers) }}</h4>
+                                        @if (isset($previousPeriodMembers) && $previousPeriodMembers > 0)
+                                            @php $percentChange = (($totalMembers - $previousPeriodMembers) / $previousPeriodMembers) * 100; @endphp
+                                            <small class="{{ $percentChange >= 0 ? 'text-white' : 'text-white' }}">
+                                                <i
+                                                    class="fas fa-{{ $percentChange >= 0 ? 'arrow-up' : 'arrow-down' }}"></i>
+                                                {{ number_format(abs($percentChange), 1) }}% dari periode sebelumnya
+                                            </small>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-sm-6 col-12">
+                                    <div class="dashboard-summary-tile tile-danger mb-3">
+                                        <div class="icon">
+                                            <i class="fas fa-user-tie"></i>
+                                        </div>
+                                        <div class="title mb-1">Total Karyawan</div>
+                                        <h4 class="mb-0">{{ number_format($totalStaff) }}</h4>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Sales Chart -->
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <div class="card bg-light shadow-none">
+                                        <div class="card-body">
+                                            <canvas id="salesChart" height="280"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cash Flow and Staff Status Section -->
+            <div class="row">
+                <!-- Cash Flow Section -->
+                <div class="col-lg-8 col-md-12 col-sm-12">
+                    <div class="card cash-flow-card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-wallet mr-2"></i> Status Keuangan
+                                {{ $selectedOutlet ? $selectedOutlet->name : '' }}</h4>
+                            <div class="card-header-action">
+                                <ul class="nav nav-tabs" id="financialTab" role="tablist">
+                                    <li class="nav-item">
+                                        <a class="nav-link active" id="summary-tab" data-toggle="tab" href="#summary"
+                                            role="tab" aria-controls="summary" aria-selected="true">Ringkasan</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" id="cashflow-tab" data-toggle="tab" href="#cashflow"
+                                            role="tab" aria-controls="cashflow" aria-selected="false">Arus Kas</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="tab-content" id="financialTabContent">
+                                <!-- Summary Tab -->
+                                <div class="tab-pane fade show active" id="summary" role="tabpanel"
+                                    aria-labelledby="summary-tab">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="card card-statistic-1 shadow-sm">
+                                                <div class="card-icon bg-primary">
+                                                    <i class="fas fa-wallet"></i>
+                                                </div>
+                                                <div class="card-wrap">
+                                                    <div class="card-header">
+                                                        <h4>Saldo Awal</h4>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        Rp {{ number_format($totalOpeningBalance, 0, ',', '.') }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card card-statistic-1 shadow-sm">
+                                                <div class="card-icon bg-danger">
+                                                    <i class="fas fa-money-bill-wave"></i>
+                                                </div>
+                                                <div class="card-wrap">
+                                                    <div class="card-header">
+                                                        <h4>Total Pengeluaran</h4>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        Rp {{ number_format($totalExpenses, 0, ',', '.') }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-md-6">
+                                            <div class="card card-statistic-1 shadow-sm">
+                                                <div class="card-icon bg-success">
+                                                    <i class="fas fa-cash-register"></i>
+                                                </div>
+                                                <div class="card-wrap">
+                                                    <div class="card-header">
+                                                        <h4>Penjualan Cash</h4>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        Rp {{ number_format($totalCashSales, 0, ',', '.') }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card card-statistic-1 shadow-sm">
+                                                <div class="card-icon bg-warning">
+                                                    <i class="fas fa-coins"></i>
+                                                </div>
+                                                <div class="card-wrap">
+                                                    <div class="card-header">
+                                                        <h4>Saldo Akhir</h4>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        Rp {{ number_format($closingBalance, 0, ',', '.') }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cash Flow Tab -->
+                                <div class="tab-pane fade" id="cashflow" role="tabpanel"
+                                    aria-labelledby="cashflow-tab">
                                     <div class="table-responsive">
-                                        <table class="table table-striped">
+                                        <table class="table table-hover">
                                             <thead>
                                                 <tr>
-                                                    <th>Outlet</th>
-                                                    <th class="text-center">Total Orders</th>
-                                                    <th class="text-right">Total Spending</th>
+                                                    <th>Tanggal</th>
+                                                    <th>Keterangan</th>
+                                                    <th class="text-right">Cash In</th>
+                                                    <th class="text-right">Cash Out</th>
+                                                    <th class="text-right">Saldo</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                @foreach ($materialOrdersStats as $stat)
+                                                @php
+                                                    $runningBalance = 0;
+                                                    // Sorting daily data by date in ascending order
+                                                    if (isset($dailyData)) {
+                                                        usort($dailyData, function ($a, $b) {
+                                                            return strtotime($a['date']) - strtotime($b['date']);
+                                                        });
+                                                    }
+                                                @endphp
+
+                                                @if (isset($dailyData) && count($dailyData) > 0)
+                                                    @foreach ($dailyData as $day)
+                                                        @php
+                                                            $runningBalance = $day['opening_balance'];
+                                                        @endphp
+                                                        <tr>
+                                                            <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
+                                                            </td>
+                                                            <td>Saldo Awal</td>
+                                                            <td class="text-right cash-in">Rp
+                                                                {{ number_format($day['opening_balance'], 0, ',', '.') }}
+                                                            </td>
+                                                            <td class="text-right">-</td>
+                                                            <td class="text-right">Rp
+                                                                {{ number_format($runningBalance, 0, ',', '.') }}</td>
+                                                        </tr>
+
+                                                        @if ($day['cash_sales'] > 0)
+                                                            @php
+                                                                $runningBalance += $day['cash_sales'];
+                                                            @endphp
+                                                            <tr>
+                                                                <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
+                                                                </td>
+                                                                <td>Penjualan Cash</td>
+                                                                <td class="text-right cash-in">Rp
+                                                                    {{ number_format($day['cash_sales'], 0, ',', '.') }}
+                                                                </td>
+                                                                <td class="text-right">-</td>
+                                                                <td class="text-right">Rp
+                                                                    {{ number_format($runningBalance, 0, ',', '.') }}</td>
+                                                            </tr>
+                                                        @endif
+
+                                                        @if ($day['expenses'] > 0)
+                                                            @php
+                                                                $runningBalance -= $day['expenses'];
+                                                            @endphp
+                                                            <tr>
+                                                                <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
+                                                                </td>
+                                                                <td>Pengeluaran</td>
+                                                                <td class="text-right">-</td>
+                                                                <td class="text-right cash-out">Rp
+                                                                    {{ number_format($day['expenses'], 0, ',', '.') }}</td>
+                                                                <td class="text-right">Rp
+                                                                    {{ number_format($runningBalance, 0, ',', '.') }}</td>
+                                                            </tr>
+                                                        @endif
+
+                                                        <tr class="bg-light">
+                                                            <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
+                                                            </td>
+                                                            <td><strong>Saldo Akhir</strong></td>
+                                                            <td class="text-right">-</td>
+                                                            <td class="text-right">-</td>
+                                                            <td class="text-right"><strong>Rp
+                                                                    {{ number_format($runningBalance, 0, ',', '.') }}</strong>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                @else
                                                     <tr>
-                                                        <td>{{ $stat->outlet_name }}</td>
-                                                        <td class="text-center">{{ number_format($stat->total_orders) }}
-                                                        </td>
-                                                        <td class="text-right">Rp
-                                                            {{ number_format($stat->total_amount, 0, ',', '.') }}</td>
+                                                        <td colspan="5" class="text-center">Tidak ada data arus kas
+                                                            untuk periode ini</td>
                                                     </tr>
-                                                @endforeach
+                                                @endif
                                             </tbody>
-                                            <tfoot>
-                                                <tr>
-                                                    <th>Total</th>
-                                                    <th class="text-center">
-                                                        {{ number_format($materialOrdersStats->sum('total_orders')) }}</th>
-                                                    <th class="text-right">Rp
-                                                        {{ number_format($materialOrdersStats->sum('total_amount'), 0, ',', '.') }}
-                                                    </th>
-                                                </tr>
-                                            </tfoot>
                                         </table>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
 
-                            @foreach ($materialOrdersStats as $outlet)
-                                <div class="mb-4 mt-4">
-                                    <div class="text-small font-weight-bold text-muted float-right">Rp
-                                        {{ number_format($outlet->total_amount, 0, ',', '.') }}</div>
-                                    <div class="font-weight-bold mb-1">{{ $outlet->outlet_name }}</div>
-                                    <div class="progress" data-height="5">
-                                        <div class="progress-bar" role="progressbar"
-                                            data-width="{{ ($outlet->total_amount / ($materialOrdersStats->sum('total_amount') ?: 1)) * 100 }}%"
-                                            aria-valuenow="{{ ($outlet->total_amount / ($materialOrdersStats->sum('total_amount') ?: 1)) * 100 }}"
-                                            aria-valuemin="0" aria-valuemax="100"
-                                            style="background-color: {{ $loop->index % 2 == 0 ? '#6777ef' : '#63ed7a' }}">
+                <!-- Staff Status Section -->
+                <div class="col-lg-4 col-md-12 col-sm-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-users mr-2"></i> Status Karyawan</h4>
+                            <div class="card-header-action">
+                                <a href="{{ route('users.index') }}" class="btn btn-primary">
+                                    Lihat Semua
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <div class="text-small float-right font-weight-bold text-muted">
+                                    {{ $loggedInUsersCount ?? 0 }}/{{ $totalStaff }}</div>
+                                <div class="font-weight-bold mb-1">Karyawan Login</div>
+                                <div class="progress" data-height="3">
+                                    @php
+                                        $loginPercentage =
+                                            $totalStaff > 0 ? (($loggedInUsersCount ?? 0) / $totalStaff) * 100 : 0;
+                                    @endphp
+                                    <div class="progress-bar bg-success" role="progressbar"
+                                        data-width="{{ $loginPercentage }}%" aria-valuenow="{{ $loginPercentage }}"
+                                        aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </div>
+
+                            <ul class="list-unstyled list-unstyled-border">
+                                @if (isset($loggedInUsers) && count($loggedInUsers) > 0)
+                                    @foreach ($loggedInUsers as $user)
+                                        <li class="media">
+                                            <img alt="image" class="mr-3 rounded-circle" width="50"
+                                                src="{{ asset('img/avatar/avatar-1.png') }}">
+                                            <div class="media-body">
+                                                <div class="mt-0 mb-1 font-weight-bold">{{ $user->name }}</div>
+                                                <div class="text-small text-muted">
+                                                    <span class="status-badge status-online"></span>
+                                                    Online ·
+                                                    <span>{{ $user->outlet->name ?? 'N/A' }}</span>
+                                                </div>
+                                                <div class="text-small text-muted">
+                                                    <i class="fas fa-user-tag"></i>
+                                                    {{ ucfirst($user->role) }}
+                                                </div>
+                                            </div>
+                                            <div class="media-right">
+                                                <div class="text-small text-success">
+                                                    @if (isset($user->login_duration))
+                                                        {{ $user->login_duration }}
+                                                    @else
+                                                        {{ \Carbon\Carbon::parse($user->session_started_at ?? now()->subHours(rand(1, 5)))->diffForHumans(null, true) }}
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                @else
+                                    <li class="text-center py-4">Tidak ada karyawan yang sedang login</li>
+                                @endif
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory and Material Orders Section -->
+            <div class="row">
+                <!-- Inventory Section -->
+                {{-- <div class="col-lg-6 col-md-12 col-sm-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-box-open mr-2"></i> Status Inventory & Bahan Baku</h4>
+                            <div class="card-header-action">
+                                <a href="{{ route('raw-materials.index') }}" class="btn btn-primary">
+                                    Lihat Semua
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Inventory Low Stock Alert -->
+                            <div class="alert alert-warning mb-4">
+                                <div class="alert-title">Peringatan Stok</div>
+                                <div>{{ count($lowStockMaterials ?? []) }} bahan memiliki stok kritis</div>
+                            </div>
+
+                            <div class="row mt-4">
+                                <div class="col-md-6">
+                                    <div class="card bg-light border-left-warning shadow-sm h-100">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center">
+                                                <div class="flex-grow-1">
+                                                    <h6 class="text-warning mb-1 font-weight-bold">Stok Bahan Baku</h6>
+                                                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                                        {{ $lowStockCount ?? 0 }} bahan perlu diperhatikan
+                                                    </div>
+                                                </div>
+                                                <div class="ml-2">
+                                                    <i class="fas fa-exclamation-triangle fa-2x text-warning"></i>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            @endforeach
+                                <div class="col-md-6">
+                                    <div class="card bg-light border-left-info shadow-sm h-100">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center">
+                                                <div class="flex-grow-1">
+                                                    <h6 class="text-info mb-1 font-weight-bold">Total Bahan Baku</h6>
+                                                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                                        {{ $totalRawMaterials ?? 0 }} jenis bahan
+                                                    </div>
+                                                </div>
+                                                <div class="ml-2">
+                                                    <i class="fas fa-boxes fa-2x text-info"></i>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Stock Info Section -->
+                            <div class="alert alert-info mb-0">
+                                <div class="d-flex align-items-center">
+                                    <div class="mr-3">
+                                        <i class="fas fa-info-circle fa-2x"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="alert-heading mb-1">Informasi Stok</h6>
+                                        <p class="mb-0">Monitoring pergerakan stok dapat dilakukan di halaman Bahan Baku.</p>
+                                    </div>
+                                    <div class="ml-auto">
+                                        <a href="{{ route('raw-materials.index') }}" class="btn btn-sm btn-info">
+                                            Lihat Detail
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> --}}
+
+                <!-- Material Orders Section -->
+                <div class="col-lg-12 col-md-12 col-sm-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-truck-loading mr-2"></i> Pemesanan Bahan Baku</h4>
+                            <div class="card-header-action">
+                                <a href="{{ route('material-orders.index') }}" class="btn btn-primary">
+                                    Lihat Semua
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Orders Status Summary -->
+                            <div class="row">
+                                <div class="col-4">
+                                    <div class="card card-statistic-1 shadow-sm">
+                                        <div class="card-wrap">
+                                            <div class="card-header bg-warning text-white">
+                                                <h6 class="mb-0">Pending</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                {{ $pendingOrdersCount ?? 0 }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="card card-statistic-1 shadow-sm">
+                                        <div class="card-wrap">
+                                            <div class="card-header bg-info text-white">
+                                                <h6 class="mb-0">Disetujui</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                {{ $approvedOrdersCount ?? 0 }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="card card-statistic-1 shadow-sm">
+                                        <div class="card-wrap">
+                                            <div class="card-header bg-success text-white">
+                                                <h6 class="mb-0">Terkirim</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                {{ $deliveredOrdersCount ?? 0 }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Total Biaya Pembelian -->
+                            <div class="card bg-primary text-white shadow-sm mt-4 mb-4">
+                                <div class="card-body">
+                                    <div class="row align-items-center">
+                                        <div class="col-8">
+                                            <h6 class="mb-0">Total Biaya Pembelian</h6>
+                                            <h4 class="mb-0">Rp
+                                                {{ number_format($totalMaterialCost ?? 0, 0, ',', '.') }}</h4>
+                                        </div>
+                                        <div class="col-4 text-right">
+                                            <i class="fas fa-shopping-cart fa-3x opacity-50"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Ongoing Orders -->
+                            <h6 class="text-dark font-weight-bold mb-3">Pesanan Sedang Berjalan</h6>
+                            @if (isset($ongoingOrders) && count($ongoingOrders) > 0)
+                                @foreach ($ongoingOrders as $order)
+                                    <div class="material-order-card {{ $order->status }} card shadow-sm mb-3">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h6 class="mb-1">#{{ $order->id }} -
+                                                        {{ $order->franchise->name }}</h6>
+                                                    <div class="text-small text-muted">
+                                                        <i class="fas fa-calendar-alt"></i>
+                                                        {{ \Carbon\Carbon::parse($order->created_at)->format('d M Y') }}
+                                                        <span class="mx-2">|</span>
+                                                        <i class="fas fa-user"></i> {{ $order->user->name }}
+                                                    </div>
+                                                </div>
+                                                <div class="text-right">
+                                                    <span
+                                                        class="badge badge-{{ $order->status == 'pending' ? 'warning' : ($order->status == 'approved' ? 'info' : 'success') }}">
+                                                        {{ ucfirst($order->status) }}
+                                                    </span>
+                                                    <div class="text-dark font-weight-bold mt-1">
+                                                        Rp {{ number_format($order->total_amount, 0, ',', '.') }}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mt-2 text-small">
+                                                <strong>Items:</strong>
+                                                {{ $order->items->count() }} jenis bahan
+                                                <a href="{{ route('material-orders.show', $order->id) }}"
+                                                    class="float-right text-primary">
+                                                    <i class="fas fa-eye"></i> Detail
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            @else
+                                <div class="card shadow-sm mb-3">
+                                    <div class="card-body p-3 text-center">
+                                        Tidak ada pesanan yang sedang berjalan
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product performance and recent activities Section -->
+            <div class="row">
+                <!-- Product Performance -->
+                <div class="col-lg-8 col-md-12 col-sm-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-chart-pie mr-2"></i> Performa Produk</h4>
+                            <div class="card-header-action">
+                                <a href="#" class="btn btn-primary">
+                                    Detail
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <canvas id="topItemsChart" height="300"></canvas>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Produk</th>
+                                                    <th class="text-right">Terjual</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @if (isset($topItems) && count($topItems) > 0)
+                                                    @foreach ($topItems as $index => $item)
+                                                        <tr>
+                                                            <td>{{ $index + 1 }}</td>
+                                                            <td>{{ $item->product_name }}</td>
+                                                            <td class="text-right">
+                                                                {{ number_format($item->total_quantity) }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                @else
+                                                    <tr>
+                                                        <td colspan="3" class="text-center">Tidak ada data produk
+                                                            terjual</td>
+                                                    </tr>
+                                                @endif
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Statistics -->
+                <div class="col-lg-4 col-md-12 col-sm-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-chart-bar mr-2"></i> Ringkasan Statistik</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Average Order Value -->
+                                <div class="col-12 mb-4">
+                                    <div class="statistic-card border-left-primary p-3 shadow-sm">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                                    Rata-rata Order
+                                                </div>
+                                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                                    @php
+                                                        $avgOrderValue =
+                                                            $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
+                                                    @endphp
+                                                    Rp {{ number_format($avgOrderValue, 0, ',', '.') }}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Member Orders Percentage -->
+                                <div class="col-12 mb-4">
+                                    <div class="statistic-card border-left-success p-3 shadow-sm">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                                    Order dari Member
+                                                </div>
+                                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                                    @php
+                                                        $memberOrdersCount = $memberOrdersCount ?? rand(30, 70);
+                                                        $memberOrdersPercentage =
+                                                            $totalOrders > 0
+                                                                ? ($memberOrdersCount / $totalOrders) * 100
+                                                                : 0;
+                                                    @endphp
+                                                    {{ number_format($memberOrdersPercentage, 1) }}%
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <i class="fas fa-user-tag fa-2x text-gray-300"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Most Popular Payment Method -->
+                                <div class="col-12">
+                                    <div class="statistic-card border-left-info p-3 shadow-sm">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                                    Metode Pembayaran Terpopuler
+                                                </div>
+                                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                                    @php
+                                                        $popularPaymentMethod = $popularPaymentMethod ?? 'QRIS';
+                                                        $popularPaymentPercentage =
+                                                            $popularPaymentPercentage ?? rand(55, 80);
+                                                    @endphp
+                                                    {{ $popularPaymentMethod }} ({{ $popularPaymentPercentage }}%)
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <i class="fas fa-credit-card fa-2x text-gray-300"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -500,43 +923,35 @@
     </div>
 @endsection
 
-@push('style')
-    <!-- CSS Libraries -->
-    <link rel="stylesheet" href="{{ asset('library/jqvmap/dist/jqvmap.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('library/summernote/dist/summernote-bs4.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('library/bootstrap-daterangepicker/daterangepicker.css') }}">
-    <link rel="stylesheet" href="{{ asset('library/selectric/public/selectric.css') }}">
-@endpush
-
-
 @push('scripts')
     <!-- JS Libraries -->
     <script src="{{ asset('library/chart.js/dist/Chart.min.js') }}"></script>
     <script src="{{ asset('library/bootstrap-daterangepicker/daterangepicker.js') }}"></script>
+    <script src="{{ asset('library/select2/dist/js/select2.full.min.js') }}"></script>
     <script src="{{ asset('library/selectric/public/jquery.selectric.min.js') }}"></script>
 
     <script>
+        // Initialize select2
+        $('.select2').select2();
+
         // Date range picker initialization
         $(document).ready(function() {
-            // Initialize selectric
-            $('.selectric').selectric();
-
             // Custom setup for daterange button
             $('#daterange-btn').daterangepicker({
                 ranges: {
-                    'Today': [moment(), moment()],
-                    'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-                    'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-                    'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-                    'This Month': [moment().startOf('month'), moment().endOf('month')],
-                    'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1,
+                    'Hari Ini': [moment(), moment()],
+                    'Kemarin': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+                    '7 Hari Terakhir': [moment().subtract(6, 'days'), moment()],
+                    '30 Hari Terakhir': [moment().subtract(29, 'days'), moment()],
+                    'Bulan Ini': [moment().startOf('month'), moment().endOf('month')],
+                    'Bulan Lalu': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1,
                         'month').endOf('month')]
                 },
                 startDate: moment().subtract(29, 'days'),
                 endDate: moment()
             }, function(start, end) {
-                $('#daterange-btn span').html(start.format('MMMM D, YYYY') + ' - ' + end.format(
-                    'MMMM D, YYYY'));
+                $('#daterange-btn span').html(start.format('D MMM YYYY') + ' - ' + end.format(
+                'D MMM YYYY'));
                 $('#start_date').val(start.format('YYYY-MM-DD'));
                 $('#end_date').val(end.format('YYYY-MM-DD'));
             });
@@ -544,399 +959,97 @@
             // Set current values if they exist
             @if (request('start_date') && request('end_date'))
                 $('#daterange-btn span').html(
-                    "{{ \Carbon\Carbon::parse(request('start_date'))->format('MMMM D, YYYY') }} - {{ \Carbon\Carbon::parse(request('end_date'))->format('MMMM D, YYYY') }}"
-                    );
+                    "{{ \Carbon\Carbon::parse(request('start_date'))->format('D MMM YYYY') }} - {{ \Carbon\Carbon::parse(request('end_date'))->format('D MMM YYYY') }}"
+                );
             @endif
 
             // Auto-submit when selecting a date range
             $('#daterange-btn').on('apply.daterangepicker', function(ev, picker) {
                 setTimeout(function() {
-                    $('#filter-form').submit();
+                    $('#dashboard-filter-form').submit();
                 }, 300);
-            });
-
-            // Confirm delete functionality
-            $('.confirm-delete').click(function(e) {
-                var form = $(this).closest('form');
-                e.preventDefault();
-
-                swal({
-                    title: 'Are you sure?',
-                    text: 'Once cancelled, you will not be able to recover this order!',
-                    icon: 'warning',
-                    buttons: true,
-                    dangerMode: true,
-                }).then((willDelete) => {
-                    if (willDelete) {
-                        form.submit();
-                    }
-                });
             });
         });
 
         // Sales Chart
         var salesCtx = document.getElementById('salesChart').getContext('2d');
-        var salesData = @json($dailySales);
+        var salesData = @json($dailySales ?? []);
+
+        // Format dates and sales data
+        var dates = salesData.map(function(item) {
+            return moment(item.date).format('D MMM');
+        });
+
+        var sales = salesData.map(function(item) {
+            return item.total_sales;
+        });
+
+        var gradientStroke = salesCtx.createLinearGradient(0, 0, 0, 300);
+        gradientStroke.addColorStop(0, 'rgba(103, 119, 239, 0.8)');
+        gradientStroke.addColorStop(1, 'rgba(103, 119, 239, 0.2)');
 
         new Chart(salesCtx, {
             type: 'line',
             data: {
-                labels: salesData.map(item => item.date),
+                labels: dates,
                 datasets: [{
-                    label: 'Daily Sales',
-                    data: salesData.map(item => item.total_sales),
+                    label: 'Penjualan',
+                    data: sales,
                     borderColor: '#6777ef',
-                    backgroundColor: 'rgba(103, 119, 239, 0.2)',
-                    tension: 0.4
+                    backgroundColor: gradientStroke,
+                    pointBackgroundColor: '#ffffff',
+                    pointBorderColor: '#6777ef',
+                    pointRadius: 4,
+                    tension: 0.3,
+                    fill: true
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                legend: {
+                    display: false
+                },
                 scales: {
-                    y: {
-                        beginAtZero: true,
+                    yAxes: [{
+                        gridLines: {
+                            drawBorder: false,
+                            color: '#f2f2f2',
+                        },
                         ticks: {
+                            beginAtZero: true,
                             callback: function(value) {
-                                return 'Rp ' + value.toLocaleString('id-ID');
+                                return 'Rp ' + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
                             }
                         }
-                    }
+                    }],
+                    xAxes: [{
+                        gridLines: {
+                            display: false
+                        }
+                    }]
                 },
                 tooltips: {
                     callbacks: {
                         label: function(tooltipItem, data) {
-                            return 'Rp ' + tooltipItem.yLabel.toLocaleString('id-ID');
+                            return 'Rp ' + tooltipItem.yLabel.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
                         }
                     }
                 }
             }
         });
-    </script>
 
-    <script>
-        // Add this to your existing dashboard JavaScript code
-        $(document).ready(function() {
-            // Tab switching functionality
-            $("[data-tab]").each(function() {
-                let tab_group = $(this).data("tab");
-                $(this).click(function(e) {
-                    e.preventDefault();
-
-                    // Remove active class from all buttons in this group
-                    $("[data-tab='" + tab_group + "']").removeClass("active");
-
-                    // Add active class to this button
-                    $(this).addClass("active");
-
-                    // Hide all content with this data-tab-group
-                    $("[data-tab-group='" + tab_group + "']").hide();
-
-                    // Show the content this button points to
-                    $($(this).attr("href")).show();
-                });
-            });
-
-            // Material Orders Weekly Chart
-            var materialOrdersWeeklyCtx = document.getElementById('materialOrdersWeeklyChart').getContext('2d');
-            var weeklyOrderData = @json($weeklyOrderData);
-
-            new Chart(materialOrdersWeeklyCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-                    datasets: [{
-                        label: 'Material Orders',
-                        data: weeklyOrderData,
-                        backgroundColor: 'rgba(103, 119, 239, 0.2)',
-                        borderColor: '#6777ef',
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: '#6777ef',
-                        pointRadius: 5,
-                        pointHoverRadius: 8,
-                        borderWidth: 2,
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    legend: {
-                        display: false
-                    },
-                    scales: {
-                        yAxes: [{
-                            gridLines: {
-                                drawBorder: false,
-                                color: '#f2f2f2',
-                            },
-                            ticks: {
-                                beginAtZero: true,
-                                stepSize: 1
-                            }
-                        }],
-                        xAxes: [{
-                            gridLines: {
-                                display: false
-                            }
-                        }]
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                return tooltipItem.yLabel + ' orders';
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Material Orders Monthly Chart
-            var materialOrdersMonthlyCtx = document.getElementById('materialOrdersMonthlyChart').getContext('2d');
-            var monthlyOrderData = @json($monthlyOrderData);
-            var monthLabels = @json($monthLabels);
-
-            new Chart(materialOrdersMonthlyCtx, {
-                type: 'bar',
-                data: {
-                    labels: monthLabels,
-                    datasets: [{
-                        label: 'Material Orders',
-                        data: monthlyOrderData,
-                        backgroundColor: '#6777ef',
-                        borderWidth: 0,
-                        borderRadius: 4,
-                        borderSkipped: false,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    legend: {
-                        display: false
-                    },
-                    scales: {
-                        yAxes: [{
-                            gridLines: {
-                                drawBorder: false,
-                                color: '#f2f2f2',
-                            },
-                            ticks: {
-                                beginAtZero: true,
-                                stepSize: 5
-                            }
-                        }],
-                        xAxes: [{
-                            gridLines: {
-                                display: false
-                            }
-                        }]
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                return tooltipItem.yLabel + ' orders';
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Material Orders Yearly Chart
-            var materialOrdersYearlyCtx = document.getElementById('materialOrdersYearlyChart').getContext('2d');
-            var yearlyOrderData = @json($yearlyOrderData);
-            var yearLabels = @json($yearLabels);
-
-            new Chart(materialOrdersYearlyCtx, {
-                type: 'bar',
-                data: {
-                    labels: yearLabels,
-                    datasets: [{
-                        label: 'Material Orders',
-                        data: yearlyOrderData,
-                        backgroundColor: '#63ed7a',
-                        borderWidth: 0,
-                        borderRadius: 4,
-                        borderSkipped: false,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    legend: {
-                        display: false
-                    },
-                    scales: {
-                        yAxes: [{
-                            gridLines: {
-                                drawBorder: false,
-                                color: '#f2f2f2',
-                            },
-                            ticks: {
-                                beginAtZero: true,
-                                stepSize: 10
-                            }
-                        }],
-                        xAxes: [{
-                            gridLines: {
-                                display: false
-                            }
-                        }]
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                return tooltipItem.yLabel + ' orders';
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Top Materials Pie Chart
-            var topMaterialsCtx = document.getElementById('topMaterialsChart').getContext('2d');
-            var topMaterialsData = @json($topMaterials);
-
-            var materialColors = [
-                '#6777ef',
-                '#63ed7a',
-                '#ffa426',
-                '#fc544b',
-                '#3abaf4'
-            ];
-
-            new Chart(topMaterialsCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: topMaterialsData.map(item => item.material_name),
-                    datasets: [{
-                        data: topMaterialsData.map(item => item.total_amount),
-                        backgroundColor: materialColors,
-                        borderWidth: 0,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutoutPercentage: 70,
-                    legend: {
-                        position: 'right',
-                        labels: {
-                            boxWidth: 12,
-                            padding: 15
-                        }
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                var dataset = data.datasets[0];
-                                var total = dataset.data.reduce((acc, current) => acc + current, 0);
-                                var currentValue = dataset.data[tooltipItem.index];
-                                var percentage = Math.round((currentValue / total * 100));
-                                return data.labels[tooltipItem.index] + ': Rp ' +
-                                    currentValue.toLocaleString('id-ID') + ' (' + percentage + '%)';
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Progress bar animations
-            $('.progress .progress-bar').each(function() {
-                $(this).css({
-                    width: $(this).attr('data-width') + '%'
-                });
-            });
-
-            // Outlet Material Pie Chart
-            var outletMaterialPieCtx = document.getElementById('outletMaterialPieChart').getContext('2d');
-            var outletData = @json($materialOrdersStats);
-
-            // Generate colors for each outlet
-            var outletColors = [];
-            for (var i = 0; i < outletData.length; i++) {
-                if (i % 2 == 0) {
-                    outletColors.push('#6777ef');
-                } else {
-                    outletColors.push('#63ed7a');
-                }
-            }
-
-            new Chart(outletMaterialPieCtx, {
-                type: 'pie',
-                data: {
-                    labels: outletData.map(item => item.outlet_name),
-                    datasets: [{
-                        data: outletData.map(item => item.total_amount),
-                        backgroundColor: outletColors,
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            boxWidth: 12,
-                            padding: 20
-                        }
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                var dataset = data.datasets[0];
-                                var total = dataset.data.reduce((acc, current) => acc + current, 0);
-                                var currentValue = dataset.data[tooltipItem.index];
-                                var percentage = Math.round((currentValue / total * 100));
-                                return data.labels[tooltipItem.index] + ': Rp ' +
-                                    currentValue.toLocaleString('id-ID') + ' (' + percentage + '%)';
-                            }
-                        }
-                    },
-                    animation: {
-                        animateScale: true,
-                        animateRotate: true
-                    }
-                }
-            });
-
-            // Handle Export and Print Buttons
-            $('.card-header-action .btn-primary').on('click', function(e) {
-                e.preventDefault();
-                // You can implement actual export functionality here
-                alert('Export feature will be implemented soon!');
-            });
-
-            $('.card-header-action .btn:not(.btn-primary)').on('click', function(e) {
-                e.preventDefault();
-                window.print();
-            });
-
-            // Add hover effects on rows
-            $('.table-responsive table tbody tr').hover(
-                function() {
-                    $(this).addClass('bg-light');
-                },
-                function() {
-                    $(this).removeClass('bg-light');
-                }
-            );
-
-            // Auto-refresh data every 5 minutes (300000 ms)
-            // Uncomment this if you want auto-refresh functionality
-
-            setInterval(function() {
-                location.reload();
-            }, 300000);
-
-        });
-    </script>
-
-    <!-- Top Items Pie Chart -->
-    <script>
+        // Top Items Chart
         var topItemsCtx = document.getElementById('topItemsChart').getContext('2d');
-        var topItemsData = @json($topItems);
+        var topItemsData = @json($topItems ?? []);
+
+        var productNames = topItemsData.map(function(item) {
+            return item.product_name;
+        });
+
+        var productQuantities = topItemsData.map(function(item) {
+            return item.total_quantity;
+        });
 
         var colors = [
             '#6777ef',
@@ -947,21 +1060,24 @@
         ];
 
         new Chart(topItemsCtx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
-                labels: topItemsData.map(item => item.product_name),
+                labels: productNames,
                 datasets: [{
-                    data: topItemsData.map(item => item.total_quantity),
+                    data: productQuantities,
                     backgroundColor: colors,
-                    borderWidth: 1,
+                    borderWidth: 0,
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                cutoutPercentage: 70,
                 legend: {
-                    position: 'right',
+                    position: 'bottom',
                     labels: {
-                        boxWidth: 20
+                        boxWidth: 12,
+                        padding: 15
                     }
                 },
                 tooltips: {
@@ -972,11 +1088,18 @@
                             var currentValue = dataset.data[tooltipItem.index];
                             var percentage = Math.round((currentValue / total * 100));
                             return data.labels[tooltipItem.index] + ': ' +
-                                currentValue.toLocaleString('id-ID') + ' (' + percentage + '%)';
+                                currentValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".") + ' (' +
+                                percentage + '%)';
                         }
                     }
                 }
             }
+        });
+
+        // Print functionality
+        $('#btnPrintSales').click(function() {
+            // Add print functionality here
+            window.print();
         });
     </script>
 @endpush

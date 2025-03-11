@@ -8,6 +8,8 @@ use App\Models\Order;
 use App\Models\Member;
 use App\Models\User;
 use App\Models\Outlet;
+use App\Models\RawMaterial;
+use App\Models\DailyCash;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -20,14 +22,13 @@ class DashboardController extends Controller
         // Filter periode
         $startDate = $request->input('start_date', Carbon::now()->startOfMonth());
         $endDate = $request->input('end_date', Carbon::now());
+        $periodType = $request->input('period_type', 'monthly');
 
         // Initialize $selectedOutlet
         $selectedOutlet = null;
 
         // Get outlets based on role
-        if (
-            Auth::user()->role === 'owner'
-        ) {
+        if (Auth::user()->role === 'owner') {
             $outlets = Outlet::all();
             if ($request->outlet_id) {
                 $selectedOutlet = Outlet::find($request->outlet_id);
@@ -42,9 +43,7 @@ class DashboardController extends Controller
         $userQuery = User::query();
 
         // Filter by outlet
-        if (
-            Auth::user()->role === 'owner'
-        ) {
+        if (Auth::user()->role === 'owner') {
             if ($request->outlet_id) {
                 $orderQuery->where('outlet_id', $request->outlet_id);
                 $userQuery->where('outlet_id', $request->outlet_id);
@@ -56,6 +55,18 @@ class DashboardController extends Controller
 
         // Date filter
         $orderQuery->whereBetween('created_at', [$startDate, $endDate]);
+
+        // Previous period for comparison
+        $previousPeriodStartDate = Carbon::parse($startDate)->subDays(Carbon::parse($startDate)->diffInDays($endDate) + 1);
+        $previousPeriodEndDate = Carbon::parse($startDate)->subDay();
+
+        $previousPeriodOrdersQuery = clone $orderQuery;
+        $previousPeriodOrdersQuery->whereBetween('created_at', [$previousPeriodStartDate, $previousPeriodEndDate]);
+
+        // Previous period statistics
+        $previousPeriodOrders = $previousPeriodOrdersQuery->count();
+        $previousPeriodRevenue = $previousPeriodOrdersQuery->sum('total');
+        $previousPeriodMembers = Member::where('created_at', '<', $startDate)->count();
 
         // Statistik umum
         $totalRevenue = $orderQuery->sum('total');
@@ -93,12 +104,11 @@ class DashboardController extends Controller
             ->groupBy('outlets.id', 'outlets.name')
             ->get();
 
-        // Trend penjualan harian
+        // Format daily sales data based on period type
         $dailySalesQuery = Order::select(
             DB::raw('DATE(created_at) as date'),
             DB::raw('SUM(total) as total_sales')
-        )
-            ->whereBetween('created_at', [$startDate, $endDate]);
+        )->whereBetween('created_at', [$startDate, $endDate]);
 
         if (Auth::user()->role !== 'owner') {
             $dailySalesQuery->where('outlet_id', Auth::user()->outlet_id);
@@ -106,10 +116,42 @@ class DashboardController extends Controller
             $dailySalesQuery->where('outlet_id', $request->outlet_id);
         }
 
-        $dailySales = $dailySalesQuery
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get();
+        if ($periodType === 'daily') {
+            // Daily data - no additional grouping needed
+            $dailySalesQuery->groupBy('date');
+        } elseif ($periodType === 'weekly') {
+            // Weekly data - group by week
+            $dailySalesQuery = Order::select(
+                DB::raw('YEARWEEK(created_at, 1) as week'),
+                DB::raw('MIN(DATE(created_at)) as date'),
+                DB::raw('SUM(total) as total_sales')
+            )->whereBetween('created_at', [$startDate, $endDate]);
+
+            if (Auth::user()->role !== 'owner') {
+                $dailySalesQuery->where('outlet_id', Auth::user()->outlet_id);
+            } elseif ($request->outlet_id) {
+                $dailySalesQuery->where('outlet_id', $request->outlet_id);
+            }
+
+            $dailySalesQuery->groupBy('week');
+        } elseif ($periodType === 'monthly') {
+            // Monthly data - group by month
+            $dailySalesQuery = Order::select(
+                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+                DB::raw('MIN(DATE(created_at)) as date'),
+                DB::raw('SUM(total) as total_sales')
+            )->whereBetween('created_at', [$startDate, $endDate]);
+
+            if (Auth::user()->role !== 'owner') {
+                $dailySalesQuery->where('outlet_id', Auth::user()->outlet_id);
+            } elseif ($request->outlet_id) {
+                $dailySalesQuery->where('outlet_id', $request->outlet_id);
+            }
+
+            $dailySalesQuery->groupBy('month');
+        }
+
+        $dailySales = $dailySalesQuery->orderBy('date')->get();
 
         // Top selling items
         $topItemsQuery = DB::table('order_items')
@@ -157,164 +199,144 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-
+        // Low stock materials
+        $lowStockMaterials = RawMaterial::where('stock', '<=', 15)
+            ->where('is_active', true)
+            ->orderBy('stock')
+            ->get();
 
         // Material orders statistics
-        // Get current time periods
-        $currentWeekStart = Carbon::now()->startOfWeek();
-        $currentWeekEnd = Carbon::now()->endOfWeek();
-        $lastWeekStart = Carbon::now()->subWeek()->startOfWeek();
-        $lastWeekEnd = Carbon::now()->subWeek()->endOfWeek();
-
-        $currentMonthStart = Carbon::now()->startOfMonth();
-        $currentMonthEnd = Carbon::now()->endOfMonth();
-        $lastMonthStart = Carbon::now()->subMonth()->startOfMonth();
-        $lastMonthEnd = Carbon::now()->subMonth()->endOfMonth();
-
-        $currentYearStart = Carbon::now()->startOfYear();
-        $currentYearEnd = Carbon::now()->endOfYear();
-        $lastYearStart = Carbon::now()->subYear()->startOfYear();
-        $lastYearEnd = Carbon::now()->subYear()->endOfYear();
-
-        // Base query for material orders
-        $materialOrdersQuery = MaterialOrder::select(
-            'outlets.id as outlet_id',
-            'outlets.name as outlet_name',
-            DB::raw('COUNT(material_orders.id) as total_orders'),
-            DB::raw('SUM(material_orders.total_amount) as total_amount'),
-
-            // Current periods
-            DB::raw('SUM(CASE WHEN material_orders.created_at BETWEEN "' . $currentWeekStart . '" AND "' . $currentWeekEnd . '" THEN 1 ELSE 0 END) as total_orders_this_week'),
-            DB::raw('SUM(CASE WHEN material_orders.created_at BETWEEN "' . $currentMonthStart . '" AND "' . $currentMonthEnd . '" THEN 1 ELSE 0 END) as total_orders_this_month'),
-            DB::raw('SUM(CASE WHEN material_orders.created_at BETWEEN "' . $currentYearStart . '" AND "' . $currentYearEnd . '" THEN 1 ELSE 0 END) as total_orders_this_year'),
-
-            // Previous periods
-            DB::raw('SUM(CASE WHEN material_orders.created_at BETWEEN "' . $lastWeekStart . '" AND "' . $lastWeekEnd . '" THEN 1 ELSE 0 END) as total_orders_last_week'),
-            DB::raw('SUM(CASE WHEN material_orders.created_at BETWEEN "' . $lastMonthStart . '" AND "' . $lastMonthEnd . '" THEN 1 ELSE 0 END) as total_orders_last_month'),
-            DB::raw('SUM(CASE WHEN material_orders.created_at BETWEEN "' . $lastYearStart . '" AND "' . $lastYearEnd . '" THEN 1 ELSE 0 END) as total_orders_last_year'),
-
-            // Weekly data points (for charts)
-            DB::raw('SUM(CASE WHEN DAYOFWEEK(material_orders.created_at) = 1 THEN 1 ELSE 0 END) as sunday_orders'),
-            DB::raw('SUM(CASE WHEN DAYOFWEEK(material_orders.created_at) = 2 THEN 1 ELSE 0 END) as monday_orders'),
-            DB::raw('SUM(CASE WHEN DAYOFWEEK(material_orders.created_at) = 3 THEN 1 ELSE 0 END) as tuesday_orders'),
-            DB::raw('SUM(CASE WHEN DAYOFWEEK(material_orders.created_at) = 4 THEN 1 ELSE 0 END) as wednesday_orders'),
-            DB::raw('SUM(CASE WHEN DAYOFWEEK(material_orders.created_at) = 5 THEN 1 ELSE 0 END) as thursday_orders'),
-            DB::raw('SUM(CASE WHEN DAYOFWEEK(material_orders.created_at) = 6 THEN 1 ELSE 0 END) as friday_orders'),
-            DB::raw('SUM(CASE WHEN DAYOFWEEK(material_orders.created_at) = 7 THEN 1 ELSE 0 END) as saturday_orders')
-        )
-            ->join('outlets', 'outlets.id', '=', 'material_orders.franchise_id')
-            ->whereBetween('material_orders.created_at', [$startDate, $endDate]);
-
-        // Apply user role and outlet filters
-        if (Auth::user()->role !== 'owner') {
-            $materialOrdersQuery->where('material_orders.franchise_id', Auth::user()->outlet_id);
-        } elseif ($request->outlet_id) {
-            $materialOrdersQuery->where('material_orders.franchise_id', $request->outlet_id);
-        }
-
-        $materialOrdersStats = $materialOrdersQuery
-            ->groupBy('outlets.id', 'outlets.name')
-            ->get();
-
-        // Calculate percentage changes for periods
-        $totalOrdersThisWeek = $materialOrdersStats->sum('total_orders_this_week');
-        $totalOrdersLastWeek = $materialOrdersStats->sum('total_orders_last_week');
-        $materialOrdersWeekChange = $totalOrdersLastWeek > 0
-            ? (($totalOrdersThisWeek - $totalOrdersLastWeek) / $totalOrdersLastWeek) * 100
-            : 0;
-
-        $totalOrdersThisMonth = $materialOrdersStats->sum('total_orders_this_month');
-        $totalOrdersLastMonth = $materialOrdersStats->sum('total_orders_last_month');
-        $materialOrdersMonthChange = $totalOrdersLastMonth > 0
-            ? (($totalOrdersThisMonth - $totalOrdersLastMonth) / $totalOrdersLastMonth) * 100
-            : 0;
-
-        $totalOrdersThisYear = $materialOrdersStats->sum('total_orders_this_year');
-        $totalOrdersLastYear = $materialOrdersStats->sum('total_orders_last_year');
-        $materialOrdersYearChange = $totalOrdersLastYear > 0
-            ? (($totalOrdersThisYear - $totalOrdersLastYear) / $totalOrdersLastYear) * 100
-            : 0;
-
-        // Get weekly data for chart
-        $weeklyOrderData = [
-            $materialOrdersStats->sum('sunday_orders'),
-            $materialOrdersStats->sum('monday_orders'),
-            $materialOrdersStats->sum('tuesday_orders'),
-            $materialOrdersStats->sum('wednesday_orders'),
-            $materialOrdersStats->sum('thursday_orders'),
-            $materialOrdersStats->sum('friday_orders'),
-            $materialOrdersStats->sum('saturday_orders'),
-        ];
-
-        // Get monthly data for charts (last 6 months)
-        $monthlyOrderData = [];
-        $monthLabels = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $month = Carbon::now()->subMonths($i);
-            $monthStart = $month->copy()->startOfMonth();
-            $monthEnd = $month->copy()->endOfMonth();
-
-            $monthOrders = MaterialOrder::whereBetween('created_at', [$monthStart, $monthEnd]);
-
-            // Apply filters
-            if (
-                Auth::user()->role !== 'owner'
-            ) {
-                $monthOrders->where('franchise_id', Auth::user()->outlet_id);
-            } elseif ($request->outlet_id) {
-                $monthOrders->where('franchise_id', $request->outlet_id);
-            }
-
-            $monthlyOrderData[] = $monthOrders->count();
-            $monthLabels[] = $month->format('M Y');
-        }
-
-        // Get yearly data (last 3 years)
-        $yearlyOrderData = [];
-        $yearLabels = [];
-        for ($i = 2; $i >= 0; $i--) {
-            $year = Carbon::now()->subYears($i);
-            $yearStart = $year->copy()->startOfYear();
-            $yearEnd = $year->copy()->endOfYear();
-
-            $yearOrders = MaterialOrder::whereBetween('created_at', [$yearStart, $yearEnd]);
-
-            // Apply filters
-            if (
-                Auth::user()->role !== 'owner'
-            ) {
-                $yearOrders->where('franchise_id', Auth::user()->outlet_id);
-            } elseif ($request->outlet_id) {
-                $yearOrders->where('franchise_id', $request->outlet_id);
-            }
-
-            $yearlyOrderData[] = $yearOrders->count();
-            $yearLabels[] = $year->format('Y');
-        }
-
-        // Get top ordered materials
-        $topMaterialsQuery = MaterialOrderItem::select(
-            'raw_materials.id',
-            'raw_materials.name as material_name',
-            'raw_materials.unit',
-            DB::raw('SUM(material_order_items.quantity) as total_quantity'),
-            DB::raw('SUM(material_order_items.subtotal) as total_amount')
-        )
-            ->join('material_orders', 'material_orders.id', '=', 'material_order_items.material_order_id')
-            ->join('raw_materials', 'raw_materials.id', '=', 'material_order_items.raw_material_id')
-            ->whereBetween('material_orders.created_at', [$startDate, $endDate]);
+        // Get orders based on status
+        $materialOrdersQuery = MaterialOrder::query();
 
         if (Auth::user()->role !== 'owner') {
-            $topMaterialsQuery->where('material_orders.franchise_id', Auth::user()->outlet_id);
+            $materialOrdersQuery->where('franchise_id', Auth::user()->outlet_id);
         } elseif ($request->outlet_id) {
-            $topMaterialsQuery->where('material_orders.franchise_id', $request->outlet_id);
+            $materialOrdersQuery->where('franchise_id', $request->outlet_id);
         }
 
-        $topMaterials = $topMaterialsQuery
-            ->groupBy('raw_materials.id', 'raw_materials.name', 'raw_materials.unit')
-            ->orderByDesc('total_quantity')
+        $pendingOrdersCount = (clone $materialOrdersQuery)->where('status', 'pending')->count();
+        $approvedOrdersCount = (clone $materialOrdersQuery)->where('status', 'approved')->count();
+        $deliveredOrdersCount = (clone $materialOrdersQuery)->where('status', 'delivered')->count();
+
+        // Total material cost
+        $totalMaterialCost = (clone $materialOrdersQuery)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->sum('total_amount');
+
+        // Ongoing orders (pending and approved)
+        $ongoingOrders = (clone $materialOrdersQuery)
+            ->whereIn('status', ['pending', 'approved'])
+            ->with(['franchise', 'user', 'items'])
+            ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();
+
+        // Daily cash data for cash flow
+        $dailyCashQuery = DailyCash::whereBetween('date', [$startDate, $endDate]);
+
+        if (Auth::user()->role !== 'owner') {
+            $dailyCashQuery->where('outlet_id', Auth::user()->outlet_id);
+        } elseif ($request->outlet_id) {
+            $dailyCashQuery->where('outlet_id', $request->outlet_id);
+        }
+
+        $dailyCashRecords = $dailyCashQuery->get();
+
+        // Calculate cash flow data
+        $totalOpeningBalance = $dailyCashRecords->sum('opening_balance');
+        $totalExpenses = $dailyCashRecords->sum('expenses');
+
+        // Get cash sales
+        $totalCashSales = Order::whereBetween('created_at', [$startDate, $endDate])
+            ->where('payment_method', 'cash');
+
+        if (Auth::user()->role !== 'owner') {
+            $totalCashSales->where('outlet_id', Auth::user()->outlet_id);
+        } elseif ($request->outlet_id) {
+            $totalCashSales->where('outlet_id', $request->outlet_id);
+        }
+
+        $totalCashSales = $totalCashSales->sum('total');
+
+        // Calculate closing balance
+        $closingBalance = $totalOpeningBalance + $totalCashSales - $totalExpenses;
+
+        // Prepare daily breakdown
+        $dailyData = [];
+        $datesInRange = [];
+        $current = Carbon::parse($startDate);
+        while ($current <= Carbon::parse($endDate)) {
+            $datesInRange[] = $current->format('Y-m-d');
+            $current = $current->addDay();
+        }
+
+        foreach ($datesInRange as $date) {
+            // Get daily cash record
+            $dailyCash = $dailyCashRecords->where('date', $date)->first();
+
+            // Get orders for this date
+            $dateOrders = Order::whereDate('created_at', $date);
+
+            if (Auth::user()->role !== 'owner') {
+                $dateOrders->where('outlet_id', Auth::user()->outlet_id);
+            } elseif ($request->outlet_id) {
+                $dateOrders->where('outlet_id', $request->outlet_id);
+            }
+
+            $cashSalesForDate = (clone $dateOrders)->where('payment_method', 'cash')->sum('total');
+            $qrisSalesForDate = (clone $dateOrders)->where('payment_method', 'qris')->sum('total');
+
+            $dailyData[] = [
+                'date' => $date,
+                'opening_balance' => $dailyCash ? $dailyCash->opening_balance : 0,
+                'expenses' => $dailyCash ? $dailyCash->expenses : 0,
+                'cash_sales' => $cashSalesForDate,
+                'qris_sales' => $qrisSalesForDate,
+                'total_sales' => $cashSalesForDate + $qrisSalesForDate
+            ];
+        }
+
+        // Active staff
+        $activeStaff = User::whereIn('role', ['admin', 'staff'])
+            ->select('users.*', DB::raw('RAND() as random_order')) // Random order for demo purposes
+            ->orderBy('random_order')
+            ->limit(5)
+            ->get();
+
+        $activeStaffCount = count($activeStaff);
+
+        // Mock stock movements for demonstration
+        $recentStockMovements = collect([
+            (object)[
+                'created_at' => now()->subHours(2),
+                'material_name' => 'Bawang Merah',
+                'adjustment' => 10,
+                'unit' => 'Kg',
+                'notes' => 'Pengiriman dari supplier'
+            ],
+            (object)[
+                'created_at' => now()->subHours(6),
+                'material_name' => 'Cabai Merah',
+                'adjustment' => 5,
+                'unit' => 'Kg',
+                'notes' => 'Pengiriman dari supplier'
+            ],
+            (object)[
+                'created_at' => now()->subHours(8),
+                'material_name' => 'Tepung',
+                'adjustment' => -2,
+                'unit' => 'Kg',
+                'notes' => 'Penggunaan untuk produksi'
+            ],
+            (object)[
+                'created_at' => now()->subDay(),
+                'material_name' => 'Mie',
+                'adjustment' => 15,
+                'unit' => 'Kg',
+                'notes' => 'Pengiriman dari supplier'
+            ]
+        ]);
 
         // Pass all the variables to the view
         return view(
@@ -328,20 +350,28 @@ class DashboardController extends Controller
                 'dailySales',
                 'startDate',
                 'endDate',
+                'periodType',
                 'outlets',
                 'selectedOutlet',
                 'topItems',
                 'topCustomers',
-                'materialOrdersStats',
-                'topMaterials',
-                'materialOrdersWeekChange',
-                'materialOrdersMonthChange',
-                'materialOrdersYearChange',
-                'weeklyOrderData',
-                'monthlyOrderData',
-                'monthLabels',
-                'yearlyOrderData',
-                'yearLabels'
+                'previousPeriodOrders',
+                'previousPeriodRevenue',
+                'previousPeriodMembers',
+                'lowStockMaterials',
+                'pendingOrdersCount',
+                'approvedOrdersCount',
+                'deliveredOrdersCount',
+                'totalMaterialCost',
+                'ongoingOrders',
+                'totalOpeningBalance',
+                'totalExpenses',
+                'totalCashSales',
+                'closingBalance',
+                'dailyData',
+                'activeStaff',
+                'activeStaffCount',
+                'recentStockMovements'
             )
         );
     }
