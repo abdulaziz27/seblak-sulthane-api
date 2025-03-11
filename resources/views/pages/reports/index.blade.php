@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Reports Dashboard')
+@section('title', 'Dashboard Laporan')
 
 @push('style')
     <link rel="stylesheet" href="{{ asset('library/bootstrap-daterangepicker/daterangepicker.css') }}">
@@ -11,30 +11,30 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Reports Dashboard</h1>
+                <h1>Dashboard Laporan</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item">Reports</div>
+                    <div class="breadcrumb-item">Laporan</div>
                 </div>
             </div>
 
             <div class="section-body">
-                <h2 class="section-title">Download Reports</h2>
+                <h2 class="section-title">Unduh Laporan</h2>
                 <p class="section-lead">
-                    Select the report type and date range, then click on the download button to get your report in PDF or Excel format.
+                    Pilih jenis laporan dan rentang tanggal, lalu klik tombol unduh untuk mendapatkan laporan dalam format PDF atau Excel.
                 </p>
 
                 <div class="row">
-                    <!-- Sales Summary Report Card -->
+                    <!-- Kartu Laporan Ringkasan Penjualan -->
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Sales Summary Report</h4>
+                                <h4>Laporan Ringkasan Penjualan</h4>
                             </div>
                             <div class="card-body">
                                 <form action="{{ route('reports.sales-summary') }}" method="GET" target="_blank">
                                     <div class="form-group">
-                                        <label>Date Range</label>
+                                        <label>Rentang Tanggal</label>
                                         <div class="input-group">
                                             <div class="input-group-prepend">
                                                 <div class="input-group-text">
@@ -49,7 +49,7 @@
                                     <div class="form-group">
                                         <label>Outlet</label>
                                         <select class="form-control select2" name="outlet_id">
-                                            <option value="">All Outlets</option>
+                                            <option value="">Semua Outlet</option>
                                             @foreach($outlets as $outlet)
                                                 <option value="{{ $outlet->id }}">{{ $outlet->name }}</option>
                                             @endforeach
@@ -63,23 +63,23 @@
                                         </select>
                                     </div>
                                     <div class="text-right">
-                                        <button type="submit" class="btn btn-primary">Download Report</button>
+                                        <button type="submit" class="btn btn-primary">Unduh Laporan</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Outlet Performance Report Card -->
+                    <!-- Kartu Laporan Kinerja Outlet -->
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Outlet Performance Report</h4>
+                                <h4>Laporan Kinerja Outlet</h4>
                             </div>
                             <div class="card-body">
                                 <form action="{{ route('reports.outlet-performance') }}" method="GET" target="_blank">
                                     <div class="form-group">
-                                        <label>Date Range</label>
+                                        <label>Rentang Tanggal</label>
                                         <div class="input-group">
                                             <div class="input-group-prepend">
                                                 <div class="input-group-text">
@@ -99,23 +99,23 @@
                                         </select>
                                     </div>
                                     <div class="text-right">
-                                        <button type="submit" class="btn btn-primary">Download Report</button>
+                                        <button type="submit" class="btn btn-primary">Unduh Laporan</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Product Performance Report Card -->
+                    <!-- Kartu Laporan Kinerja Produk -->
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Product Performance Report</h4>
+                                <h4>Laporan Kinerja Produk</h4>
                             </div>
                             <div class="card-body">
                                 <form action="{{ route('reports.product-performance') }}" method="GET" target="_blank">
                                     <div class="form-group">
-                                        <label>Date Range</label>
+                                        <label>Rentang Tanggal</label>
                                         <div class="input-group">
                                             <div class="input-group-prepend">
                                                 <div class="input-group-text">
@@ -130,7 +130,7 @@
                                     <div class="form-group">
                                         <label>Outlet</label>
                                         <select class="form-control select2" name="outlet_id">
-                                            <option value="">All Outlets</option>
+                                            <option value="">Semua Outlet</option>
                                             @foreach($outlets as $outlet)
                                                 <option value="{{ $outlet->id }}">{{ $outlet->name }}</option>
                                             @endforeach
@@ -144,23 +144,23 @@
                                         </select>
                                     </div>
                                     <div class="text-right">
-                                        <button type="submit" class="btn btn-primary">Download Report</button>
+                                        <button type="submit" class="btn btn-primary">Unduh Laporan</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Customer Insights Report Card -->
+                    <!-- Kartu Laporan Analisis Pelanggan -->
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Customer Insights Report</h4>
+                                <h4>Laporan Analisis Pelanggan</h4>
                             </div>
                             <div class="card-body">
                                 <form action="{{ route('reports.customer-insights') }}" method="GET" target="_blank">
                                     <div class="form-group">
-                                        <label>Date Range</label>
+                                        <label>Rentang Tanggal</label>
                                         <div class="input-group">
                                             <div class="input-group-prepend">
                                                 <div class="input-group-text">
@@ -180,22 +180,22 @@
                                         </select>
                                     </div>
                                     <div class="text-right">
-                                        <button type="submit" class="btn btn-primary">Download Report</button>
+                                        <button type="submit" class="btn btn-primary">Unduh Laporan</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Inventory Report Card -->
+                    <!-- Kartu Laporan Inventaris -->
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Inventory & Raw Materials Report</h4>
+                                <h4>Laporan Inventaris & Bahan Baku</h4>
                             </div>
                             <div class="card-body">
                                 <form action="{{ route('reports.inventory') }}" method="GET" target="_blank">
-                                    <p>This report shows current inventory levels and recent material orders. No date range required.</p>
+                                    <p>Laporan ini menampilkan tingkat inventaris saat ini dan pesanan bahan baku terbaru. Tidak perlu rentang tanggal.</p>
                                     <div class="form-group">
                                         <label>Format</label>
                                         <select class="form-control" name="format">
@@ -204,7 +204,7 @@
                                         </select>
                                     </div>
                                     <div class="text-right">
-                                        <button type="submit" class="btn btn-primary">Download Report</button>
+                                        <button type="submit" class="btn btn-primary">Unduh Laporan</button>
                                     </div>
                                 </form>
                             </div>
@@ -223,10 +223,10 @@
 
     <script>
         $(document).ready(function() {
-            // Initialize select2
+            // Inisialisasi select2
             $('.select2').select2();
 
-            // Initialize daterangepicker for all forms
+            // Inisialisasi daterangepicker untuk semua form
             $('.daterange').daterangepicker({
                 locale: {
                     format: 'YYYY-MM-DD'
@@ -235,7 +235,7 @@
                 opens: 'right'
             });
 
-            // Update hidden start_date and end_date fields when date range changes
+            // Perbarui field start_date dan end_date tersembunyi saat rentang tanggal berubah
             $('.daterange').on('apply.daterangepicker', function(ev, picker) {
                 var formId = $(this).closest('form').attr('action');
 
@@ -254,7 +254,7 @@
                 }
             });
 
-            // Set default date range (last 30 days)
+            // Set rentang tanggal default (30 hari terakhir)
             var start = moment().subtract(29, 'days');
             var end = moment();
 
@@ -263,7 +263,7 @@
                 $(this).data('daterangepicker').setEndDate(end);
             });
 
-            // Set initial hidden field values
+            // Set nilai awal field tersembunyi
             $('#sales_start_date').val(start.format('YYYY-MM-DD'));
             $('#sales_end_date').val(end.format('YYYY-MM-DD'));
             $('#outlet_start_date').val(start.format('YYYY-MM-DD'));

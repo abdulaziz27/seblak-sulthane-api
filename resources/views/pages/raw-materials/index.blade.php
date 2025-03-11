@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Raw Materials')
+@section('title', 'Bahan Baku')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -11,20 +11,20 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Raw Materials</h1>
+                <h1>Bahan Baku</h1>
                 <div class="section-header-button">
-                    <a href="{{ route('raw-materials.create') }}" class="btn btn-primary">Add New</a>
+                    <a href="{{ route('raw-materials.create') }}" class="btn btn-primary">Tambah Baru</a>
                     <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
-                        Import Excel
+                        Impor Excel
                     </button>
                     <a href="{{ route('raw-materials.export') }}" class="btn btn-info ml-2">
-                        Export Excel
+                        Ekspor Excel
                     </a>
                 </div>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Inventory</a></div>
-                    <div class="breadcrumb-item">Raw Materials</div>
+                    <div class="breadcrumb-item"><a href="#">Inventaris</a></div>
+                    <div class="breadcrumb-item">Bahan Baku</div>
                 </div>
             </div>
 
@@ -35,11 +35,11 @@
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Raw Materials List</h4>
+                                <h4>Daftar Bahan Baku</h4>
                                 <div class="card-header-form">
                                     <form method="GET" action="{{ route('raw-materials.index') }}">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" placeholder="Search by name"
+                                            <input type="text" class="form-control" placeholder="Cari berdasarkan nama"
                                                 name="search" value="{{ request('search') }}">
                                             <div class="input-group-btn">
                                                 <button class="btn btn-primary"><i class="fas fa-search"></i></button>
@@ -53,13 +53,13 @@
                                     <table class="table table-striped">
                                         <thead>
                                             <tr>
-                                                <th>Name</th>
-                                                <th>Unit</th>
-                                                <th>Price</th>
-                                                <th>Stock</th>
-                                                <th>Description</th>
+                                                <th>Nama</th>
+                                                <th>Satuan</th>
+                                                <th>Harga</th>
+                                                <th>Stok</th>
+                                                <th>Deskripsi</th>
                                                 <th>Status</th>
-                                                <th>Action</th>
+                                                <th>Aksi</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -78,7 +78,7 @@
                                                     <td>
                                                         <div
                                                             class="badge badge-{{ $material->is_active ? 'success' : 'danger' }}">
-                                                            {{ $material->is_active ? 'Active' : 'Inactive' }}
+                                                            {{ $material->is_active ? 'Aktif' : 'Nonaktif' }}
                                                         </div>
                                                     </td>
                                                     <td>
@@ -99,7 +99,7 @@
                                                                 @method('DELETE')
                                                                 <button type="submit"
                                                                     class="btn btn-sm btn-danger confirm-delete"
-                                                                    data-confirm="Are you sure?|This action cannot be undone.">
+                                                                    data-confirm="Apakah Anda yakin?|Tindakan ini tidak dapat dibatalkan.">
                                                                     <i class="fas fa-trash"></i>
                                                                 </button>
                                                             </form>
@@ -121,13 +121,13 @@
         </section>
     </div>
 
-    <!-- Import Modal -->
+    <!-- Modal Impor -->
     <div class="modal fade" id="importModal" tabindex="-1" role="dialog" aria-labelledby="importModalLabel"
         aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="importModalLabel">Import Raw Materials</h5>
+                    <h5 class="modal-title" id="importModalLabel">Impor Bahan Baku</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -136,35 +136,35 @@
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
-                            <label>Excel File</label>
+                            <label>File Excel</label>
                             <input type="file" class="form-control" name="file" accept=".xlsx, .xls" required>
                         </div>
                         <div class="alert alert-info">
-                            <h6>Instructions:</h6>
+                            <h6>Instruksi:</h6>
                             <ol>
-                                <li>Download template <a href="{{ route('raw-materials.template') }}">here</a></li>
-                                <li>Fill in the data according to the template</li>
-                                <li>Save and upload the file</li>
+                                <li>Unduh template <a href="{{ route('raw-materials.template') }}">di sini</a></li>
+                                <li>Isi data sesuai dengan template</li>
+                                <li>Simpan dan unggah file</li>
                             </ol>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Import</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                        <button type="submit" class="btn btn-primary">Impor</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Stock Adjustment Modals -->
+    <!-- Modal Penyesuaian Stok -->
     @foreach ($materials as $material)
     <div class="modal fade" id="stockModal{{ $material->id }}" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        Adjust Stock: {{ $material->name }}
+                        Sesuaikan Stok: {{ $material->name }}
                     </h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
@@ -174,26 +174,26 @@
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
-                            <label>Current Stock</label>
+                            <label>Stok Saat Ini</label>
                             <input type="text" class="form-control"
                                 value="{{ $material->stock }} {{ $material->unit }}"
                                 disabled>
                         </div>
                         <div class="form-group">
-                            <label>Adjustment (positive to add, negative to subtract)</label>
+                            <label>Penyesuaian (positif untuk menambah, negatif untuk mengurangi)</label>
                             <input type="number" class="form-control"
                                 name="adjustment" required>
                         </div>
                         <div class="form-group">
-                            <label>Notes</label>
+                            <label>Catatan</label>
                             <textarea class="form-control" name="notes" rows="3"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary"
-                            data-dismiss="modal">Cancel</button>
+                            data-dismiss="modal">Batal</button>
                         <button type="submit"
-                            class="btn btn-primary">Update Stock</button>
+                            class="btn btn-primary">Perbarui Stok</button>
                     </div>
                 </form>
             </div>
@@ -223,42 +223,42 @@
     <script src="{{ asset('js/page/features-posts.js') }}"></script>
 
     <script>
-        console.log('Scripts loaded');
+        console.log('Skrip dimuat');
 
         // Debug Bootstrap modal
         $(document).ready(function() {
-            console.log('Document ready');
+            console.log('Dokumen siap');
 
-            // Manually initialize all modals
+            // Inisialisasi semua modal secara manual
             $('.modal').modal({
                 show: false
             });
 
-            // Debug modal button clicks
+            // Debug klik tombol modal
             $('[data-toggle="modal"]').on('click', function() {
-                console.log('Modal button clicked');
+                console.log('Tombol modal diklik');
                 var target = $(this).data('target');
                 console.log('Target modal:', target);
                 $(target).modal('show');
             });
 
-            // Debug modal events
+            // Debug event modal
             $('.modal').on('show.bs.modal', function() {
-                console.log('Modal show event fired', this.id);
+                console.log('Event show modal dipicu', this.id);
             }).on('shown.bs.modal', function() {
-                console.log('Modal shown event fired', this.id);
+                console.log('Event shown modal dipicu', this.id);
             }).on('hide.bs.modal', function() {
-                console.log('Modal hide event fired', this.id);
+                console.log('Event hide modal dipicu', this.id);
             }).on('hidden.bs.modal', function() {
-                console.log('Modal hidden event fired', this.id);
+                console.log('Event hidden modal dipicu', this.id);
                 $(this).find('form')[0].reset();
             });
         });
 
-        // Existing scripts below...
+        // Skrip yang sudah ada di bawah...
         $('.stock-adjust-btn').click(function() {
             var id = $(this).data('id');
-            console.log('Trying to show modal for ID:', id);
+            console.log('Mencoba menampilkan modal untuk ID:', id);
 
             // Hapus backdrop yang mungkin tertinggal
             $('.modal-backdrop').remove();
@@ -267,14 +267,14 @@
             $('#stockModal' + id).modal('show');
         });
 
-        // Confirm delete functionality
+        // Fungsi konfirmasi hapus
         $('.confirm-delete').click(function(e) {
             var form = $(this).closest('form');
             e.preventDefault();
 
             swal({
-                    title: 'Are you sure?',
-                    text: 'Once deleted, you will not be able to recover this item!',
+                    title: 'Apakah Anda yakin?',
+                    text: 'Setelah dihapus, Anda tidak dapat memulihkan item ini!',
                     icon: 'warning',
                     buttons: true,
                     dangerMode: true,
