@@ -48,7 +48,7 @@ class DashboardSeeder extends Seeder
         // Create outlets
         $outlets = [
             [
-                'name' => 'Seblak Sulthane Cabang Pusat',
+                'name' => 'Seblak Sulthane Purwokerto Pusat',
                 'address1' => 'Jl. Merdeka No. 123',
                 'address2' => 'Kecamatan Sukajadi, Bandung',
                 'phone' => '081234567890',
@@ -56,20 +56,20 @@ class DashboardSeeder extends Seeder
                 'notes' => 'Cabang Utama'
             ],
             [
-                'name' => 'Seblak Sulthane Dago',
-                'address1' => 'Jl. Dago No. 45',
-                'address2' => 'Kecamatan Coblong, Bandung',
+                'name' => 'Seblak Sulthane Cilacap',
+                'address1' => 'Jl. Cilacap No. 45',
+                'address2' => 'Kecamatan Cilacap, Cilacap',
                 'phone' => '081234567891',
                 'leader' => 'Siti Nurhasanah',
-                'notes' => 'Cabang Premium'
+                'notes' => 'Cabang'
             ],
             [
-                'name' => 'Seblak Sulthane Buah Batu',
-                'address1' => 'Jl. Buah Batu No. 78',
-                'address2' => 'Kecamatan Lengkong, Bandung',
+                'name' => 'Seblak Sulthane Purwokerto Timur',
+                'address1' => 'Jl. Purwokerto Timur No. 78',
+                'address2' => 'Kecamatan PWT TIMUR, Banyumas',
                 'phone' => '081234567892',
                 'leader' => 'Budi Santoso',
-                'notes' => 'Cabang Standard'
+                'notes' => 'Cabang'
             ],
             [
                 'name' => 'Seblak Sulthane Cimahi',
@@ -77,7 +77,7 @@ class DashboardSeeder extends Seeder
                 'address2' => 'Kecamatan Cimahi Tengah, Cimahi',
                 'phone' => '081234567893',
                 'leader' => 'Dewi Anggraini',
-                'notes' => 'Cabang Baru'
+                'notes' => 'Cabang'
             ],
         ];
 
