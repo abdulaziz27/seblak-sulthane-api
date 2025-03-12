@@ -53,7 +53,7 @@
             <button class="close" data-dismiss="alert">
                 <span>×</span>
             </button>
-            <i class="fas fa-exclamation-circle mr-2"></i> Please check the form below for errors
+            <i class="fas fa-exclamation-circle mr-2"></i> Silakan periksa formulir di bawah untuk kesalahan
             <ul class="mt-2 mb-0">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>

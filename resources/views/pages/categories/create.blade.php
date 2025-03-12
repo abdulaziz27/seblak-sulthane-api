@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Category Create')
+@section('title', 'Buat Kategori')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -16,27 +16,27 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Advanced Forms</h1>
+                <h1>Form Lanjutan</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Forms</a></div>
-                    <div class="breadcrumb-item">Category</div>
+                    <div class="breadcrumb-item"><a href="#">Form</a></div>
+                    <div class="breadcrumb-item">Kategori</div>
                 </div>
             </div>
 
             <div class="section-body">
-                <h2 class="section-title">Category</h2>
+                <h2 class="section-title">Kategori</h2>
 
 
                 <div class="card">
                     <form action="{{ route('categories.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
                         <div class="card-header">
-                            <h4>Input Text</h4>
+                            <h4>Input Teks</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label>Name</label>
+                                <label>Nama</label>
                                 <input type="text"
                                     class="form-control @error('name')
                                 is-invalid
@@ -49,7 +49,7 @@
                                 @enderror
                             </div>
                             <div class="form-group">
-                                <label>Description</label>
+                                <label>Deskripsi</label>
                                 <input type="text"
                                     class="form-control @error('description')
                                 is-invalid
@@ -64,7 +64,7 @@
 
 
                             <div class="form-group">
-                                <label class="form-label">Photo Category</label>
+                                <label class="form-label">Foto Kategori</label>
                                 <div class="col-sm-9">
                                     <input type="file" class="form-control" name="image"
                                         @error('image') is-invalid @enderror>
@@ -80,7 +80,7 @@
 
                         </div>
                         <div class="card-footer text-right">
-                            <button class="btn btn-primary">Submit</button>
+                            <button class="btn btn-primary">Simpan</button>
                         </div>
                     </form>
                 </div>

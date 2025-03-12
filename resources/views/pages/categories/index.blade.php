@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Categories')
+@section('title', 'Kategori')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -11,9 +11,9 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Categories</h1>
+                <h1>Kategori</h1>
                 <div class="section-header-button">
-                    <a href="{{ route('categories.create') }}" class="btn btn-primary">Add New</a>
+                    <a href="{{ route('categories.create') }}" class="btn btn-primary">Tambah Baru</a>
                     <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
                         Import Excel
                     </button>
@@ -21,10 +21,10 @@
                         Export Excel
                     </a>
                     <button type="button" class="btn btn-warning ml-2" data-toggle="modal" data-target="#bulkUpdateModal">
-                        Bulk Update
+                        Update Massal
                     </button>
                     <button type="button" class="btn btn-danger ml-2" data-toggle="modal" data-target="#deleteAllModal">
-                        Delete All
+                        Hapus Semua
                     </button>
                 </div>
             </div>
@@ -39,7 +39,7 @@
                                 <div class="float-right">
                                     <form method="GET" action="{{ route('categories.index') }}">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" placeholder="Search" name="name">
+                                            <input type="text" class="form-control" placeholder="Cari" name="name">
                                             <div class="input-group-append">
                                                 <button class="btn btn-primary"><i class="fas fa-search"></i></button>
                                             </div>
@@ -52,9 +52,9 @@
                                 <div class="table-responsive">
                                     <table class="table-striped table">
                                         <tr>
-                                            <th>Name</th>
-                                            <th>Created At</th>
-                                            <th>Action</th>
+                                            <th>Nama</th>
+                                            <th>Dibuat Pada</th>
+                                            <th>Aksi</th>
                                         </tr>
                                         @foreach ($categories as $category)
                                             <tr>
@@ -65,7 +65,7 @@
                                                         <a href='{{ route('categories.edit', $category->id) }}'
                                                             class="btn btn-sm btn-info btn-icon">
                                                             <i class="fas fa-edit"></i>
-                                                            Edit
+                                                            Ubah
                                                         </a>
 
                                                         <form action="{{ route('categories.destroy', $category->id) }}"
@@ -74,7 +74,7 @@
                                                             <input type="hidden" name="_token"
                                                                 value="{{ csrf_token() }}" />
                                                             <button class="btn btn-sm btn-danger btn-icon confirm-delete">
-                                                                <i class="fas fa-times"></i> Delete
+                                                                <i class="fas fa-times"></i> Hapus
                                                             </button>
                                                         </form>
                                                     </div>
@@ -100,7 +100,7 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="importModalLabel">Import Categories</h5>
+                    <h5 class="modal-title" id="importModalLabel">Import Kategori</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -109,20 +109,20 @@
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
-                            <label>Excel File</label>
+                            <label>File Excel</label>
                             <input type="file" class="form-control" name="file" accept=".xlsx, .xls" required>
                         </div>
                         <div class="alert alert-info">
-                            <h6>Instructions:</h6>
+                            <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Download template <a href="{{ route('categories.template') }}">disini</a></li>
+                                <li>Unduh template <a href="{{ route('categories.template') }}">disini</a></li>
                                 <li>Isi data kategori sesuai template</li>
-                                <li>Save dan upload file</li>
+                                <li>Simpan dan unggah file</li>
                             </ol>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
                         <button type="submit" class="btn btn-primary">Import</button>
                     </div>
                 </form>
@@ -136,22 +136,21 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title text-danger" id="deleteAllModalLabel">Delete All Categories</h5>
+                    <h5 class="modal-title text-danger" id="deleteAllModalLabel">Hapus Semua Kategori</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure you want to delete all categories? This action cannot be undone.</p>
-                    <p class="text-danger"><strong>Warning: This will permanently delete all categories from the
-                            database!</strong></p>
+                    <p>Apakah Anda yakin ingin menghapus semua kategori? Tindakan ini tidak dapat dibatalkan.</p>
+                    <p class="text-danger"><strong>Peringatan: Ini akan secara permanen menghapus semua kategori dari database!</strong></p>
                 </div>
                 <div class="modal-footer">
                     <form action="{{ route('categories.deleteAll') }}" method="POST">
                         @csrf
                         @method('DELETE')
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger">Delete All Categories</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-danger">Hapus Semua Kategori</button>
                     </form>
                 </div>
             </div>
@@ -164,7 +163,7 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="bulkUpdateModalLabel">Bulk Update Categories</h5>
+                    <h5 class="modal-title" id="bulkUpdateModalLabel">Update Massal Kategori</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -173,25 +172,24 @@
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
-                            <label>Excel File</label>
+                            <label>File Excel</label>
                             <input type="file" class="form-control" name="file" accept=".xlsx, .xls" required>
                         </div>
                         <div class="alert alert-info">
-                            <h6>Instructions:</h6>
+                            <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Download template update <a
+                                <li>Unduh template update <a
                                         href="{{ route('categories.exportForUpdate') }}">disini</a></li>
                                 <li>Update data kategori sesuai template</li>
-                                <li>Save dan upload file</li>
+                                <li>Simpan dan unggah file</li>
                             </ol>
-                            <p>Column order: ID, Name</p>
-                            <p class="text-warning">Note: ID kategori tidak boleh diubah karena digunakan sebagai referensi
-                                untuk update</p>
+                            <p>Urutan kolom: ID, Nama</p>
+                            <p class="text-warning">Catatan: ID kategori tidak boleh diubah karena digunakan sebagai referensi untuk update</p>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Update Categories</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                        <button type="submit" class="btn btn-primary">Update Kategori</button>
                     </div>
                 </form>
             </div>

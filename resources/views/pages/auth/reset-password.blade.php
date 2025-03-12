@@ -14,7 +14,7 @@
         </div>
 
         <div class="card-body">
-            <p class="text-muted">Enter your new password</p>
+            <p class="text-muted">Masukkan password baru Anda</p>
 
             <form method="POST" action="{{ route('password.update') }}">
                 @csrf
@@ -40,7 +40,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="password">New Password</label>
+                    <label for="password">Password Baru</label>
                     <input id="password"
                         type="password"
                         class="form-control pwstrength @error('password') is-invalid @enderror"
@@ -61,7 +61,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="password-confirm">Confirm Password</label>
+                    <label for="password-confirm">Konfirmasi Password</label>
                     <input id="password-confirm"
                         type="password"
                         class="form-control"
@@ -83,7 +83,7 @@
 @endsection
 
 @push('scripts')
-    <!-- JS Libraies -->
+    <!-- JS Libraries -->
     <script src="{{ asset('library/jquery.pwstrength/jquery.pwstrength.min.js') }}"></script>
 
     <!-- Page Specific JS File -->
