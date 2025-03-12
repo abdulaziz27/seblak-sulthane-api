@@ -15,10 +15,10 @@
                 <div class="section-header-button">
                     <a href="{{ route('raw-materials.create') }}" class="btn btn-primary">Tambah Baru</a>
                     <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
-                        Impor Excel
+                        Import Excel
                     </button>
                     <a href="{{ route('raw-materials.export') }}" class="btn btn-info ml-2">
-                        Ekspor Excel
+                        Eksport Excel
                     </a>
                 </div>
                 <div class="section-header-breadcrumb">

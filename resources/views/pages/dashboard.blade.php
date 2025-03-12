@@ -392,10 +392,10 @@
                                                 </div>
                                                 <div class="card-wrap">
                                                     <div class="card-header">
-                                                        <h4>Penjualan Cash</h4>
+                                                        <h4>Total Penjualan</h4>
                                                     </div>
                                                     <div class="card-body">
-                                                        Rp {{ number_format($totalCashSales, 0, ',', '.') }}
+                                                        Rp {{ number_format($totalSales, 0, ',', '.') }}
                                                     </div>
                                                 </div>
                                             </div>
@@ -446,6 +446,7 @@
                                                 @if (isset($dailyData) && count($dailyData) > 0)
                                                     @foreach ($dailyData as $day)
                                                         @php
+                                                            // Set the initial running balance to the opening balance
                                                             $runningBalance = $day['opening_balance'];
                                                         @endphp
                                                         <tr>
@@ -460,16 +461,16 @@
                                                                 {{ number_format($runningBalance, 0, ',', '.') }}</td>
                                                         </tr>
 
-                                                        @if ($day['cash_sales'] > 0)
+                                                        @if ($day['total_sales'] > 0)
                                                             @php
-                                                                $runningBalance += $day['cash_sales'];
+                                                                $runningBalance += $day['total_sales'];
                                                             @endphp
                                                             <tr>
                                                                 <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
                                                                 </td>
-                                                                <td>Penjualan Cash</td>
+                                                                <td>Total Penjualan</td>
                                                                 <td class="text-right cash-in">Rp
-                                                                    {{ number_format($day['cash_sales'], 0, ',', '.') }}
+                                                                    {{ number_format($day['total_sales'], 0, ',', '.') }}
                                                                 </td>
                                                                 <td class="text-right">-</td>
                                                                 <td class="text-right">Rp
@@ -951,7 +952,7 @@
                 endDate: moment()
             }, function(start, end) {
                 $('#daterange-btn span').html(start.format('D MMM YYYY') + ' - ' + end.format(
-                'D MMM YYYY'));
+                    'D MMM YYYY'));
                 $('#start_date').val(start.format('YYYY-MM-DD'));
                 $('#end_date').val(end.format('YYYY-MM-DD'));
             });

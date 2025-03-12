@@ -259,8 +259,19 @@ class DashboardController extends Controller
 
         $totalCashSales = $totalCashSales->sum('total');
 
+        // Get total sales from all payment methods
+        $totalSales = Order::whereBetween('created_at', [$startDate, $endDate]);
+
+        if (Auth::user()->role !== 'owner') {
+            $totalSales = $totalSales->where('outlet_id', Auth::user()->outlet_id);
+        } elseif ($request->outlet_id) {
+            $totalSales = $totalSales->where('outlet_id', $request->outlet_id);
+        }
+
+        $totalSales = $totalSales->sum('total');
+
         // Calculate closing balance
-        $closingBalance = $totalOpeningBalance + $totalCashSales - $totalExpenses;
+        $closingBalance = $totalOpeningBalance + $totalSales - $totalExpenses;
 
         // Prepare daily breakdown
         $dailyData = [];
@@ -367,6 +378,7 @@ class DashboardController extends Controller
                 'totalOpeningBalance',
                 'totalExpenses',
                 'totalCashSales',
+                'totalSales',
                 'closingBalance',
                 'dailyData',
                 'activeStaff',
