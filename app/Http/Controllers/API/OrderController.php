@@ -185,7 +185,7 @@ class OrderController extends Controller
         $beverageSales = $beverageQuery->sum(DB::raw('order_items.quantity * order_items.price'));
 
         // Calculate closing balance
-        $closingBalance = $totalOpeningBalance + $cashSales - $totalExpenses;
+        $closingBalance = $totalOpeningBalance + $cashSales + $qrisSales - $totalExpenses;
 
         // Prepare daily breakdown data if date range is provided
         $dailyBreakdown = [];
@@ -197,24 +197,19 @@ class OrderController extends Controller
             while ($currentDate <= $lastDate) {
                 $currentDateStr = $currentDate->format('Y-m-d');
 
-                // Get daily orders
-                $dailyOrders = Order::when($outletId, function ($q) use ($outletId) {
+                // Get base daily orders query
+                $baseDailyOrders = Order::when($outletId, function ($q) use ($outletId) {
                     return $q->where('outlet_id', $outletId);
-                })
-                    ->whereDate('created_at', $currentDateStr);
+                })->whereDate('created_at', $currentDateStr);
 
                 // Get daily cash record
                 $dailyCash = DailyCash::when($outletId, function ($q) use ($outletId) {
                     return $q->where('outlet_id', $outletId);
-                })
-                    ->where('date', $currentDateStr)
-                    ->first();
+                })->where('date', $currentDateStr)->first();
 
-                // Calculate daily cash sales
-                $dailyCashSales = $dailyOrders->where('payment_method', 'cash')->sum('total');
-
-                // Calculate daily QRIS sales
-                $dailyQrisSales = $dailyOrders->where('payment_method', 'qris')->sum('total');
+                // Calculate sales for each payment method
+                $dailyCashSales = (clone $baseDailyOrders)->where('payment_method', 'cash')->sum('total');
+                $dailyQrisSales = (clone $baseDailyOrders)->where('payment_method', 'qris')->sum('total');
 
                 // Daily totals
                 $dailyBreakdown[] = [
@@ -224,7 +219,10 @@ class OrderController extends Controller
                     'cash_sales' => $dailyCashSales,
                     'qris_sales' => $dailyQrisSales,
                     'total_sales' => $dailyCashSales + $dailyQrisSales,
-                    'closing_balance' => ($dailyCash ? $dailyCash->opening_balance : 0) + $dailyCashSales - ($dailyCash ? $dailyCash->expenses : 0)
+                    'closing_balance' => ($dailyCash ? $dailyCash->opening_balance : 0)
+                        + $dailyCashSales
+                        + $dailyQrisSales
+                        - ($dailyCash ? $dailyCash->expenses : 0)
                 ];
 
                 $currentDate->addDay();

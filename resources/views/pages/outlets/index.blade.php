@@ -140,7 +140,7 @@
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Unduh template <a href="{{ route('outlets.template') }}">di sini</a></li>
+                                <li>Unduh template <a href="{{ route('outlets.template') }}" class="font-weight-bold text-primary">disini</a></li>
                                 <li>Isi data sesuai dengan template</li>
                                 <li>Simpan dan unggah filenya</li>
                             </ol>
@@ -177,7 +177,7 @@
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Unduh template update <a href="{{ route('outlets.exportForUpdate') }}">di sini</a></li>
+                                <li>Unduh template update <a href="{{ route('outlets.exportForUpdate') }}" class="font-weight-bold text-primary">disini</a></li>
                                 <li>Perbarui data sesuai kebutuhan</li>
                                 <li>Simpan dan unggah filenya</li>
                             </ol>

@@ -107,8 +107,16 @@ class ReportController extends Controller
             ->first();
 
         // Hitung total penjualan dengan cash (untuk closing balance)
-        $cashSales = collect($paymentMethods)->firstWhere('payment_method', 'cash');
-        $totalCashSales = $cashSales ? $cashSales->total : 0;
+        $cashSales = Order::whereBetween('created_at', [$startDate, $endDate])
+            ->whereIn('payment_method', ['cash', 'qris']); // Diubah ke whereIn
+
+        if ($outletId) {
+            $cashSales->where('outlet_id', $outletId);
+        }
+
+        $totalCashSales = $cashSales->sum('total');
+
+        // $totalCashSales = $cashSales ? $cashSales->total : 0;
 
         // Hitung closing balance
         $closingBalance = $totalOpeningBalance + $totalCashSales - $totalExpenses;

@@ -115,7 +115,7 @@
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Unduh template <a href="{{ route('categories.template') }}">disini</a></li>
+                                <li>Unduh template <a href="{{ route('categories.template') }}" class="font-weight-bold text-primary">disini</a></li>
                                 <li>Isi data kategori sesuai template</li>
                                 <li>Simpan dan unggah file</li>
                             </ol>
@@ -179,7 +179,7 @@
                             <h6>Petunjuk:</h6>
                             <ol>
                                 <li>Unduh template update <a
-                                        href="{{ route('categories.exportForUpdate') }}">disini</a></li>
+                                        href="{{ route('categories.exportForUpdate') }}" class="font-weight-bold text-primary">disini</a></li>
                                 <li>Update data kategori sesuai template</li>
                                 <li>Simpan dan unggah file</li>
                             </ol>
