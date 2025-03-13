@@ -187,11 +187,12 @@
                                         <label class="mb-2">Tampilkan Data:</label>
                                         <select class="form-control select2" name="period_type" id="period_type">
                                             <option value="daily"
-                                                {{ request('period_type') == 'daily' ? 'selected' : '' }}>Harian</option>
+                                                {{ request('period_type', 'daily') == 'daily' ? 'selected' : '' }}>Harian
+                                            </option>
                                             <option value="weekly"
                                                 {{ request('period_type') == 'weekly' ? 'selected' : '' }}>Mingguan</option>
                                             <option value="monthly"
-                                                {{ request('period_type', 'monthly') == 'monthly' ? 'selected' : '' }}>
+                                                {{ request('period_type') == 'monthly' ? 'selected' : '' }}>
                                                 Bulanan</option>
                                         </select>
                                     </div>
@@ -239,13 +240,13 @@
                                 <i class="fas fa-chart-line mr-2"></i>
                                 Ringkasan Penjualan {{ $selectedOutlet ? $selectedOutlet->name : 'Semua Outlet' }}
                             </h4>
-                            <div class="card-header-action">
+                            {{-- <div class="card-header-action">
                                 <div class="btn-group">
                                     <a href="#" class="btn btn-primary" id="btnPrintSales">
                                         <i class="fas fa-download"></i> Export
                                     </a>
                                 </div>
-                            </div>
+                            </div> --}}
                         </div>
                         <div class="card-body">
                             <div class="row">
