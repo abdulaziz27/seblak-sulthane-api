@@ -255,7 +255,7 @@
                                         <div class="icon">
                                             <i class="fas fa-money-bill"></i>
                                         </div>
-                                        <div class="title mb-1">Total Pendapatan</div>
+                                        <div class="title mb-1">Total Penjualan</div>
                                         <h4 class="mb-0">Rp {{ number_format($totalRevenue, 0, ',', '.') }}</h4>
                                         @if (isset($previousPeriodRevenue) && $previousPeriodRevenue > 0)
                                             @php $percentChange = (($totalRevenue - $previousPeriodRevenue) / $previousPeriodRevenue) * 100; @endphp
@@ -435,7 +435,10 @@
                                             </thead>
                                             <tbody>
                                                 @php
-                                                    $runningBalance = 0;
+                                                    $totalCashIn = 0;
+                                                    $totalCashOut = 0;
+                                                    $finalBalance = 0;
+
                                                     // Sorting daily data by date in ascending order
                                                     if (isset($dailyData)) {
                                                         usort($dailyData, function ($a, $b) {
@@ -447,24 +450,33 @@
                                                 @if (isset($dailyData) && count($dailyData) > 0)
                                                     @foreach ($dailyData as $day)
                                                         @php
-                                                            // Set the initial running balance to the opening balance
-                                                            $runningBalance = $day['opening_balance'];
+                                                            $dayBalance = 0; // Track balance for display purposes
                                                         @endphp
-                                                        <tr>
-                                                            <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
-                                                            </td>
-                                                            <td>Saldo Awal</td>
-                                                            <td class="text-right cash-in">Rp
-                                                                {{ number_format($day['opening_balance'], 0, ',', '.') }}
-                                                            </td>
-                                                            <td class="text-right">-</td>
-                                                            <td class="text-right">Rp
-                                                                {{ number_format($runningBalance, 0, ',', '.') }}</td>
-                                                        </tr>
 
+                                                        <!-- Opening Balance -->
+                                                        @if ($day['opening_balance'] > 0)
+                                                            @php
+                                                                $dayBalance += $day['opening_balance'];
+                                                                $totalCashIn += $day['opening_balance'];
+                                                            @endphp
+                                                            <tr>
+                                                                <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
+                                                                </td>
+                                                                <td>Saldo Awal</td>
+                                                                <td class="text-right cash-in">Rp
+                                                                    {{ number_format($day['opening_balance'], 0, ',', '.') }}
+                                                                </td>
+                                                                <td class="text-right">-</td>
+                                                                <td class="text-right">Rp
+                                                                    {{ number_format($dayBalance, 0, ',', '.') }}</td>
+                                                            </tr>
+                                                        @endif
+
+                                                        <!-- Sales -->
                                                         @if ($day['total_sales'] > 0)
                                                             @php
-                                                                $runningBalance += $day['total_sales'];
+                                                                $dayBalance += $day['total_sales'];
+                                                                $totalCashIn += $day['total_sales'];
                                                             @endphp
                                                             <tr>
                                                                 <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
@@ -475,13 +487,15 @@
                                                                 </td>
                                                                 <td class="text-right">-</td>
                                                                 <td class="text-right">Rp
-                                                                    {{ number_format($runningBalance, 0, ',', '.') }}</td>
+                                                                    {{ number_format($dayBalance, 0, ',', '.') }}</td>
                                                             </tr>
                                                         @endif
 
+                                                        <!-- Expenses -->
                                                         @if ($day['expenses'] > 0)
                                                             @php
-                                                                $runningBalance -= $day['expenses'];
+                                                                $dayBalance -= $day['expenses'];
+                                                                $totalCashOut += $day['expenses'];
                                                             @endphp
                                                             <tr>
                                                                 <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
@@ -491,21 +505,41 @@
                                                                 <td class="text-right cash-out">Rp
                                                                     {{ number_format($day['expenses'], 0, ',', '.') }}</td>
                                                                 <td class="text-right">Rp
-                                                                    {{ number_format($runningBalance, 0, ',', '.') }}</td>
+                                                                    {{ number_format($dayBalance, 0, ',', '.') }}</td>
                                                             </tr>
                                                         @endif
 
-                                                        <tr class="bg-light">
-                                                            <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
-                                                            </td>
-                                                            <td><strong>Saldo Akhir</strong></td>
-                                                            <td class="text-right">-</td>
-                                                            <td class="text-right">-</td>
-                                                            <td class="text-right"><strong>Rp
-                                                                    {{ number_format($runningBalance, 0, ',', '.') }}</strong>
-                                                            </td>
-                                                        </tr>
+                                                        @if ($day['opening_balance'] > 0 || $day['total_sales'] > 0 || $day['expenses'] > 0)
+                                                            <!-- Daily Closing -->
+                                                            <tr class="bg-light">
+                                                                <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
+                                                                </td>
+                                                                <td><strong>Saldo Akhir</strong></td>
+                                                                <td class="text-right">-</td>
+                                                                <td class="text-right">-</td>
+                                                                <td class="text-right"><strong>Rp
+                                                                        {{ number_format($day['closing_balance'], 0, ',', '.') }}</strong>
+                                                                </td>
+                                                            </tr>
+                                                            @php
+                                                                $finalBalance = $day['closing_balance']; // Use the pre-calculated closing balance
+                                                            @endphp
+                                                        @endif
                                                     @endforeach
+
+                                                    <!-- Grand Totals Row -->
+                                                    <tr class="bg-primary text-white">
+                                                        <td colspan="2"><strong>TOTAL</strong></td>
+                                                        <td class="text-right"><strong>Rp
+                                                                {{ number_format($totalCashIn, 0, ',', '.') }}</strong>
+                                                        </td>
+                                                        <td class="text-right"><strong>Rp
+                                                                {{ number_format($totalCashOut, 0, ',', '.') }}</strong>
+                                                        </td>
+                                                        <td class="text-right"><strong>Rp
+                                                                {{ number_format($finalBalance, 0, ',', '.') }}</strong>
+                                                        </td>
+                                                    </tr>
                                                 @else
                                                     <tr>
                                                         <td colspan="5" class="text-center">Tidak ada data arus kas
@@ -876,14 +910,10 @@
                                                     Order dari Member
                                                 </div>
                                                 <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                                    @php
-                                                        $memberOrdersCount = $memberOrdersCount ?? rand(30, 70);
-                                                        $memberOrdersPercentage =
-                                                            $totalOrders > 0
-                                                                ? ($memberOrdersCount / $totalOrders) * 100
-                                                                : 0;
-                                                    @endphp
                                                     {{ number_format($memberOrdersPercentage, 1) }}%
+                                                </div>
+                                                <div class="text-xs text-muted">
+                                                    {{ $memberOrdersCount }} dari {{ $totalOrders }} transaksi
                                                 </div>
                                             </div>
                                             <div>
@@ -902,12 +932,11 @@
                                                     Metode Pembayaran Terpopuler
                                                 </div>
                                                 <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                                    @php
-                                                        $popularPaymentMethod = $popularPaymentMethod ?? 'QRIS';
-                                                        $popularPaymentPercentage =
-                                                            $popularPaymentPercentage ?? rand(55, 80);
-                                                    @endphp
-                                                    {{ $popularPaymentMethod }} ({{ $popularPaymentPercentage }}%)
+                                                    {{ $popularPaymentMethodName }}
+                                                    ({{ number_format($popularPaymentPercentage, 1) }}%)
+                                                </div>
+                                                <div class="text-xs text-muted">
+                                                    {{ $popularPaymentCount }} dari {{ $totalPaymentCount }} transaksi
                                                 </div>
                                             </div>
                                             <div>

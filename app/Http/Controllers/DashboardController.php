@@ -20,9 +20,9 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         // Filter periode
-        $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date'))->startOfDay() : Carbon::now()->startOfMonth()->startOfDay();
-        $endDate = $request->input('end_date') ? Carbon::parse($request->input('end_date'))->endOfDay() : Carbon::now()->endOfDay();
-        $periodType = $request->input('period_type', 'daily');
+        $startDate = $request->input('start_date', Carbon::now()->startOfMonth());
+        $endDate = $request->input('end_date', Carbon::now());
+        $periodType = $request->input('period_type', 'daily'); // Changed default to daily
 
         // Initialize $selectedOutlet
         $selectedOutlet = null;
@@ -53,12 +53,16 @@ class DashboardController extends Controller
             $userQuery->where('outlet_id', Auth::user()->outlet_id);
         }
 
+        // Convert dates to proper format
+        $startDateFormatted = Carbon::parse($startDate)->startOfDay();
+        $endDateFormatted = Carbon::parse($endDate)->endOfDay();
+
         // Date filter
-        $orderQuery->whereBetween('created_at', [$startDate, $endDate]);
+        $orderQuery->whereBetween('created_at', [$startDateFormatted, $endDateFormatted]);
 
         // Previous period for comparison
-        $previousPeriodStartDate = Carbon::parse($startDate)->subDays(Carbon::parse($startDate)->diffInDays($endDate) + 1);
-        $previousPeriodEndDate = Carbon::parse($startDate)->subDay();
+        $previousPeriodStartDate = Carbon::parse($startDateFormatted)->subDays(Carbon::parse($startDateFormatted)->diffInDays($endDateFormatted) + 1);
+        $previousPeriodEndDate = Carbon::parse($startDateFormatted)->subDay();
 
         $previousPeriodOrdersQuery = clone $orderQuery;
         $previousPeriodOrdersQuery->whereBetween('created_at', [$previousPeriodStartDate, $previousPeriodEndDate]);
@@ -66,13 +70,28 @@ class DashboardController extends Controller
         // Previous period statistics
         $previousPeriodOrders = $previousPeriodOrdersQuery->count();
         $previousPeriodRevenue = $previousPeriodOrdersQuery->sum('total');
-        $previousPeriodMembers = Member::where('created_at', '<', $startDate)->count();
+        $previousPeriodMembers = Member::where('created_at', '<', $startDateFormatted)->count();
 
         // Statistik umum
         $totalRevenue = $orderQuery->sum('total');
         $totalOrders = $orderQuery->count();
         $totalMembers = Member::count();
         $totalStaff = $userQuery->whereIn('role', ['staff', 'admin'])->count();
+
+        // Hitung Profit Margin
+
+        // Hitung member
+        $memberOrdersCount = Order::whereBetween('created_at', [$startDateFormatted, $endDateFormatted])
+            ->whereNotNull('member_id');
+
+        if (Auth::user()->role !== 'owner') {
+            $memberOrdersCount->where('outlet_id', Auth::user()->outlet_id);
+        } elseif ($request->outlet_id) {
+            $memberOrdersCount->where('outlet_id', $request->outlet_id);
+        }
+
+        $memberOrdersCount = $memberOrdersCount->count();
+        $memberOrdersPercentage = $totalOrders > 0 ? ($memberOrdersCount / $totalOrders) * 100 : 0;
 
         // Reset the order query for reuse
         $orderQuery = Order::query();
@@ -81,7 +100,7 @@ class DashboardController extends Controller
         } elseif (Auth::user()->role !== 'owner') {
             $orderQuery->where('outlet_id', Auth::user()->outlet_id);
         }
-        $orderQuery->whereBetween('created_at', [$startDate, $endDate]);
+        $orderQuery->whereBetween('created_at', [$startDateFormatted, $endDateFormatted]);
 
         // Performa per outlet
         $outletPerformanceQuery = Order::select(
@@ -92,7 +111,7 @@ class DashboardController extends Controller
             DB::raw('COUNT(DISTINCT orders.member_id) as total_customers')
         )
             ->join('outlets', 'outlets.id', '=', 'orders.outlet_id')
-            ->whereBetween('orders.created_at', [$startDate, $endDate]);
+            ->whereBetween('orders.created_at', [$startDateFormatted, $endDateFormatted]);
 
         if (Auth::user()->role !== 'owner') {
             $outletPerformanceQuery->where('orders.outlet_id', Auth::user()->outlet_id);
@@ -108,7 +127,7 @@ class DashboardController extends Controller
         $dailySalesQuery = Order::select(
             DB::raw('DATE(created_at) as date'),
             DB::raw('SUM(total) as total_sales')
-        )->whereBetween('created_at', [$startDate, $endDate]);
+        )->whereBetween('created_at', [$startDateFormatted, $endDateFormatted]);
 
         if (Auth::user()->role !== 'owner') {
             $dailySalesQuery->where('outlet_id', Auth::user()->outlet_id);
@@ -125,7 +144,7 @@ class DashboardController extends Controller
                 DB::raw('YEARWEEK(created_at, 1) as week'),
                 DB::raw('MIN(DATE(created_at)) as date'),
                 DB::raw('SUM(total) as total_sales')
-            )->whereBetween('created_at', [$startDate, $endDate]);
+            )->whereBetween('created_at', [$startDateFormatted, $endDateFormatted]);
 
             if (Auth::user()->role !== 'owner') {
                 $dailySalesQuery->where('outlet_id', Auth::user()->outlet_id);
@@ -140,7 +159,7 @@ class DashboardController extends Controller
                 DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
                 DB::raw('MIN(DATE(created_at)) as date'),
                 DB::raw('SUM(total) as total_sales')
-            )->whereBetween('created_at', [$startDate, $endDate]);
+            )->whereBetween('created_at', [$startDateFormatted, $endDateFormatted]);
 
             if (Auth::user()->role !== 'owner') {
                 $dailySalesQuery->where('outlet_id', Auth::user()->outlet_id);
@@ -161,7 +180,7 @@ class DashboardController extends Controller
                 'products.name as product_name',
                 DB::raw('SUM(order_items.quantity) as total_quantity')
             )
-            ->whereBetween('orders.created_at', [$startDate, $endDate]);
+            ->whereBetween('orders.created_at', [$startDateFormatted, $endDateFormatted]);
 
         if (Auth::user()->role !== 'owner') {
             $topItemsQuery->where('orders.outlet_id', Auth::user()->outlet_id);
@@ -184,7 +203,7 @@ class DashboardController extends Controller
                 DB::raw('COUNT(orders.id) as total_transactions'),
                 DB::raw('SUM(orders.total) as total_spent')
             )
-            ->whereBetween('orders.created_at', [$startDate, $endDate])
+            ->whereBetween('orders.created_at', [$startDateFormatted, $endDateFormatted])
             ->whereNotNull('orders.member_id');
 
         if (Auth::user()->role !== 'owner') {
@@ -221,7 +240,7 @@ class DashboardController extends Controller
 
         // Total material cost
         $totalMaterialCost = (clone $materialOrdersQuery)
-            ->whereBetween('created_at', [$startDate, $endDate])
+            ->whereBetween('created_at', [$startDateFormatted, $endDateFormatted])
             ->sum('total_amount');
 
         // Ongoing orders (pending and approved)
@@ -232,26 +251,28 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        // Daily cash data for cash flow
-        $dailyCashQuery = DailyCash::whereBetween('date', [
-            Carbon::parse($startDate)->format('Y-m-d'),
-            Carbon::parse($endDate)->format('Y-m-d')
-        ]);
+        // Daily cash data for cash flow - Use formatted date strings
+        $startDateStr = Carbon::parse($startDateFormatted)->format('Y-m-d');
+        $endDateStr = Carbon::parse($endDateFormatted)->format('Y-m-d');
+
+        // Direct DB query for daily cash - using DB facade for clarity
+        $dailyCashRecords = DB::table('daily_cash')
+            ->whereBetween('date', [$startDateStr, $endDateStr]);
 
         if (Auth::user()->role !== 'owner') {
-            $dailyCashQuery->where('outlet_id', Auth::user()->outlet_id);
+            $dailyCashRecords->where('outlet_id', Auth::user()->outlet_id);
         } elseif ($request->outlet_id) {
-            $dailyCashQuery->where('outlet_id', $request->outlet_id);
+            $dailyCashRecords->where('outlet_id', $request->outlet_id);
         }
 
-        $dailyCashRecords = $dailyCashQuery->get();
+        $dailyCashData = $dailyCashRecords->get();
 
         // Calculate cash flow data
-        $totalOpeningBalance = $dailyCashRecords->sum('opening_balance');
-        $totalExpenses = $dailyCashRecords->sum('expenses');
+        $totalOpeningBalance = $dailyCashData->sum('opening_balance');
+        $totalExpenses = $dailyCashData->sum('expenses');
 
         // Get cash sales
-        $totalCashSales = Order::whereBetween('created_at', [$startDate, $endDate])
+        $totalCashSales = Order::whereBetween('created_at', [$startDateFormatted, $endDateFormatted])
             ->whereIn('payment_method', ['cash', 'qris']);
 
         if (Auth::user()->role !== 'owner') {
@@ -263,7 +284,7 @@ class DashboardController extends Controller
         $totalCashSales = $totalCashSales->sum('total');
 
         // Get total sales from all payment methods
-        $totalSales = Order::whereBetween('created_at', [$startDate, $endDate]);
+        $totalSales = Order::whereBetween('created_at', [$startDateFormatted, $endDateFormatted]);
 
         if (Auth::user()->role !== 'owner') {
             $totalSales = $totalSales->where('outlet_id', Auth::user()->outlet_id);
@@ -276,22 +297,26 @@ class DashboardController extends Controller
         // Calculate closing balance
         $closingBalance = $totalOpeningBalance + $totalSales - $totalExpenses;
 
-        // Prepare daily breakdown
-        $dailyData = [];
+        // Prepare daily breakdown - generate dates range
         $datesInRange = [];
-        $current = Carbon::parse($startDate)->startOfDay();
-        while ($current <= Carbon::parse($endDate)->endOfDay()) {
+        $current = Carbon::parse($startDateFormatted)->startOfDay();
+        while ($current <= Carbon::parse($endDateFormatted)->endOfDay()) {
             $datesInRange[] = $current->format('Y-m-d');
             $current = $current->addDay();
         }
 
-        foreach ($datesInRange as $date) {
-            // Get daily cash record
-            $formattedDate = Carbon::parse($date)->format('Y-m-d');
-            $dailyCash = $dailyCashRecords->where('date', $formattedDate)->first();
+        // Prepare daily data with running balance
+        $dailyData = [];
+        $runningBalance = 0; // Initialize running balance
 
-            // Get orders for this date - using whereDate to ensure we capture the full day
-            $dateOrders = Order::whereDate('created_at', $formattedDate);
+        foreach ($datesInRange as $index => $date) {
+            // Find the daily cash record for this date
+            $dailyCash = $dailyCashData->first(function ($record) use ($date) {
+                return $record->date == $date;
+            });
+
+            // Get orders for this date
+            $dateOrders = Order::whereDate('created_at', $date);
 
             if (Auth::user()->role !== 'owner') {
                 $dateOrders->where('outlet_id', Auth::user()->outlet_id);
@@ -301,25 +326,82 @@ class DashboardController extends Controller
 
             $cashSalesForDate = (clone $dateOrders)->where('payment_method', 'cash')->sum('total');
             $qrisSalesForDate = (clone $dateOrders)->where('payment_method', 'qris')->sum('total');
+            $totalSalesForDate = $cashSalesForDate + $qrisSalesForDate;
 
+            // Get opening balance and expenses from DailyCash table
+            $openingBalance = $dailyCash ? $dailyCash->opening_balance : 0;
+            $expenses = $dailyCash ? $dailyCash->expenses : 0;
+
+            // Add opening balance to running balance
+            $runningBalance += $openingBalance;
+
+            // Add sales to running balance
+            $runningBalance += $totalSalesForDate;
+
+            // Subtract expenses from running balance
+            $runningBalance -= $expenses;
+
+            // Store the daily data with the current running balance
             $dailyData[] = [
                 'date' => $date,
-                'opening_balance' => $dailyCash ? $dailyCash->opening_balance : 0,
-                'expenses' => $dailyCash ? $dailyCash->expenses : 0,
+                'opening_balance' => $openingBalance,
+                'expenses' => $expenses,
                 'cash_sales' => $cashSalesForDate,
                 'qris_sales' => $qrisSalesForDate,
-                'total_sales' => $cashSalesForDate + $qrisSalesForDate
+                'total_sales' => $totalSalesForDate,
+                'closing_balance' => $runningBalance // This now represents the running total
             ];
         }
 
         // Active staff
         $activeStaff = User::whereIn('role', ['admin', 'staff'])
-            ->select('users.*', DB::raw('RAND() as random_order')) // Random order for demo purposes
-            ->orderBy('random_order')
+            ->select('users.*')
+            ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();
 
         $activeStaffCount = count($activeStaff);
+
+        // Menghitung metode pembayaran yang paling populer
+        $paymentMethodsQuery = Order::whereBetween('created_at', [$startDateFormatted, $endDateFormatted])
+            ->select('payment_method', DB::raw('COUNT(*) as count'))
+            ->groupBy('payment_method');
+
+        if (Auth::user()->role !== 'owner') {
+            $paymentMethodsQuery->where('outlet_id', Auth::user()->outlet_id);
+        } elseif ($request->outlet_id) {
+            $paymentMethodsQuery->where('outlet_id', $request->outlet_id);
+        }
+
+        $paymentMethods = $paymentMethodsQuery->get();
+
+        // Mencari metode pembayaran terpopuler
+        $popularPaymentMethod = null;
+        $popularPaymentCount = 0;  // Inisialisasi variabel
+        $totalPaymentCount = 0;
+
+        foreach ($paymentMethods as $method) {
+            $totalPaymentCount += $method->count;
+            if ($method->count > $popularPaymentCount) {
+                $popularPaymentCount = $method->count;
+                $popularPaymentMethod = $method->payment_method;
+            }
+        }
+
+        // Menghitung persentase metode pembayaran terpopuler
+        $popularPaymentPercentage = $totalPaymentCount > 0 ? ($popularPaymentCount / $totalPaymentCount) * 100 : 0;
+
+        // Membuat mapping nama metode pembayaran yang lebih user-friendly
+        $paymentMethodNames = [
+            'cash' => 'Tunai',
+            'qris' => 'QRIS',
+            'credit_card' => 'Kartu Kredit',
+            'debit_card' => 'Kartu Debit',
+            'transfer' => 'Transfer Bank'
+        ];
+
+        // Mendapatkan nama yang user-friendly
+        $popularPaymentMethodName = $paymentMethodNames[$popularPaymentMethod] ?? ucfirst($popularPaymentMethod);
 
         // Pass all the variables to the view
         return view(
@@ -354,7 +436,14 @@ class DashboardController extends Controller
                 'closingBalance',
                 'dailyData',
                 'activeStaff',
-                'activeStaffCount'
+                'activeStaffCount',
+                'memberOrdersCount',
+                'memberOrdersPercentage',
+                'popularPaymentMethod',
+                'popularPaymentMethodName',
+                'popularPaymentPercentage',
+                'popularPaymentCount',
+                'totalPaymentCount'
             )
         );
     }
