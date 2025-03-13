@@ -202,27 +202,31 @@ class OrderController extends Controller
                     return $q->where('outlet_id', $outletId);
                 })->whereDate('created_at', $currentDateStr);
 
-                // Get daily cash record
-                $dailyCash = DailyCash::when($outletId, function ($q) use ($outletId) {
+                // Ambil semua record DailyCash untuk hari ini (bisa lebih dari satu record jika semua outlet)
+                $dailyCashRecords = DailyCash::when($outletId, function ($q) use ($outletId) {
                     return $q->where('outlet_id', $outletId);
-                })->where('date', $currentDateStr)->first();
+                })->where('date', $currentDateStr)->get();
 
-                // Calculate sales for each payment method
+                // Jumlahkan opening_balance dan expenses dari semua record pada hari ini
+                $dailyOpeningBalance = $dailyCashRecords->sum('opening_balance');
+                $dailyExpenses = $dailyCashRecords->sum('expenses');
+
+                // Hitung penjualan untuk masing-masing metode pembayaran
                 $dailyCashSales = (clone $baseDailyOrders)->where('payment_method', 'cash')->sum('total');
                 $dailyQrisSales = (clone $baseDailyOrders)->where('payment_method', 'qris')->sum('total');
 
-                // Daily totals
+                // Hitung total dan closing balance harian
+                $totalSales = $dailyCashSales + $dailyQrisSales;
+                $dailyClosingBalance = $dailyOpeningBalance + $totalSales - $dailyExpenses;
+
                 $dailyBreakdown[] = [
                     'date' => $currentDateStr,
-                    'opening_balance' => $dailyCash ? $dailyCash->opening_balance : 0,
-                    'expenses' => $dailyCash ? $dailyCash->expenses : 0,
+                    'opening_balance' => $dailyOpeningBalance,
+                    'expenses' => $dailyExpenses,
                     'cash_sales' => $dailyCashSales,
                     'qris_sales' => $dailyQrisSales,
-                    'total_sales' => $dailyCashSales + $dailyQrisSales,
-                    'closing_balance' => ($dailyCash ? $dailyCash->opening_balance : 0)
-                        + $dailyCashSales
-                        + $dailyQrisSales
-                        - ($dailyCash ? $dailyCash->expenses : 0)
+                    'total_sales' => $totalSales,
+                    'closing_balance' => $dailyClosingBalance
                 ];
 
                 $currentDate->addDay();
