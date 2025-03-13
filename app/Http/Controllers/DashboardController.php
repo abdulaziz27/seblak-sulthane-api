@@ -249,7 +249,7 @@ class DashboardController extends Controller
 
         // Get cash sales
         $totalCashSales = Order::whereBetween('created_at', [$startDate, $endDate])
-            ->where('payment_method', 'cash');
+            ->whereIn('payment_method', ['cash', 'qris']);
 
         if (Auth::user()->role !== 'owner') {
             $totalCashSales->where('outlet_id', Auth::user()->outlet_id);

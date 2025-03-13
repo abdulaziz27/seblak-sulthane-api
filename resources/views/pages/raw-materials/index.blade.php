@@ -142,7 +142,7 @@
                         <div class="alert alert-info">
                             <h6>Instruksi:</h6>
                             <ol>
-                                <li>Unduh template <a href="{{ route('raw-materials.template') }}">di sini</a></li>
+                                <li>Unduh template <a href="{{ route('raw-materials.template') }}" class="font-weight-bold text-primary">disini</a></li>
                                 <li>Isi data sesuai dengan template</li>
                                 <li>Simpan dan unggah file</li>
                             </ol>
