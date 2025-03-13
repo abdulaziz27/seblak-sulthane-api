@@ -20,9 +20,9 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         // Filter periode
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth());
-        $endDate = $request->input('end_date', Carbon::now());
-        $periodType = $request->input('period_type', 'monthly');
+        $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date'))->startOfDay() : Carbon::now()->startOfMonth()->startOfDay();
+        $endDate = $request->input('end_date') ? Carbon::parse($request->input('end_date'))->endOfDay() : Carbon::now()->endOfDay();
+        $periodType = $request->input('period_type', 'daily');
 
         // Initialize $selectedOutlet
         $selectedOutlet = null;
@@ -233,7 +233,10 @@ class DashboardController extends Controller
             ->get();
 
         // Daily cash data for cash flow
-        $dailyCashQuery = DailyCash::whereBetween('date', [$startDate, $endDate]);
+        $dailyCashQuery = DailyCash::whereBetween('date', [
+            Carbon::parse($startDate)->format('Y-m-d'),
+            Carbon::parse($endDate)->format('Y-m-d')
+        ]);
 
         if (Auth::user()->role !== 'owner') {
             $dailyCashQuery->where('outlet_id', Auth::user()->outlet_id);
@@ -276,18 +279,19 @@ class DashboardController extends Controller
         // Prepare daily breakdown
         $dailyData = [];
         $datesInRange = [];
-        $current = Carbon::parse($startDate);
-        while ($current <= Carbon::parse($endDate)) {
+        $current = Carbon::parse($startDate)->startOfDay();
+        while ($current <= Carbon::parse($endDate)->endOfDay()) {
             $datesInRange[] = $current->format('Y-m-d');
             $current = $current->addDay();
         }
 
         foreach ($datesInRange as $date) {
             // Get daily cash record
-            $dailyCash = $dailyCashRecords->where('date', $date)->first();
+            $formattedDate = Carbon::parse($date)->format('Y-m-d');
+            $dailyCash = $dailyCashRecords->where('date', $formattedDate)->first();
 
-            // Get orders for this date
-            $dateOrders = Order::whereDate('created_at', $date);
+            // Get orders for this date - using whereDate to ensure we capture the full day
+            $dateOrders = Order::whereDate('created_at', $formattedDate);
 
             if (Auth::user()->role !== 'owner') {
                 $dateOrders->where('outlet_id', Auth::user()->outlet_id);
@@ -316,38 +320,6 @@ class DashboardController extends Controller
             ->get();
 
         $activeStaffCount = count($activeStaff);
-
-        // Mock stock movements for demonstration
-        $recentStockMovements = collect([
-            (object)[
-                'created_at' => now()->subHours(2),
-                'material_name' => 'Bawang Merah',
-                'adjustment' => 10,
-                'unit' => 'Kg',
-                'notes' => 'Pengiriman dari supplier'
-            ],
-            (object)[
-                'created_at' => now()->subHours(6),
-                'material_name' => 'Cabai Merah',
-                'adjustment' => 5,
-                'unit' => 'Kg',
-                'notes' => 'Pengiriman dari supplier'
-            ],
-            (object)[
-                'created_at' => now()->subHours(8),
-                'material_name' => 'Tepung',
-                'adjustment' => -2,
-                'unit' => 'Kg',
-                'notes' => 'Penggunaan untuk produksi'
-            ],
-            (object)[
-                'created_at' => now()->subDay(),
-                'material_name' => 'Mie',
-                'adjustment' => 15,
-                'unit' => 'Kg',
-                'notes' => 'Pengiriman dari supplier'
-            ]
-        ]);
 
         // Pass all the variables to the view
         return view(
@@ -382,8 +354,7 @@ class DashboardController extends Controller
                 'closingBalance',
                 'dailyData',
                 'activeStaff',
-                'activeStaffCount',
-                'recentStockMovements'
+                'activeStaffCount'
             )
         );
     }
