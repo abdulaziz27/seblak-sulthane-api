@@ -310,10 +310,14 @@ class DashboardController extends Controller
         $runningBalance = 0; // Initialize running balance
 
         foreach ($datesInRange as $index => $date) {
-            // Find the daily cash record for this date
-            $dailyCash = $dailyCashData->first(function ($record) use ($date) {
+            // PERUBAHAN DI SINI: Dapatkan semua record daily cash untuk tanggal ini
+            $dailyCashForDate = $dailyCashData->filter(function ($record) use ($date) {
                 return $record->date == $date;
             });
+
+            // Sum up opening balances and expenses from all outlets for this date
+            $openingBalance = $dailyCashForDate->sum('opening_balance');
+            $expenses = $dailyCashForDate->sum('expenses');
 
             // Get orders for this date
             $dateOrders = Order::whereDate('created_at', $date);
@@ -327,10 +331,6 @@ class DashboardController extends Controller
             $cashSalesForDate = (clone $dateOrders)->where('payment_method', 'cash')->sum('total');
             $qrisSalesForDate = (clone $dateOrders)->where('payment_method', 'qris')->sum('total');
             $totalSalesForDate = $cashSalesForDate + $qrisSalesForDate;
-
-            // Get opening balance and expenses from DailyCash table
-            $openingBalance = $dailyCash ? $dailyCash->opening_balance : 0;
-            $expenses = $dailyCash ? $dailyCash->expenses : 0;
 
             // Add opening balance to running balance
             $runningBalance += $openingBalance;
@@ -395,9 +395,7 @@ class DashboardController extends Controller
         $paymentMethodNames = [
             'cash' => 'Tunai',
             'qris' => 'QRIS',
-            'credit_card' => 'Kartu Kredit',
             'debit_card' => 'Kartu Debit',
-            'transfer' => 'Transfer Bank'
         ];
 
         // Mendapatkan nama yang user-friendly
