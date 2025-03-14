@@ -16,29 +16,28 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Form Lanjutan</h1>
+                <h1>Edit Produk</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Form</a></div>
-                    <div class="breadcrumb-item">Produk</div>
+                    <div class="breadcrumb-item"><a href="#">Produk</a></div>
+                    <div class="breadcrumb-item">Edit Produk</div>
                 </div>
             </div>
 
             <div class="section-body">
-                <h2 class="section-title">Produk</h2>
-
-
+                <h2 class="section-title">Edit Produk: {{ $product->name }}</h2>
+                <p class="section-lead">Silakan perbarui informasi produk pada form berikut.</p>
 
                 <div class="card">
                     <form action="{{ route('products.update', $product) }}" method="POST" enctype="multipart/form-data">
                         @csrf
-                        {{-- @method('PUT') --}}
+                        @method('PUT')
                         <div class="card-header">
-                            <h4>Input Teks</h4>
+                            <h4>Form Edit Produk</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label>Nama</label>
+                                <label>Nama Produk</label>
                                 <input type="text"
                                     class="form-control @error('name')
                                 is-invalid
@@ -64,7 +63,7 @@
                                 @enderror
                             </div>
                             <div class="form-group">
-                                <label>Harga</label>
+                                <label>Harga (Rp)</label>
                                 <input type="number"
                                     class="form-control @error('price')
                                 is-invalid
@@ -104,11 +103,36 @@
                                         </option>
                                     @endforeach
                                 </select>
-
+                                @error('category_id')
+                                    <div class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
                             </div>
 
+                            {{-- <div class="form-group">
+                                <label class="form-label">Foto Produk</label>
+                                <div class="col-sm-9">
+                                    <input type="file" class="form-control" name="image"
+                                        @error('image') is-invalid @enderror>
+                                    <small class="text-muted">Biarkan kosong jika tidak ingin mengubah gambar.</small>
+
+                                    @if ($product->image)
+                                    <div class="mt-3">
+                                        <p>Gambar saat ini:</p>
+                                        <img src="{{ asset($product->image) }}" alt="{{ $product->name }}" style="max-height: 100px">
+                                    </div>
+                                    @endif
+                                </div>
+                                @error('image')
+                                    <div class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div> --}}
+
                             <div class="form-group mb-0">
-                                <label class="form-label w-100">Status</label>
+                                <label class="form-label w-100">Status Produk</label>
                                 <div class="selectgroup selectgroup-pills">
                                     <label class="selectgroup-item">
                                         <input type="radio" name="status" value="1" class="selectgroup-input"
@@ -123,17 +147,8 @@
                                 </div>
                             </div>
 
-                            {{-- <div class="form-group">
-                                <label class="form-label mt-4">Foto Produk</label>
-                                <div class="col-sm-9">
-                                    <input type="file" class="form-control" name="image"
-                                        @error('image') is-invalid @enderror>
-                                </div>
-                            </div> --}}
-
-                            {{-- is favorite --}}
                             <div class="form-group mt-4">
-                                <label class="form-label w-100">Favorit</label>
+                                <label class="form-label w-100">Produk Favorit</label>
                                 <div class="selectgroup selectgroup-pills">
                                     <label class="selectgroup-item">
                                         <input type="radio" name="is_favorite" value="1" class="selectgroup-input"
@@ -149,15 +164,17 @@
                             </div>
                         </div>
                         <div class="card-footer text-right">
-                            <button class="btn btn-primary">Simpan</button>
+                            <a href="{{ route('products.index') }}" class="btn btn-secondary mr-2">Batal</a>
+                            <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
                         </div>
                     </form>
                 </div>
-
             </div>
         </section>
     </div>
 @endsection
 
 @push('scripts')
+    <!-- JS Libraries -->
+    <script src="{{ asset('library/selectric/public/jquery.selectric.min.js') }}"></script>
 @endpush

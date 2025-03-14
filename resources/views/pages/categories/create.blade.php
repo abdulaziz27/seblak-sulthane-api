@@ -16,11 +16,11 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Form Lanjutan</h1>
+                <h1>Buat Kategori</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
-                    <div class="breadcrumb-item"><a href="#">Form</a></div>
-                    <div class="breadcrumb-item">Kategori</div>
+                    <div class="breadcrumb-item"><a href="#">Kategori</a></div>
+                    <div class="breadcrumb-item">Buat Kategori</div>
                 </div>
             </div>
 
@@ -32,7 +32,7 @@
                     <form action="{{ route('categories.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
                         <div class="card-header">
-                            <h4>Input Teks</h4>
+                            <h4>Form Kategori</h4>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
@@ -61,23 +61,6 @@
                                     </div>
                                 @enderror
                             </div>
-
-
-                            <div class="form-group">
-                                <label class="form-label">Foto Kategori</label>
-                                <div class="col-sm-9">
-                                    <input type="file" class="form-control" name="image"
-                                        @error('image') is-invalid @enderror>
-                                </div>
-                                @error('image')
-                                    <div class="invalid-feedback">
-                                        {{ $message }}
-                                    </div>
-                                @enderror
-                            </div>
-
-
-
                         </div>
                         <div class="card-footer text-right">
                             <button class="btn btn-primary">Simpan</button>
