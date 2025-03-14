@@ -63,7 +63,7 @@ class ProductController extends Controller
             $product->save();
         }
 
-        return redirect()->route('products.index')->with('success', 'Product created successfully');
+        return redirect()->route('products.index')->with('success', 'Produk berhasil ditambahkan');
     }
 
     // show
@@ -113,7 +113,7 @@ class ProductController extends Controller
             $product->save();
         }
 
-        return redirect()->route('products.index')->with('success', 'Product updated successfully');
+        return redirect()->route('products.index')->with('success', 'Produk berhasil diperbarui');
     }
 
     // destroy
@@ -136,10 +136,10 @@ class ProductController extends Controller
             $product->delete();
 
             DB::commit();
-            return redirect()->route('products.index')->with('success', 'Product deleted successfully');
+            return redirect()->route('products.index')->with('success', 'Produk berhasil dihapus');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->route('products.index')->with('error', 'Error deleting product: ' . $e->getMessage());
+            return redirect()->route('products.index')->with('error', 'Gagal menghapus produk: ' . $e->getMessage());
         }
     }
 
@@ -203,7 +203,7 @@ class ProductController extends Controller
         ];
 
         // Instructions section to the side
-        $sheet->setCellValue($column . $startRow, 'INSTRUCTIONS');
+        $sheet->setCellValue($column . $startRow, 'PETUNJUK');
         $sheet->getStyle($column . $startRow)->applyFromArray($instructionHeaderStyle);
         $sheet->getRowDimension($startRow)->setRowHeight(30);
 
@@ -270,7 +270,7 @@ class ProductController extends Controller
                 // Validate category name is not empty
                 $categoryName = trim($row[1] ?? '');
                 if (empty($categoryName)) {
-                    $errors[] = "Row {$rowNumber}: Category name cannot be empty";
+                    $errors[] = "Baris {$rowNumber}: Nama kategori tidak boleh kosong";
                     continue;
                 }
 
@@ -291,7 +291,7 @@ class ProductController extends Controller
 
                     // Validate other required fields
                     if (empty($row[0])) {
-                        $errors[] = "Row {$rowNumber}: Product name is required";
+                        $errors[] = "Baris {$rowNumber}: Nama produk wajib diisi";
                         continue;
                     }
 
@@ -311,15 +311,15 @@ class ProductController extends Controller
 
                     $importCount++;
                 } catch (\Exception $e) {
-                    $errors[] = "Row {$rowNumber}: " . $e->getMessage();
+                    $errors[] = "Baris {$rowNumber}: " . $e->getMessage();
                 }
             }
 
             DB::commit();
 
-            $message = "Successfully imported {$importCount} products.";
+            $message = "Berhasil mengimpor {$importCount} produk.";
             if (!empty($errors)) {
-                $message .= " However, there were some errors: " . implode(", ", $errors);
+                $message .= " Namun, ada beberapa kesalahan: " . implode(", ", $errors);
                 return redirect()->route('products.index')->with('warning', $message);
             }
 
@@ -330,7 +330,7 @@ class ProductController extends Controller
             DB::rollBack();
             return redirect()
                 ->route('products.index')
-                ->with('error', 'Error importing products: ' . $e->getMessage());
+                ->with('error', 'Gagal mengimpor produk: ' . $e->getMessage());
         }
     }
 
@@ -341,18 +341,18 @@ class ProductController extends Controller
         $categories = DB::table('categories')->pluck('name')->toArray();
 
         $headers = [
-            'Name',
-            'Category',
-            'Description',
-            'Price',
-            'Stock'
+            'Nama',
+            'Kategori',
+            'Deskripsi',
+            'Harga',
+            'Stok'
         ];
 
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
         // Apply common styling
-        $headerStyle = $this->applyCommonStyles($spreadsheet, 'Product Import Template');
+        $headerStyle = $this->applyCommonStyles($spreadsheet, 'Template Import Produk');
 
         // Add headers
         foreach ($headers as $index => $header) {
@@ -426,21 +426,21 @@ class ProductController extends Controller
         }
 
         // Set column widths
-        $sheet->getColumnDimension('A')->setWidth(30); // Name
-        $sheet->getColumnDimension('B')->setWidth(20); // Category
-        $sheet->getColumnDimension('C')->setWidth(40); // Description
-        $sheet->getColumnDimension('D')->setWidth(15); // Price
-        $sheet->getColumnDimension('E')->setWidth(15); // Stock
+        $sheet->getColumnDimension('A')->setWidth(30); // Nama
+        $sheet->getColumnDimension('B')->setWidth(20); // Kategori
+        $sheet->getColumnDimension('C')->setWidth(40); // Deskripsi
+        $sheet->getColumnDimension('D')->setWidth(15); // Harga
+        $sheet->getColumnDimension('E')->setWidth(15); // Stok
 
         // Add instructions section
         $instructions = [
-            "1. Fill out product details starting from row 2",
-            "2. For Category column, use the dropdown to select a category",
-            "3. Don't modify column headers in row 1",
-            "4. Price and Stock must be numbers only",
-            "5. All products will be set to 'Active' status by default",
-            "6. All fields are required except Description",
-            "7. Template supports up to 500 product entries"
+            "1. Isi data produk mulai dari baris ke-2",
+            "2. Untuk kolom Kategori, gunakan dropdown untuk memilih kategori",
+            "3. Jangan mengubah header kolom di baris 1",
+            "4. Harga dan Stok harus berupa angka",
+            "5. Semua produk akan diatur ke status 'Aktif' secara default",
+            "6. Semua kolom wajib diisi kecuali Deskripsi",
+            "7. Template ini mendukung hingga 500 entri produk"
         ];
         $this->addInstructionsSection($sheet, $instructions, 1, 'G');
 
@@ -460,15 +460,15 @@ class ProductController extends Controller
             ],
         ];
 
-        $sheet->setCellValue('G10', 'FIELD EXPLANATIONS');
+        $sheet->setCellValue('G10', 'PENJELASAN KOLOM');
         $sheet->getStyle('G10')->applyFromArray($fieldExplanationHeaderStyle);
 
         $fieldExplanations = [
-            'Name' => 'Product name, e.g., "Seblak Ayam"',
-            'Category' => 'Product category - choose from dropdown',
-            'Description' => 'Detailed description of the product (optional)',
-            'Price' => 'Product price in Rupiah (numbers only)',
-            'Stock' => 'Initial stock quantity (numbers only)'
+            'Nama' => 'Nama produk, contoh: "Seblak Ayam"',
+            'Kategori' => 'Kategori produk - pilih dari dropdown',
+            'Deskripsi' => 'Deskripsi detail dari produk (opsional)',
+            'Harga' => 'Harga produk dalam Rupiah (angka saja)',
+            'Stok' => 'Jumlah stok awal (angka saja)'
         ];
 
         $fieldRow = 11;
@@ -511,12 +511,12 @@ class ProductController extends Controller
             ],
         ];
 
-        $sheet->setCellValue('G17', 'EXAMPLE ROW');
+        $sheet->setCellValue('G17', 'CONTOH BARIS');
         $sheet->getStyle('G17')->applyFromArray($exampleHeaderStyle);
 
         $sheet->setCellValue(
             'G18',
-            'See row 2 for an example of a completed product entry'
+            'Lihat baris 2 untuk contoh pengisian produk yang lengkap'
         );
         $exampleStyle = [
             'fill' => [
@@ -540,7 +540,7 @@ class ProductController extends Controller
         $writer = new Xlsx($spreadsheet);
 
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment;filename="products_template.xlsx"');
+        header('Content-Disposition: attachment;filename="template_produk.xlsx"');
         header('Cache-Control: max-age=0');
 
         $writer->save('php://output');
@@ -556,18 +556,18 @@ class ProductController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
 
             // Apply common styling
-            $headerStyle = $this->applyCommonStyles($spreadsheet, 'Products Export');
+            $headerStyle = $this->applyCommonStyles($spreadsheet, 'Export Produk');
 
             // Set headers
             $headers = [
                 'ID',
-                'Name',
-                'Category',
-                'Description',
-                'Price',
-                'Stock',
+                'Nama',
+                'Kategori',
+                'Deskripsi',
+                'Harga',
+                'Stok',
                 'Status',
-                'Is Favorite'
+                'Favorit'
             ];
 
             foreach ($headers as $index => $header) {
@@ -587,8 +587,8 @@ class ProductController extends Controller
                 $sheet->setCellValue('D' . $row, $product->description);
                 $sheet->setCellValue('E' . $row, $product->price);
                 $sheet->setCellValue('F' . $row, $product->stock);
-                $sheet->setCellValue('G' . $row, $product->status ? 'Active' : 'Inactive');
-                $sheet->setCellValue('H' . $row, $product->is_favorite ? 'Yes' : 'No');
+                $sheet->setCellValue('G' . $row, $product->status ? 'Aktif' : 'Tidak Aktif');
+                $sheet->setCellValue('H' . $row, $product->is_favorite ? 'Ya' : 'Tidak');
 
                 // Format numbers
                 $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
@@ -615,17 +615,17 @@ class ProductController extends Controller
 
             // Set column widths
             $sheet->getColumnDimension('A')->setWidth(10); // ID
-            $sheet->getColumnDimension('B')->setWidth(30); // Name
-            $sheet->getColumnDimension('C')->setWidth(20); // Category
-            $sheet->getColumnDimension('D')->setWidth(40); // Description
-            $sheet->getColumnDimension('E')->setWidth(15); // Price
-            $sheet->getColumnDimension('F')->setWidth(15); // Stock
+            $sheet->getColumnDimension('B')->setWidth(30); // Nama
+            $sheet->getColumnDimension('C')->setWidth(20); // Kategori
+            $sheet->getColumnDimension('D')->setWidth(40); // Deskripsi
+            $sheet->getColumnDimension('E')->setWidth(15); // Harga
+            $sheet->getColumnDimension('F')->setWidth(15); // Stok
             $sheet->getColumnDimension('G')->setWidth(15); // Status
-            $sheet->getColumnDimension('H')->setWidth(15); // Is Favorite
+            $sheet->getColumnDimension('H')->setWidth(15); // Favorit
 
             // Add export info on the right side
-            $sheet->setCellValue('J1', 'Exported on: ' . now()->format('d M Y H:i:s'));
-            $sheet->setCellValue('J2', 'Total Products: ' . ($row - 2));
+            $sheet->setCellValue('J1', 'Diekspor pada: ' . now()->format('d M Y H:i:s'));
+            $sheet->setCellValue('J2', 'Total Produk: ' . ($row - 2));
 
             $exportInfoStyle = [
                 'font' => [
@@ -656,7 +656,7 @@ class ProductController extends Controller
             $writer = new Xlsx($spreadsheet);
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="products_export_' . date('Y-m-d') . '.xlsx"');
+            header('Content-Disposition: attachment;filename="export_produk_' . date('Y-m-d') . '.xlsx"');
             header('Cache-Control: max-age=0');
 
             $writer->save('php://output');
@@ -665,7 +665,7 @@ class ProductController extends Controller
         } catch (\Exception $e) {
             return redirect()
                 ->route('products.index')
-                ->with('error', 'Error exporting products: ' . $e->getMessage());
+                ->with('error', 'Gagal mengekspor produk: ' . $e->getMessage());
         }
     }
 
@@ -682,9 +682,9 @@ class ProductController extends Controller
             $spreadsheet->getProperties()
                 ->setCreator('Seblak Sulthane')
                 ->setLastModifiedBy('Seblak Sulthane')
-                ->setTitle('Products Bulk Update Template')
+                ->setTitle('Template Update Massal Produk')
                 ->setSubject('Seblak Sulthane Products')
-                ->setDescription('Generated by Seblak Sulthane Management System');
+                ->setDescription('Dibuat oleh Sistem Manajemen Seblak Sulthane');
 
             // Get all categories for the dropdown list
             $categories = DB::table('categories')->pluck('name')->toArray();
@@ -692,13 +692,13 @@ class ProductController extends Controller
             // Set headers with status and favorite fields
             $headers = [
                 'ID',
-                'Name',
-                'Category',
-                'Description',
-                'Price',
-                'Stock',
-                'Active',
-                'Favorite'
+                'Nama',
+                'Kategori',
+                'Deskripsi',
+                'Harga',
+                'Stok',
+                'Aktif',
+                'Favorit'
             ];
 
             // Header styling
@@ -750,8 +750,8 @@ class ProductController extends Controller
                 $sheet->setCellValue('F' . $row, $product->stock);
 
                 // Set TRUE/FALSE for status and favorite fields
-                $sheet->setCellValue('G' . $row, $product->status ? 'TRUE' : 'FALSE');
-                $sheet->setCellValue('H' . $row, $product->is_favorite ? 'TRUE' : 'FALSE');
+                $sheet->setCellValue('G' . $row, $product->status ? 'BENAR' : 'SALAH');
+                $sheet->setCellValue('H' . $row, $product->is_favorite ? 'BENAR' : 'SALAH');
 
                 // Add data validation for Category column
                 $validation = $sheet->getCell('C' . $row)->getDataValidation();
@@ -767,7 +767,7 @@ class ProductController extends Controller
                 $activeValidation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
                 $activeValidation->setAllowBlank(false);
                 $activeValidation->setShowDropDown(true);
-                $activeValidation->setFormula1('"TRUE,FALSE"');
+                $activeValidation->setFormula1('"BENAR,SALAH"');
 
                 // Add TRUE/FALSE dropdown for Favorite column
                 $favoriteValidation = $sheet->getCell('H' . $row)->getDataValidation();
@@ -775,7 +775,7 @@ class ProductController extends Controller
                 $favoriteValidation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
                 $favoriteValidation->setAllowBlank(false);
                 $favoriteValidation->setShowDropDown(true);
-                $favoriteValidation->setFormula1('"TRUE,FALSE"');
+                $favoriteValidation->setFormula1('"BENAR,SALAH"');
 
                 // Alternate row colors
                 if ($row % 2 == 0) {
@@ -796,16 +796,16 @@ class ProductController extends Controller
 
             // Set column widths
             $sheet->getColumnDimension('A')->setWidth(10); // ID
-            $sheet->getColumnDimension('B')->setWidth(30); // Name
-            $sheet->getColumnDimension('C')->setWidth(20); // Category
-            $sheet->getColumnDimension('D')->setWidth(40); // Description
-            $sheet->getColumnDimension('E')->setWidth(15); // Price
-            $sheet->getColumnDimension('F')->setWidth(15); // Stock
-            $sheet->getColumnDimension('G')->setWidth(15); // Active
-            $sheet->getColumnDimension('H')->setWidth(15); // Favorite
+            $sheet->getColumnDimension('B')->setWidth(30); // Nama
+            $sheet->getColumnDimension('C')->setWidth(20); // Kategori
+            $sheet->getColumnDimension('D')->setWidth(40); // Deskripsi
+            $sheet->getColumnDimension('E')->setWidth(15); // Harga
+            $sheet->getColumnDimension('F')->setWidth(15); // Stok
+            $sheet->getColumnDimension('G')->setWidth(15); // Aktif
+            $sheet->getColumnDimension('H')->setWidth(15); // Favorit
 
             // Add instructions section
-            $sheet->setCellValue('J1', 'INSTRUCTIONS');
+            $sheet->setCellValue('J1', 'PETUNJUK');
             $sheet->getStyle('J1')->applyFromArray([
                 'font' => [
                     'bold' => true,
@@ -825,14 +825,14 @@ class ProductController extends Controller
 
             // Instruction content
             $instructions = [
-                "1. DO NOT modify the ID column (column A)",
-                "2. For Category, select from the dropdown list",
-                "3. Price and Stock should be numbers only",
-                "4. For Active and Favorite columns, select TRUE or FALSE from dropdown",
-                "5. Fields you don't want to update can be left unchanged",
-                "6. The system will only update the fields you modify",
-                "7. Do not modify the header row",
-                "8. When finished, save and upload the file to perform the updates"
+                "1. JANGAN memodifikasi kolom ID (kolom A)",
+                "2. Untuk Kategori, pilih dari dropdown yang tersedia",
+                "3. Harga dan Stok harus berupa angka",
+                "4. Untuk kolom Aktif dan Favorit, pilih BENAR atau SALAH dari dropdown",
+                "5. Kolom yang tidak ingin diubah bisa dibiarkan apa adanya",
+                "6. Sistem hanya akan mengupdate kolom yang Anda modifikasi",
+                "7. Jangan mengubah baris header",
+                "8. Setelah selesai, simpan dan unggah file untuk melakukan update"
             ];
 
             $instructionText = implode("\n\n", $instructions);
@@ -867,7 +867,7 @@ class ProductController extends Controller
             $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="products_for_update.xlsx"');
+            header('Content-Disposition: attachment;filename="produk_untuk_update.xlsx"');
             header('Cache-Control: max-age=0');
 
             $writer->save('php://output');
@@ -876,7 +876,7 @@ class ProductController extends Controller
         } catch (\Exception $e) {
             return redirect()
                 ->route('products.index')
-                ->with('error', 'Error exporting products: ' . $e->getMessage());
+                ->with('error', 'Gagal mengekspor produk: ' . $e->getMessage());
         }
     }
 
@@ -911,7 +911,7 @@ class ProductController extends Controller
                     $product = Product::where('id', $row[0])->first();
 
                     if (!$product) {
-                        $errors[] = "Row " . ($index + 2) . ": Product with ID {$row[0]} not found";
+                        $errors[] = "Baris " . ($index + 2) . ": Produk dengan ID {$row[0]} tidak ditemukan";
                         continue;
                     }
 
@@ -974,7 +974,7 @@ class ProductController extends Controller
                         $skippedCount++;
                     }
                 } catch (\Exception $e) {
-                    $errors[] = "Row " . ($index + 2) . ": " . $e->getMessage();
+                    $errors[] = "Baris " . ($index + 2) . ": " . $e->getMessage();
                     \Log::error("Error processing row " . ($index + 2) . ": " . $e->getMessage());
                 }
             }
@@ -982,17 +982,17 @@ class ProductController extends Controller
             DB::commit();
 
             // Build a comprehensive message
-            $message = "Product update summary: {$updateCount} products updated";
+            $message = "Ringkasan pembaruan produk: {$updateCount} produk diperbarui";
             if ($skippedCount > 0) {
-                $message .= ", {$skippedCount} products unchanged";
+                $message .= ", {$skippedCount} produk tidak berubah";
             }
 
             if (!empty($errors)) {
                 if (count($errors) <= 3) {
-                    $message .= ". However, there were some errors: " . implode("; ", $errors);
+                    $message .= ". Namun, terdapat beberapa kesalahan: " . implode("; ", $errors);
                     return redirect()->route('products.index')->with('warning', $message);
                 } else {
-                    $message .= ". However, there were " . count($errors) . " errors. First few: " .
+                    $message .= ". Namun, terdapat " . count($errors) . " kesalahan. Beberapa diantaranya: " .
                         implode(
                             "; ",
                             array_slice($errors, 0, 3)
@@ -1006,7 +1006,7 @@ class ProductController extends Controller
             DB::rollBack();
             return redirect()
                 ->route('products.index')
-                ->with('error', 'Error updating products: ' . $e->getMessage());
+                ->with('error', 'Kesalahan dalam memperbarui produk: ' . $e->getMessage());
         }
     }
 
@@ -1048,7 +1048,7 @@ class ProductController extends Controller
 
             return redirect()
                 ->route('products.index')
-                ->with('success', "All {$productCount} products have been deleted successfully");
+                ->with('success', "Semua {$productCount} produk telah berhasil dihapus");
         } catch (\Exception $e) {
             // Log error
             \Log::error('Error in deleteAll: ' . $e->getMessage());
@@ -1063,7 +1063,7 @@ class ProductController extends Controller
 
             return redirect()
                 ->route('products.index')
-                ->with('error', 'Error deleting products: ' . $e->getMessage());
+                ->with('error', 'Gagal menghapus produk: ' . $e->getMessage());
         }
     }
 }

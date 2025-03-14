@@ -38,7 +38,7 @@ class OutletController extends Controller
     {
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can create new outlets');
+                ->with('error', 'Hanya pemilik yang dapat membuat outlet baru');
         }
 
         return view('pages.outlets.create');
@@ -48,7 +48,7 @@ class OutletController extends Controller
     {
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can create new outlets');
+                ->with('error', 'Hanya pemilik yang dapat membuat outlet baru');
         }
 
         $request->validate([
@@ -61,14 +61,14 @@ class OutletController extends Controller
         ]);
 
         Outlet::create($request->all());
-        return redirect()->route('outlets.index')->with('success', 'Outlet created successfully');
+        return redirect()->route('outlets.index')->with('success', 'Outlet berhasil dibuat');
     }
 
     public function edit(Outlet $outlet)
     {
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can edit outlets');
+                ->with('error', 'Hanya pemilik yang dapat mengedit outlet');
         }
 
         return view('pages.outlets.edit', compact('outlet'));
@@ -78,7 +78,7 @@ class OutletController extends Controller
     {
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can update outlets');
+                ->with('error', 'Hanya pemilik yang dapat memperbarui outlet');
         }
 
         $request->validate([
@@ -91,24 +91,24 @@ class OutletController extends Controller
         ]);
 
         $outlet->update($request->all());
-        return redirect()->route('outlets.index')->with('success', 'Outlet updated successfully');
+        return redirect()->route('outlets.index')->with('success', 'Outlet berhasil diperbarui');
     }
 
     public function destroy(Outlet $outlet)
     {
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can delete outlets');
+                ->with('error', 'Hanya pemilik yang dapat menghapus outlet');
         }
 
         // Check for associated records
         if ($outlet->users()->exists() || $outlet->orders()->exists()) {
             return redirect()->route('outlets.index')
-                ->with('error', 'Cannot delete outlet with associated users or orders');
+                ->with('error', 'Tidak dapat menghapus outlet yang memiliki pengguna atau pesanan terkait');
         }
 
         $outlet->delete();
-        return redirect()->route('outlets.index')->with('success', 'Outlet deleted successfully');
+        return redirect()->route('outlets.index')->with('success', 'Outlet berhasil dihapus');
     }
 
     /**
@@ -119,7 +119,7 @@ class OutletController extends Controller
         // Ensure only owner can access template
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can access this feature');
+                ->with('error', 'Hanya pemilik yang dapat mengakses fitur ini');
         }
 
         $spreadsheet = new Spreadsheet();
@@ -129,9 +129,9 @@ class OutletController extends Controller
         $spreadsheet->getProperties()
             ->setCreator('Seblak Sulthane')
             ->setLastModifiedBy('Seblak Sulthane')
-            ->setTitle('Outlet Import Template')
-            ->setSubject('Template for Outlet Import')
-            ->setDescription('Download template ini, isi sesuai format, kemudian upload kembali.');
+            ->setTitle('Template Import Outlet')
+            ->setSubject('Template untuk Import Outlet')
+            ->setDescription('Unduh template ini, isi sesuai format, kemudian unggah kembali.');
 
         // Set headers using Indonesian terms as requested
         $headers = ['NAMA OUTLET', 'ALAMAT 1', 'ALAMAT 2', 'NO. TELP', 'PIMPINAN', 'KET'];
@@ -352,7 +352,7 @@ class OutletController extends Controller
         // Ensure only owner can export outlets
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can export outlets');
+                ->with('error', 'Hanya pemilik yang dapat mengekspor outlet');
         }
 
         try {
@@ -490,7 +490,7 @@ class OutletController extends Controller
             exit;
         } catch (\Exception $e) {
             return redirect()->route('outlets.index')
-                ->with('error', 'Error exporting outlets: ' . $e->getMessage());
+                ->with('error', 'Terjadi kesalahan saat mengekspor outlet: ' . $e->getMessage());
         }
     }
 
@@ -502,7 +502,7 @@ class OutletController extends Controller
         // Ensure only owner can access bulk update template
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can access this feature');
+                ->with('error', 'Hanya pemilik yang dapat mengakses fitur ini');
         }
 
         try {
@@ -680,7 +680,7 @@ class OutletController extends Controller
             exit;
         } catch (\Exception $e) {
             return redirect()->route('outlets.index')
-                ->with('error', 'Error preparing update template: ' . $e->getMessage());
+                ->with('error', 'Terjadi kesalahan saat menyiapkan template update: ' . $e->getMessage());
         }
     }
 
@@ -692,7 +692,7 @@ class OutletController extends Controller
         // Ensure only owner can import outlets
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can import outlets');
+                ->with('error', 'Hanya pemilik yang dapat mengimpor outlet');
         }
 
         $request->validate([
@@ -793,7 +793,7 @@ class OutletController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->route('outlets.index')
-                ->with('error', 'Error importing outlets: ' . $e->getMessage());
+                ->with('error', 'Terjadi kesalahan saat mengimpor outlet: ' . $e->getMessage());
         }
     }
 
@@ -805,7 +805,7 @@ class OutletController extends Controller
         // Ensure only owner can perform bulk updates
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can perform bulk updates');
+                ->with('error', 'Hanya pemilik yang dapat melakukan update massal');
         }
 
         $request->validate([
@@ -926,7 +926,7 @@ class OutletController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->route('outlets.index')
-                ->with('error', 'Error updating outlets: ' . $e->getMessage());
+                ->with('error', 'Terjadi kesalahan saat memperbarui outlet: ' . $e->getMessage());
         }
     }
 
@@ -938,7 +938,7 @@ class OutletController extends Controller
         // Ensure only owner can delete all outlets
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Only owner can perform this action');
+                ->with('error', 'Hanya pemilik yang dapat melakukan tindakan ini');
         }
 
         try {
@@ -973,7 +973,7 @@ class OutletController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->route('outlets.index')
-                ->with('error', 'Error deleting outlets: ' . $e->getMessage());
+                ->with('error', 'Terjadi kesalahan saat menghapus outlet: ' . $e->getMessage());
         }
     }
 }

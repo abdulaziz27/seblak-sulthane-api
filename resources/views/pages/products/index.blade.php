@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Produk')
+@section('title', 'Daftar Produk')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -11,9 +11,9 @@
     <div class="main-content">
         <section class="section">
             <div class="section-header">
-                <h1>Produk</h1>
+                <h1>Manajemen Produk</h1>
                 <div class="section-header-button">
-                    <a href="{{ route('products.create') }}" class="btn btn-primary">Tambah Baru</a>
+                    <a href="{{ route('products.create') }}" class="btn btn-primary">Tambah Produk Baru</a>
                     <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
                         Import Excel
                     </button>
@@ -40,17 +40,17 @@
                     </div>
                 </div>
 
-
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="card">
-
+                            <div class="card-header">
+                                <h4>Daftar Semua Produk</h4>
+                            </div>
                             <div class="card-body">
-
                                 <div class="float-right">
                                     <form method="GET" action="{{ route('products.index') }}">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" placeholder="Cari" name="name">
+                                            <input type="text" class="form-control" placeholder="Cari produk..." name="name">
                                             <div class="input-group-append">
                                                 <button class="btn btn-primary"><i class="fas fa-search"></i></button>
                                             </div>
@@ -63,8 +63,7 @@
                                 <div class="table-responsive">
                                     <table class="table-striped table">
                                         <tr>
-
-                                            <th>Nama</th>
+                                            <th>Nama Produk</th>
                                             <th>Kategori</th>
                                             <th>Harga</th>
                                             <th>Status</th>
@@ -73,19 +72,22 @@
                                         </tr>
                                         @foreach ($products as $product)
                                             <tr>
-
                                                 <td>{{ $product->name }}
                                                 </td>
                                                 <td>
                                                     {{ $product->category->name }}
                                                 </td>
                                                 <td>
-                                                    {{ $product->price }}
+                                                    Rp {{ number_format($product->price, 0, ',', '.') }}
                                                 </td>
                                                 <td>
-                                                    {{ $product->status == 1 ? 'Aktif' : 'Tidak Aktif' }}
+                                                    @if($product->status == 1)
+                                                        <span class="badge badge-success">Aktif</span>
+                                                    @else
+                                                        <span class="badge badge-danger">Tidak Aktif</span>
+                                                    @endif
                                                 </td>
-                                                <td>{{ $product->created_at }}</td>
+                                                <td>{{ $product->created_at->format('d M Y H:i') }}</td>
                                                 <td>
                                                     <div class="d-flex justify-content-center">
                                                         <a href='{{ route('products.edit', $product->id) }}'
@@ -107,8 +109,6 @@
                                                 </td>
                                             </tr>
                                         @endforeach
-
-
                                     </table>
                                 </div>
                                 <div class="float-right">
@@ -128,7 +128,7 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="importModalLabel">Import Produk</h5>
+                    <h5 class="modal-title" id="importModalLabel">Import Produk dari Excel</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -137,17 +137,17 @@
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
-                            <label>File Excel</label>
+                            <label>Pilih File Excel</label>
                             <input type="file" class="form-control" name="file" accept=".xlsx, .xls" required>
                         </div>
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Download template <a href="{{ route('products.template') }}" class="font-weight-bold text-primary">disini</a></li>
+                                <li>Unduh template <a href="{{ route('products.template') }}" class="font-weight-bold text-primary">disini</a></li>
                                 <li>Isi data produk sesuai dengan templatenya</li>
-                                <li>Save dan upload filenya</li>
+                                <li>Simpan dan unggah filenya</li>
                             </ol>
-                            <p>Urutan kolom: Nama, ID Kategori, Deskripsi, Harga, Stok, Status, Favorit</p>
+                            <p>Urutan kolom: Nama, Kategori, Deskripsi, Harga, Stok</p>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -202,18 +202,18 @@
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
-                            <label>File Excel</label>
+                            <label>Pilih File Excel</label>
                             <input type="file" class="form-control" name="file" accept=".xlsx, .xls" required>
                         </div>
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Download template update <a href="{{ route('products.exportForUpdate') }}" class="font-weight-bold text-primary">disini</a>
+                                <li>Unduh template update <a href="{{ route('products.exportForUpdate') }}" class="font-weight-bold text-primary">disini</a>
                                 </li>
                                 <li>Update data produk sesuai dengan templatenya</li>
-                                <li>Save dan upload filenya</li>
+                                <li>Simpan dan unggah filenya</li>
                             </ol>
-                            <p>Urutan kolom: ID, Nama, ID Kategori, Deskripsi, Harga, Stok, Status, Favorit</p>
+                            <p>Urutan kolom: ID, Nama, Kategori, Deskripsi, Harga, Stok, Status, Favorit</p>
                             <p class="text-warning">Catatan: ID produk tidak boleh diubah karena digunakan sebagai referensi
                                 untuk update</p>
                         </div>
