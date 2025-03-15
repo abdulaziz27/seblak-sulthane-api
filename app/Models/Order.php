@@ -24,12 +24,17 @@ class Order extends Model
         'transaction_time',
         'outlet_id',
         'member_id',
-        'order_type'
+        'order_type',
+        'qris_fee'
+    ];
+
+    protected $casts = [
+        'qris_fee' => 'decimal:2',
     ];
 
     public function outlet()
     {
-        return $this->belongsTo(Outlet::class);
+        return $this->belongsTo(Outlet::class)->withTrashed();
     }
 
     public function member()

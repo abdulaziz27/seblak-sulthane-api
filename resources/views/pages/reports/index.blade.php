@@ -56,6 +56,14 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
+                                        <label>Tipe Periode</label>
+                                        <select class="form-control" name="period_type">
+                                            <option value="daily">Harian</option>
+                                            <option value="weekly">Mingguan</option>
+                                            <option value="monthly">Bulanan</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
                                         <label>Format</label>
                                         <select class="form-control" name="format">
                                             <option value="pdf">PDF</option>
@@ -229,10 +237,27 @@
             // Inisialisasi daterangepicker untuk semua form
             $('.daterange').daterangepicker({
                 locale: {
-                    format: 'YYYY-MM-DD'
+                    format: 'YYYY-MM-DD',
+                    applyLabel: 'Terapkan',
+                    cancelLabel: 'Batal',
+                    fromLabel: 'Dari',
+                    toLabel: 'Sampai',
+                    customRangeLabel: 'Kustom',
+                    weekLabel: 'M',
+                    daysOfWeek: ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'],
+                    monthNames: ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'],
+                    firstDay: 1
                 },
                 drops: 'down',
-                opens: 'right'
+                opens: 'right',
+                ranges: {
+                   'Hari Ini': [moment(), moment()],
+                   'Kemarin': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+                   '7 Hari Terakhir': [moment().subtract(6, 'days'), moment()],
+                   '30 Hari Terakhir': [moment().subtract(29, 'days'), moment()],
+                   'Bulan Ini': [moment().startOf('month'), moment().endOf('month')],
+                   'Bulan Lalu': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+                }
             });
 
             // Perbarui field start_date dan end_date tersembunyi saat rentang tanggal berubah

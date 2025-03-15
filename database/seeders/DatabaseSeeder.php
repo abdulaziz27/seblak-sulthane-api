@@ -22,13 +22,13 @@ class DatabaseSeeder extends Seeder
         // Create outlets first
         $outletPurwokerto = Outlet::create([
             'name' => 'Outlet Purwokerto',
-            'address' => 'Jl. HR. Bunyamin No. 10, Purwokerto',
+            'address1' => 'Jl. HR. Bunyamin No. 10, Purwokerto',
             'phone' => '085211553430'
         ]);
 
         $outletCilacap = Outlet::create([
             'name' => 'Outlet Cilacap',
-            'address' => 'Jl. Gatot Subroto No. 15, Cilacap',
+            'address1' => 'Jl. Gatot Subroto No. 15, Cilacap',
             'phone' => '085211553431'
         ]);
 
@@ -71,6 +71,7 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             ProductSeeder::class,
             DiscountSeeder::class,
+            OwnerSeeder::class,
         ]);
     }
 }
