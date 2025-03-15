@@ -55,6 +55,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('orders/{id}', [OrderController::class, 'show'])->name('orders.show');
     Route::get('outlets', [OutletController::class, 'index'])->name('outlets.index');
     Route::get('discounts', [DiscountController::class, 'index'])->name('discounts.index');
+    Route::get('members', [MemberController::class, 'index'])->name('members.index');
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
 
     // Owner only routes
     Route::middleware('owner-only')->group(function () {
@@ -110,7 +112,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('material-orders/{materialOrder}/cancel', [MaterialOrderController::class, 'cancel'])->name('material-orders.cancel');
 
     // Reports
-    Route::middleware('owner-only')->prefix('reports')->name('reports.')->group(function () {
+    Route::middleware('prevent-staff')->prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('/sales-summary', [ReportController::class, 'salesSummary'])->name('sales-summary');
         Route::get('/outlet-performance', [ReportController::class, 'outletPerformance'])->name('outlet-performance');
@@ -118,6 +120,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/customer-insights', [ReportController::class, 'customerInsights'])->name('customer-insights');
         Route::get('/inventory', [ReportController::class, 'inventoryReport'])->name('inventory');
     });
+
+
+    Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary'])->name('reports.sales-summary');
+    Route::get('/reports/material-purchases', [ReportController::class, 'materialPurchases'])->name('reports.material-purchases');
 
     // Profile
     Route::get('/profile', [UserController::class, 'profile'])->name('profile');
