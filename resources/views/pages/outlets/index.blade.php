@@ -13,7 +13,7 @@
             <div class="section-header">
                 <h1>Daftar Outlet</h1>
                 @if (Auth::user()->role === 'owner')
-                    <div class="section-header-button">
+                    <div class="section-header-button d-none d-md-flex">
                         <a href="{{ route('outlets.create') }}" class="btn btn-primary">Tambah Baru</a>
                         <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
                             Import Excel
@@ -21,10 +21,12 @@
                         <a href="{{ route('outlets.export') }}" class="btn btn-info ml-2">
                             Export Excel
                         </a>
-                        <button type="button" class="btn btn-warning ml-2" data-toggle="modal" data-target="#bulkUpdateModal">
+                        <button type="button" class="btn btn-warning ml-2" data-toggle="modal"
+                            data-target="#bulkUpdateModal">
                             Update Massal
                         </button>
-                        <button type="button" class="btn btn-danger ml-2" data-toggle="modal" data-target="#deleteAllModal">
+                        <button type="button" class="btn btn-danger ml-2" data-toggle="modal"
+                            data-target="#deleteAllModal">
                             Hapus Semua
                         </button>
                     </div>
@@ -36,6 +38,27 @@
                 </div>
             </div>
             <div class="section-body">
+                @if (Auth::user()->role === 'owner')
+                    <!-- Responsive action buttons for small screens -->
+                    <div class="d-flex d-md-none mb-4 flex-wrap justify-content-center">
+                        <a href="{{ route('outlets.create') }}" class="btn btn-primary m-1">
+                            <i class="fas fa-plus mr-1"></i> Tambah
+                        </a>
+                        <button type="button" class="btn btn-success m-1" data-toggle="modal" data-target="#importModal">
+                            <i class="fas fa-file-import mr-1"></i> Import
+                        </button>
+                        <a href="{{ route('outlets.export') }}" class="btn btn-info m-1">
+                            <i class="fas fa-file-export mr-1"></i> Export
+                        </a>
+                        <button type="button" class="btn btn-warning m-1" data-toggle="modal" data-target="#bulkUpdateModal">
+                            <i class="fas fa-sync-alt mr-1"></i> Update
+                        </button>
+                        <button type="button" class="btn btn-danger m-1" data-toggle="modal" data-target="#deleteAllModal">
+                            <i class="fas fa-trash mr-1"></i> Hapus
+                        </button>
+                    </div>
+                @endif
+
                 <div class="row">
                     <div class="col-12">
                         @include('layouts.alert')
@@ -97,7 +120,8 @@
                                                                 <input type="hidden" name="_method" value="DELETE" />
                                                                 <input type="hidden" name="_token"
                                                                     value="{{ csrf_token() }}" />
-                                                                <button class="btn btn-sm btn-danger btn-icon confirm-delete">
+                                                                <button
+                                                                    class="btn btn-sm btn-danger btn-icon confirm-delete">
                                                                     <i class="fas fa-times"></i> Hapus
                                                                 </button>
                                                             </form>
@@ -140,7 +164,8 @@
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Unduh template <a href="{{ route('outlets.template') }}" class="font-weight-bold text-primary">disini</a></li>
+                                <li>Unduh template <a href="{{ route('outlets.template') }}"
+                                        class="font-weight-bold text-primary">disini</a></li>
                                 <li>Isi data sesuai dengan template</li>
                                 <li>Simpan dan unggah filenya</li>
                             </ol>
@@ -177,12 +202,14 @@
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Unduh template update <a href="{{ route('outlets.exportForUpdate') }}" class="font-weight-bold text-primary">disini</a></li>
+                                <li>Unduh template update <a href="{{ route('outlets.exportForUpdate') }}"
+                                        class="font-weight-bold text-primary">disini</a></li>
                                 <li>Perbarui data sesuai kebutuhan</li>
                                 <li>Simpan dan unggah filenya</li>
                             </ol>
                             <p>Urutan kolom: ID, NAMA OUTLET, ALAMAT 1, ALAMAT 2, NO. TELP, PIMPINAN, KET</p>
-                            <p class="text-warning"><strong>Catatan:</strong> Jangan mengubah kolom ID karena akan digunakan sebagai referensi untuk pembaruan.</p>
+                            <p class="text-warning"><strong>Catatan:</strong> Jangan mengubah kolom ID karena akan
+                                digunakan sebagai referensi untuk pembaruan.</p>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -207,7 +234,8 @@
                 </div>
                 <div class="modal-body">
                     <p>Apakah Anda yakin ingin menghapus semua outlet? Tindakan ini tidak dapat dibatalkan.</p>
-                    <p class="text-danger"><strong>Peringatan:</strong> Ini akan secara permanen menghapus semua outlet yang tidak memiliki user atau order terkait.</p>
+                    <p class="text-danger"><strong>Peringatan:</strong> Outlet yang dihapus akan disembunyikan dari
+                        tampilan.</p>
                 </div>
                 <div class="modal-footer">
                     <form action="{{ route('outlets.deleteAll') }}" method="POST">
@@ -237,17 +265,50 @@
             event.preventDefault();
 
             swal({
-                title: 'Apakah Anda yakin?',
-                text: 'Tindakan ini tidak dapat dibatalkan',
-                icon: 'warning',
-                buttons: true,
-                dangerMode: true,
-            })
-            .then((willDelete) => {
-                if (willDelete) {
-                    form.submit();
-                }
-            });
+                    title: 'Apakah Anda yakin?',
+                    text: 'Tindakan ini tidak dapat dibatalkan',
+                    icon: 'warning',
+                    buttons: true,
+                    dangerMode: true,
+                })
+                .then((willDelete) => {
+                    if (willDelete) {
+                        form.submit();
+                    }
+                });
+        });
+
+        // Add mobile-specific styles
+        $(document).ready(function() {
+            // On smaller screens, adjust button sizing
+            if (window.innerWidth < 768) {
+                $('.d-flex.d-md-none .btn').addClass('btn-sm');
+            }
         });
     </script>
+@endpush
+
+@push('style')
+    <style>
+        /* Responsive button styles */
+        @media (max-width: 767.98px) {
+            .d-flex.d-md-none .btn {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.9rem;
+            }
+
+            .table-responsive {
+                overflow-x: auto;
+            }
+
+            /* Ensure text doesn't overflow on small screens */
+            .btn i + span {
+                max-width: 100px;
+                display: inline-block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+    </style>
 @endpush

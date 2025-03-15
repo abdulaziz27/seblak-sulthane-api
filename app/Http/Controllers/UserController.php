@@ -51,7 +51,7 @@ class UserController extends Controller
             'email' => 'required|email|unique:users',
             'password' => 'required|min:8',
             'role' => 'required|in:owner,admin,staff',
-            'outlet_id' => 'required|exists:outlets,id',
+            'outlet_id' => 'required_unless:role,owner|nullable|exists:outlets,id',
         ]);
 
         // Check permissions
@@ -70,7 +70,7 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => $request->role,
-            'outlet_id' => $request->outlet_id,
+            'outlet_id' => $request->outlet_id ?: null,
         ]);
 
         return redirect()->route('users.index')->with('success', 'User created successfully');

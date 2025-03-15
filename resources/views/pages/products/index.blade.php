@@ -12,7 +12,7 @@
         <section class="section">
             <div class="section-header">
                 <h1>Manajemen Produk</h1>
-                <div class="section-header-button">
+                <div class="section-header-button d-none d-md-flex">
                     <a href="{{ route('products.create') }}" class="btn btn-primary">Tambah Produk Baru</a>
                     <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
                         Import Excel
@@ -34,6 +34,25 @@
                 </div>
             </div>
             <div class="section-body">
+                <!-- Responsive action buttons for small screens -->
+                <div class="d-flex d-md-none mb-4 flex-wrap justify-content-center">
+                    <a href="{{ route('products.create') }}" class="btn btn-primary m-1">
+                        <i class="fas fa-plus mr-1"></i> Tambah
+                    </a>
+                    <button type="button" class="btn btn-success m-1" data-toggle="modal" data-target="#importModal">
+                        <i class="fas fa-file-import mr-1"></i> Import
+                    </button>
+                    <a href="{{ route('products.export') }}" class="btn btn-info m-1">
+                        <i class="fas fa-file-export mr-1"></i> Export
+                    </a>
+                    <button type="button" class="btn btn-warning m-1" data-toggle="modal" data-target="#bulkUpdateModal">
+                        <i class="fas fa-sync-alt mr-1"></i> Update
+                    </button>
+                    <button type="button" class="btn btn-danger m-1" data-toggle="modal" data-target="#deleteAllModal">
+                        <i class="fas fa-trash mr-1"></i> Hapus
+                    </button>
+                </div>
+
                 <div class="row">
                     <div class="col-12">
                         @include('layouts.alert')
@@ -50,7 +69,8 @@
                                 <div class="float-right">
                                     <form method="GET" action="{{ route('products.index') }}">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" placeholder="Cari produk..." name="name">
+                                            <input type="text" class="form-control" placeholder="Cari produk..."
+                                                name="name">
                                             <div class="input-group-append">
                                                 <button class="btn btn-primary"><i class="fas fa-search"></i></button>
                                             </div>
@@ -81,7 +101,7 @@
                                                     Rp {{ number_format($product->price, 0, ',', '.') }}
                                                 </td>
                                                 <td>
-                                                    @if($product->status == 1)
+                                                    @if ($product->status == 1)
                                                         <span class="badge badge-success">Aktif</span>
                                                     @else
                                                         <span class="badge badge-danger">Tidak Aktif</span>
@@ -143,7 +163,8 @@
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Unduh template <a href="{{ route('products.template') }}" class="font-weight-bold text-primary">disini</a></li>
+                                <li>Unduh template <a href="{{ route('products.template') }}"
+                                        class="font-weight-bold text-primary">disini</a></li>
                                 <li>Isi data produk sesuai dengan templatenya</li>
                                 <li>Simpan dan unggah filenya</li>
                             </ol>
@@ -165,22 +186,23 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title text-danger" id="deleteAllModalLabel">Hapus Semua Produk</h5>
+                    <h5 class="modal-title text-danger" id="deleteAllModalLabel">Arsipkan Semua Produk</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p>Apakah Anda yakin ingin menghapus semua produk? Tindakan ini tidak dapat dibatalkan.</p>
-                    <p class="text-danger"><strong>Peringatan: Ini akan secara permanen menghapus semua produk dari
-                            database!</strong></p>
+                    <p>Apakah Anda yakin ingin mengarsipkan semua produk? Produk akan disembunyikan tetapi data tetap
+                        tersimpan.</p>
+                    <p class="text-warning"><strong>Catatan: Produk yang sudah pernah digunakan dalam transaksi akan tetap
+                            tersimpan.</strong></p>
                 </div>
                 <div class="modal-footer">
                     <form id="delete-all-form" action="{{ route('products.deleteAll') }}" method="POST">
                         @csrf
                         @method('DELETE')
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
-                        <button type="submit" class="btn btn-danger delete-all-btn">Hapus Semua Produk</button>
+                        <button type="submit" class="btn btn-danger delete-all-btn">Arsipkan Semua Produk</button>
                     </form>
                 </div>
             </div>
@@ -208,13 +230,15 @@
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Unduh template update <a href="{{ route('products.exportForUpdate') }}" class="font-weight-bold text-primary">disini</a>
+                                <li>Unduh template update <a href="{{ route('products.exportForUpdate') }}"
+                                        class="font-weight-bold text-primary">disini</a>
                                 </li>
                                 <li>Update data produk sesuai dengan templatenya</li>
                                 <li>Simpan dan unggah filenya</li>
                             </ol>
                             <p>Urutan kolom: ID, Nama, Kategori, Deskripsi, Harga, Stok, Status, Favorit</p>
-                            <p class="text-warning">Catatan: ID produk tidak boleh diubah karena digunakan sebagai referensi
+                            <p class="text-warning">Catatan: ID produk tidak boleh diubah karena digunakan sebagai
+                                referensi
                                 untuk update</p>
                         </div>
                     </div>
@@ -234,4 +258,39 @@
 
     <!-- Page Specific JS File -->
     <script src="{{ asset('js/page/features-posts.js') }}"></script>
+
+    <script>
+        // Add mobile-specific styles
+        $(document).ready(function() {
+            // On smaller screens, adjust button sizing
+            if (window.innerWidth < 768) {
+                $('.d-flex.d-md-none .btn').addClass('btn-sm');
+            }
+        });
+    </script>
+@endpush
+
+@push('style')
+    <style>
+        /* Responsive button styles */
+        @media (max-width: 767.98px) {
+            .d-flex.d-md-none .btn {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.9rem;
+            }
+
+            .table-responsive {
+                overflow-x: auto;
+            }
+
+            /* Ensure text doesn't overflow on small screens */
+            .btn i + span {
+                max-width: 100px;
+                display: inline-block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+    </style>
 @endpush

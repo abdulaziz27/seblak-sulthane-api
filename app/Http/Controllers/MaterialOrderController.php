@@ -367,4 +367,64 @@ class MaterialOrderController extends Controller
                 ->with('error', 'Failed to cancel order: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Soft delete all raw materials
+     */
+    public function deleteAll()
+    {
+        try {
+            DB::beginTransaction();
+
+            // Log start of operation
+            \Log::info('Memulai proses deleteAll untuk bahan baku');
+
+            // Check if any materials are being used in orders
+            $materialsInUse = RawMaterial::whereHas('materialOrderItems')->get();
+
+            if ($materialsInUse->isNotEmpty()) {
+                // Prepare detailed information about materials in use
+                $materialInfo = $materialsInUse->map(function ($material) {
+                    return "{$material->name} (ID: {$material->id})";
+                })->join(', ');
+
+                // Roll back and return message
+                DB::rollBack();
+                return redirect()->route('raw-materials.index')
+                    ->with('warning', "Tidak dapat menghapus semua bahan baku. Bahan baku berikut masih digunakan dalam pesanan: {$materialInfo}");
+            }
+
+            // Track how many materials will be deleted
+            $materialCount = RawMaterial::count();
+
+            if ($materialCount === 0) {
+                DB::rollBack();
+                return redirect()->route('raw-materials.index')
+                    ->with('info', 'Tidak ada bahan baku yang ditemukan untuk dihapus.');
+            }
+
+            // Soft delete all materials (the SoftDeletes trait will make this a soft delete)
+            RawMaterial::query()->delete();
+
+            // Commit the transaction
+            DB::commit();
+
+            // Log successful deletion
+            \Log::info("Berhasil soft delete semua {$materialCount} bahan baku");
+
+            return redirect()->route('raw-materials.index')
+                ->with('success', "Semua {$materialCount} bahan baku berhasil dihapus.");
+        } catch (\Exception $e) {
+            // Log error
+            \Log::error('Error dalam deleteAll bahan baku: ' . $e->getMessage());
+
+            // Rollback transaction if still active
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            return redirect()->route('raw-materials.index')
+                ->with('error', 'Kesalahan menghapus bahan baku: ' . $e->getMessage());
+        }
+    }
 }
