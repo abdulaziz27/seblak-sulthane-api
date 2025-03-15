@@ -94,21 +94,26 @@ class OutletController extends Controller
         return redirect()->route('outlets.index')->with('success', 'Outlet berhasil diperbarui');
     }
 
+    /**
+     * Soft delete the specified outlet.
+     */
     public function destroy(Outlet $outlet)
     {
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Hanya pemilik yang dapat menghapus outlet');
+                ->with('error', 'Hanya owner yang dapat menghapus outlet');
         }
 
-        // Check for associated records
-        if ($outlet->users()->exists() || $outlet->orders()->exists()) {
+        try {
+            // Soft delete outlet
+            $outlet->delete();
+
             return redirect()->route('outlets.index')
-                ->with('error', 'Tidak dapat menghapus outlet yang memiliki pengguna atau pesanan terkait');
+                ->with('success', 'Outlet berhasil dihapus');
+        } catch (\Exception $e) {
+            return redirect()->route('outlets.index')
+                ->with('error', 'Gagal menghapus outlet: ' . $e->getMessage());
         }
-
-        $outlet->delete();
-        return redirect()->route('outlets.index')->with('success', 'Outlet berhasil dihapus');
     }
 
     /**
@@ -931,49 +936,50 @@ class OutletController extends Controller
     }
 
     /**
-     * Improved delete all outlets function
+     * Soft delete all outlets without relation checking
      */
     public function deleteAll()
     {
         // Ensure only owner can delete all outlets
         if (Auth::user()->role !== 'owner') {
             return redirect()->route('outlets.index')
-                ->with('error', 'Hanya pemilik yang dapat melakukan tindakan ini');
+                ->with('error', 'Hanya owner yang dapat melakukan tindakan ini');
         }
 
         try {
             DB::beginTransaction();
 
-            // Check for outlets with associated records
-            $outletsWithRecords = Outlet::whereHas('users')
-                ->orWhereHas('orders')
-                ->get();
-
-            if ($outletsWithRecords->isNotEmpty()) {
-                $outletNames = $outletsWithRecords->pluck('name')->join(', ');
-                return redirect()->route('outlets.index')
-                    ->with('warning', "Outlet berikut tidak dapat dihapus karena memiliki data terkait (pengguna atau pesanan): {$outletNames}");
-            }
-
-            // Get count for reporting
+            // Track how many outlets will be deleted
             $outletCount = Outlet::count();
 
-            // Safe to delete all outlets
+            if ($outletCount === 0) {
+                DB::rollBack();
+                return redirect()->route('outlets.index')
+                    ->with('info', 'Tidak ada outlet yang ditemukan untuk dihapus.');
+            }
+
+            // Soft delete all outlets without checking relations
             Outlet::query()->delete();
 
+            // Commit the transaction
             DB::commit();
 
-            if ($outletCount > 0) {
-                return redirect()->route('outlets.index')
-                    ->with('success', "Berhasil menghapus {$outletCount} outlet.");
-            } else {
-                return redirect()->route('outlets.index')
-                    ->with('info', "Tidak ada outlet yang dihapus.");
-            }
-        } catch (\Exception $e) {
-            DB::rollBack();
+            // Log successful deletion
+            \Log::info("Berhasil melakukan soft delete pada {$outletCount} outlet");
+
             return redirect()->route('outlets.index')
-                ->with('error', 'Terjadi kesalahan saat menghapus outlet: ' . $e->getMessage());
+                ->with('success', "Semua {$outletCount} outlet berhasil dihapus.");
+        } catch (\Exception $e) {
+            // Log error
+            \Log::error('Error dalam deleteAll outlet: ' . $e->getMessage());
+
+            // Rollback transaction if still active
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            return redirect()->route('outlets.index')
+                ->with('error', 'Kesalahan menghapus outlet: ' . $e->getMessage());
         }
     }
 }

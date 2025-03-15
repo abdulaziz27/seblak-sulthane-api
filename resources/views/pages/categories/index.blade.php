@@ -12,7 +12,7 @@
         <section class="section">
             <div class="section-header">
                 <h1>Kategori</h1>
-                <div class="section-header-button">
+                <div class="section-header-button d-none d-md-flex">
                     <a href="{{ route('categories.create') }}" class="btn btn-primary">Tambah Baru</a>
                     <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
                         Import Excel
@@ -30,6 +30,25 @@
             </div>
 
             <div class="section-body">
+                <!-- Responsive action buttons for small screens -->
+                <div class="d-flex d-md-none mb-4 flex-wrap justify-content-center">
+                    <a href="{{ route('categories.create') }}" class="btn btn-primary m-1">
+                        <i class="fas fa-plus mr-1"></i> Tambah
+                    </a>
+                    <button type="button" class="btn btn-success m-1" data-toggle="modal" data-target="#importModal">
+                        <i class="fas fa-file-import mr-1"></i> Import
+                    </button>
+                    <a href="{{ route('categories.export') }}" class="btn btn-info m-1">
+                        <i class="fas fa-file-export mr-1"></i> Export
+                    </a>
+                    <button type="button" class="btn btn-warning m-1" data-toggle="modal" data-target="#bulkUpdateModal">
+                        <i class="fas fa-sync-alt mr-1"></i> Update
+                    </button>
+                    <button type="button" class="btn btn-danger m-1" data-toggle="modal" data-target="#deleteAllModal">
+                        <i class="fas fa-trash mr-1"></i> Hapus
+                    </button>
+                </div>
+
                 @include('layouts.alert')
 
                 <div class="row mt-4">
@@ -53,12 +72,14 @@
                                     <table class="table-striped table">
                                         <tr>
                                             <th>Nama</th>
+                                            <th>Deskripsi</th>
                                             <th>Dibuat Pada</th>
                                             <th>Aksi</th>
                                         </tr>
                                         @foreach ($categories as $category)
                                             <tr>
                                                 <td>{{ $category->name }}</td>
+                                                <td>{{ $category->description ?? '-' }}</td>
                                                 <td>{{ $category->created_at }}</td>
                                                 <td>
                                                     <div class="d-flex justify-content-center">
@@ -203,4 +224,58 @@
 
     <!-- Page Specific JS File -->
     <script src="{{ asset('js/page/features-posts.js') }}"></script>
+
+    <script>
+        // Add mobile-specific styles
+        $(document).ready(function() {
+            // On smaller screens, adjust button sizing
+            if (window.innerWidth < 768) {
+                $('.d-flex.d-md-none .btn').addClass('btn-sm');
+            }
+        });
+
+        // Confirm delete functionality
+        $('.confirm-delete').click(function(e) {
+            var form = $(this).closest('form');
+            e.preventDefault();
+
+            swal({
+                title: 'Apakah Anda yakin?',
+                text: 'Tindakan ini tidak dapat dibatalkan',
+                icon: 'warning',
+                buttons: true,
+                dangerMode: true,
+            })
+            .then((willDelete) => {
+                if (willDelete) {
+                    form.submit();
+                }
+            });
+        });
+    </script>
+@endpush
+
+@push('style')
+    <style>
+        /* Responsive button styles */
+        @media (max-width: 767.98px) {
+            .d-flex.d-md-none .btn {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.9rem;
+            }
+
+            .table-responsive {
+                overflow-x: auto;
+            }
+
+            /* Ensure text doesn't overflow on small screens */
+            .btn i + span {
+                max-width: 100px;
+                display: inline-block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+    </style>
 @endpush

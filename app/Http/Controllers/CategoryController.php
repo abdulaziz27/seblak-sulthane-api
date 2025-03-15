@@ -73,12 +73,7 @@ class CategoryController extends Controller
     {
         $category = Category::findOrFail($id);
 
-        // Check if the category has associated products
-        if ($category->products()->exists()) {
-            return redirect()->route('categories.index')
-                ->with('warning', 'Kategori ini memiliki produk yang masih aktif. Harap atur ulang atau hapus produk tersebut terlebih dahulu.');
-        }
-
+        // Dengan soft delete, kita tidak perlu mengkhawatirkan produk terkait
         $category->delete();
 
         return redirect()->route('categories.index')
@@ -849,26 +844,8 @@ class CategoryController extends Controller
         try {
             DB::beginTransaction();
 
-            // Log start of operation
             \Log::info('Memulai proses penghapusan semua kategori');
 
-            // Check if any categories have associated products
-            $categoriesWithProducts = Category::whereHas('products')->get();
-
-            if ($categoriesWithProducts->isNotEmpty()) {
-                // Prepare detailed information about categories with products
-                $categoryInfo = $categoriesWithProducts->map(function ($category) {
-                    $productCount = $category->products()->count();
-                    return "{$category->name} (ID: {$category->id}, Produk: {$productCount})";
-                })->join(', ');
-
-                // Roll back and return message
-                DB::rollBack();
-                return redirect()->route('categories.index')
-                    ->with('warning', "Tidak dapat menghapus semua kategori. Kategori berikut masih memiliki produk terkait: {$categoryInfo}. Harap atur ulang atau hapus produk tersebut terlebih dahulu.");
-            }
-
-            // Track how many categories will be deleted
             $categoryCount = Category::count();
 
             if ($categoryCount === 0) {
@@ -877,34 +854,21 @@ class CategoryController extends Controller
                     ->with('info', 'Tidak ada kategori yang ditemukan untuk dihapus.');
             }
 
-            // Disable foreign key checks
-            DB::statement('SET FOREIGN_KEY_CHECKS=0');
-
-            // Delete all categories
+            // Soft delete semua kategori
             Category::query()->delete();
 
-            // Re-enable foreign key checks
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
-
-            // Commit the transaction
             DB::commit();
 
-            // Log successful deletion
             \Log::info("Berhasil menghapus semua {$categoryCount} kategori");
 
             return redirect()->route('categories.index')
                 ->with('success', "Semua {$categoryCount} kategori telah berhasil dihapus.");
         } catch (\Exception $e) {
-            // Log error
             \Log::error('Error dalam penghapusan kategori: ' . $e->getMessage());
 
-            // Rollback transaction if still active
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
-
-            // Make sure foreign key checks are re-enabled
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
             return redirect()->route('categories.index')
                 ->with('error', 'Terjadi kesalahan saat menghapus kategori: ' . $e->getMessage());

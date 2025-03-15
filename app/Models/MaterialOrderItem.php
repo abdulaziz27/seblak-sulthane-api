@@ -30,7 +30,7 @@ class MaterialOrderItem extends Model
      */
     public function rawMaterial()
     {
-        return $this->belongsTo(RawMaterial::class);
+        return $this->belongsTo(RawMaterial::class)->withTrashed();
     }
 
     /**

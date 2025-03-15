@@ -12,6 +12,8 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
+use Illuminate\Support\Facades\Log;
+use App\Models\OrderItem;
 
 class ProductController extends Controller
 {
@@ -124,22 +126,30 @@ class ProductController extends Controller
 
             $product = Product::findOrFail($id);
 
-            // Hapus gambar jika ada
+            // Hapus gambar produk jika ada (opsional)
             if (!empty($product->image)) {
                 $imagePath = public_path($product->image);
                 if (file_exists($imagePath)) {
-                    unlink($imagePath);
+                    try {
+                        unlink($imagePath);
+                    } catch (\Exception $e) {
+                        \Log::warning("Gagal menghapus gambar produk: " . $e->getMessage());
+                    }
                 }
             }
 
-            // Hapus data produk
+            // Soft delete produk
             $product->delete();
 
             DB::commit();
-            return redirect()->route('products.index')->with('success', 'Produk berhasil dihapus');
+            return redirect()->route('products.index')
+                ->with('success', "Produk '{$product->name}' berhasil diarsipkan.");
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->route('products.index')->with('error', 'Gagal menghapus produk: ' . $e->getMessage());
+            \Log::error('Gagal menghapus produk: ' . $e->getMessage());
+
+            return redirect()->route('products.index')
+                ->with('error', "Gagal menghapus produk: {$e->getMessage()}");
         }
     }
 
@@ -1012,58 +1022,39 @@ class ProductController extends Controller
 
     public function deleteAll()
     {
-        \Log::info('deleteAll method called');
-
         try {
-            // Mulai transaksi
             DB::beginTransaction();
-            \Log::info('Starting delete all process');
 
-            // Hapus gambar terlebih dahulu
-            $products = Product::whereNotNull('image')->get();
+            $totalProducts = Product::count();
+
+            // Lakukan soft delete dengan mengupdate deleted_at
+            $deletedCount = Product::query()->update(['deleted_at' => now()]);
+
+            // Hapus gambar produk (opsional)
+            $products = Product::withTrashed()->whereNotNull('image')->get();
             foreach ($products as $product) {
                 if ($product->image) {
                     $imagePath = public_path($product->image);
                     if (file_exists($imagePath)) {
-                        unlink($imagePath);
+                        try {
+                            unlink($imagePath);
+                        } catch (\Exception $e) {
+                            \Log::warning("Gagal menghapus gambar: " . $e->getMessage());
+                        }
                     }
                 }
             }
 
-            // Get count for reporting
-            $productCount = Product::count();
-
-            // Nonaktifkan foreign key checks
-            DB::statement('SET FOREIGN_KEY_CHECKS=0');
-
-            // Hapus semua produk
-            Product::query()->delete();
-
-            // Aktifkan kembali foreign key checks
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
-
-            // Commit transaksi
             DB::commit();
-            \Log::info("Successfully deleted all {$productCount} products");
 
-            return redirect()
-                ->route('products.index')
-                ->with('success', "Semua {$productCount} produk telah berhasil dihapus");
+            return redirect()->route('products.index')
+                ->with('success', "Berhasil mengarsipkan {$deletedCount} dari {$totalProducts} produk.");
         } catch (\Exception $e) {
-            // Log error
-            \Log::error('Error in deleteAll: ' . $e->getMessage());
+            DB::rollBack();
+            \Log::error('Gagal mengarsipkan produk: ' . $e->getMessage());
 
-            // Rollback hanya jika transaksi masih aktif
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
-            }
-
-            // Pastikan foreign key checks diaktifkan kembali
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
-
-            return redirect()
-                ->route('products.index')
-                ->with('error', 'Gagal menghapus produk: ' . $e->getMessage());
+            return redirect()->route('products.index')
+                ->with('error', "Gagal mengarsipkan produk: " . $e->getMessage());
         }
     }
 }

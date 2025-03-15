@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
 
 class RawMaterial extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -17,6 +19,8 @@ class RawMaterial extends Model
         'description',
         'is_active'
     ];
+
+    protected $dates = ['deleted_at'];
 
     /**
      * Get the material order items for the raw material.

@@ -30,7 +30,7 @@ class MaterialOrder extends Model
      */
     public function franchise()
     {
-        return $this->belongsTo(Outlet::class, 'franchise_id');
+        return $this->belongsTo(Outlet::class, 'franchise_id')->withTrashed();
     }
 
     /**
@@ -38,7 +38,7 @@ class MaterialOrder extends Model
      */
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withTrashed();
     }
 
     /**

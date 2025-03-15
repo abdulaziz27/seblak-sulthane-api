@@ -56,6 +56,21 @@ Route::middleware(['auth'])->group(function () {
     Route::get('outlets', [OutletController::class, 'index'])->name('outlets.index');
     Route::get('discounts', [DiscountController::class, 'index'])->name('discounts.index');
 
+    // Owner only routes
+    Route::middleware('owner-only')->group(function () {
+        Route::delete('products/delete-all', [ProductController::class, 'deleteAll'])->name('products.deleteAll');
+        Route::delete('categories/delete-all', [CategoryController::class, 'deleteAll'])->name('categories.deleteAll');
+        Route::delete('outlets/delete-all', [OutletController::class, 'deleteAll'])->name('outlets.deleteAll');
+
+        Route::resource('outlets', OutletController::class)->except(['index', 'show']);
+        Route::post('outlets/import', [OutletController::class, 'import'])->name('outlets.import');
+        Route::get('outlets/template', [OutletController::class, 'template'])->name('outlets.template');
+        Route::get('outlets/export', [OutletController::class, 'export'])->name('outlets.export');
+        Route::get('outlets/export-update', [OutletController::class, 'exportForUpdate'])->name('outlets.exportForUpdate');
+        Route::post('outlets/bulk-update', [OutletController::class, 'bulkUpdate'])->name('outlets.bulkUpdate');
+    });
+
+
     // Routes for admin and owner only
     Route::middleware('prevent-staff')->group(function () {
         Route::resource('users', UserController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
@@ -70,20 +85,6 @@ Route::middleware(['auth'])->group(function () {
         Route::post('categories/bulk-update', [CategoryController::class, 'bulkUpdate'])->name('categories.bulkUpdate');
     });
 
-    // Owner only routes
-    Route::middleware('owner-only')->group(function () {
-        Route::resource('outlets', OutletController::class)->except(['index', 'show']);
-        Route::post('outlets/import', [OutletController::class, 'import'])->name('outlets.import');
-        Route::get('outlets/template', [OutletController::class, 'template'])->name('outlets.template');
-        Route::get('outlets/export', [OutletController::class, 'export'])->name('outlets.export');
-        Route::get('outlets/export-update', [OutletController::class, 'exportForUpdate'])->name('outlets.exportForUpdate');
-        Route::post('outlets/bulk-update', [OutletController::class, 'bulkUpdate'])->name('outlets.bulkUpdate');
-        Route::delete('outlets/delete-all', [OutletController::class, 'deleteAll'])->name('outlets.deleteAll');
-
-        Route::delete('products/delete-all', [ProductController::class, 'deleteAll'])->name('products.deleteAll');
-        Route::delete('categories/delete-all', [CategoryController::class, 'deleteAll'])->name('categories.deleteAll');
-    });
-
     // Export routes (accessible by all)
     Route::get('products/template', [ProductController::class, 'template'])->name('products.template');
     Route::get('products/export', [ProductController::class, 'export'])->name('products.export');
@@ -94,11 +95,14 @@ Route::middleware(['auth'])->group(function () {
 
 
     // Raw Materials routes
+    Route::delete('raw-materials/delete-all', [RawMaterialController::class, 'deleteAll'])->name('raw-materials.deleteAll');
     Route::resource('raw-materials', RawMaterialController::class)->except(['show']);
     Route::post('raw-materials/update-stock/{rawMaterial}', [RawMaterialController::class, 'updateStock'])->name('raw-materials.update-stock');
     Route::post('raw-materials/import', [RawMaterialController::class, 'import'])->name('raw-materials.import');
     Route::get('raw-materials/export', [RawMaterialController::class, 'export'])->name('raw-materials.export');
     Route::get('raw-materials/template', [RawMaterialController::class, 'template'])->name('raw-materials.template');
+    Route::get('raw-materials/export-for-update', [RawMaterialController::class, 'exportForUpdate'])->name('raw-materials.exportForUpdate');
+    Route::post('raw-materials/bulk-update', [RawMaterialController::class, 'bulkUpdate'])->name('raw-materials.bulkUpdate');
 
     // Material Orders routes
     Route::resource('material-orders', MaterialOrderController::class)->except(['destroy']);

@@ -87,7 +87,9 @@
                                 <select name="outlet_id" class="form-control @error('outlet_id') is-invalid @enderror"
                                     {{ Auth::user()->role === 'admin' && (!isset($user) || $user->id !== Auth::id()) ? 'disabled' : '' }}>
                                     <option value="" disabled selected>Pilih Outlet</option>
-                                    <option value="null">None (Tidak Ada)</option>
+                                    @if (Auth::user()->role === 'owner')
+                                        <option value="">None (Tidak Ada)</option>
+                                    @endif
                                     @foreach ($outlets as $outlet)
                                         <option value="{{ $outlet->id }}"
                                             {{ (isset($user) && $user->outlet_id === $outlet->id) ||
