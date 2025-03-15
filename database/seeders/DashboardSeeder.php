@@ -356,15 +356,22 @@ class DashboardSeeder extends Seeder
                     // Complete the order data
                     $order['sub_total'] = $subtotal;
                     $order['tax'] = $tax;
-                    $order['discount'] = 0; // Legacy field, kept for compatibility
+                    $order['discount'] = 0;
                     $order['discount_amount'] = $discountAmount;
                     $order['service_charge'] = $serviceCharge;
                     $order['total'] = $total;
                     $order['payment_amount'] = $total;
                     $order['total_item'] = $totalItems;
+                    $order['qris_fee'] = 0;
 
                     // Create the order
                     $createdOrder = Order::create($order);
+
+                    if ($order['payment_method'] === 'qris') {
+                        $qris_fee = $total * 0.003; // 0.3% of total
+                        $createdOrder->qris_fee = $qris_fee;
+                        $createdOrder->save();
+                    }
 
                     // Create the order items
                     foreach ($orderItems as $item) {

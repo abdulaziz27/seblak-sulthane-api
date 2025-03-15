@@ -52,7 +52,15 @@ class OrderController extends Controller
             'transaction_time' => $request->transaction_time,
             'outlet_id' => $outletId,
             'order_type' => $request->order_type,
+            'qris_fee' => 0, // Default value for qris_fee
         ]);
+
+        // Calculate QRIS fee if payment method is QRIS
+        if ($request->payment_method === 'qris') {
+            $qris_fee = $request->total * 0.003; // 0.3% dari total transaksi
+            $order->qris_fee = $qris_fee;
+            $order->save(); // Simpan perubahan
+        }
 
         // Load the outlet relationship
         $savedOrder = Order::with('outlet')->findOrFail($order->id);
@@ -120,6 +128,12 @@ class OrderController extends Controller
         $totalServiceCharge = $query->sum('service_charge');
         $totalSubtotal = $query->sum('sub_total');
 
+        // Calculate total QRIS fees using explicit casting to ensure correct summation
+        $totalQrisFee = (clone $query)
+            ->where('payment_method', 'qris')
+            ->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as total_fee')
+            ->first()->total_fee;
+
         // Get daily cash data for the period
         $dailyCashQuery = DailyCash::query();
 
@@ -141,12 +155,13 @@ class OrderController extends Controller
         $totalOpeningBalance = $dailyCashData->sum('opening_balance');
         $totalExpenses = $dailyCashData->sum('expenses');
 
-        // Payment method breakdown
+        // Payment method breakdown with improved QRIS fee calculation
         $paymentMethods = clone $query;
         $paymentMethodSummary = $paymentMethods->select(
             'payment_method',
             DB::raw('COUNT(*) as count'),
-            DB::raw('SUM(total) as total_amount')
+            DB::raw('SUM(total) as total_amount'),
+            DB::raw('CASE WHEN payment_method = "qris" THEN COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) ELSE 0 END as qris_fees')
         )
             ->groupBy('payment_method')
             ->get();
@@ -156,7 +171,8 @@ class OrderController extends Controller
         foreach ($paymentMethodSummary as $method) {
             $paymentMethodData[$method->payment_method] = [
                 'count' => $method->count,
-                'total' => $method->total_amount
+                'total' => $method->total_amount,
+                'qris_fees' => $method->qris_fees
             ];
         }
 
@@ -185,7 +201,7 @@ class OrderController extends Controller
         $beverageSales = $beverageQuery->sum(DB::raw('order_items.quantity * order_items.price'));
 
         // Calculate closing balance
-        $closingBalance = $totalOpeningBalance + $cashSales + $qrisSales - $totalExpenses;
+        $closingBalance = $totalOpeningBalance + $cashSales + $qrisSales - $totalExpenses - $totalQrisFee;
 
         // Prepare daily breakdown data if date range is provided
         $dailyBreakdown = [];
@@ -202,6 +218,12 @@ class OrderController extends Controller
                     return $q->where('outlet_id', $outletId);
                 })->whereDate('created_at', $currentDateStr);
 
+                // Get daily QRIS fee with explicit casting
+                $dailyQrisFee = (clone $baseDailyOrders)
+                    ->where('payment_method', 'qris')
+                    ->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as daily_fee')
+                    ->first()->daily_fee;
+
                 // Ambil semua record DailyCash untuk hari ini (bisa lebih dari satu record jika semua outlet)
                 $dailyCashRecords = DailyCash::when($outletId, function ($q) use ($outletId) {
                     return $q->where('outlet_id', $outletId);
@@ -217,7 +239,7 @@ class OrderController extends Controller
 
                 // Hitung total dan closing balance harian
                 $totalSales = $dailyCashSales + $dailyQrisSales;
-                $dailyClosingBalance = $dailyOpeningBalance + $totalSales - $dailyExpenses;
+                $dailyClosingBalance = $dailyOpeningBalance + $totalSales - $dailyExpenses - $dailyQrisFee;
 
                 $dailyBreakdown[] = [
                     'date' => $currentDateStr,
@@ -225,6 +247,7 @@ class OrderController extends Controller
                     'expenses' => $dailyExpenses,
                     'cash_sales' => $dailyCashSales,
                     'qris_sales' => $dailyQrisSales,
+                    'qris_fee' => $dailyQrisFee,
                     'total_sales' => $totalSales,
                     'closing_balance' => $dailyClosingBalance
                 ];
@@ -248,6 +271,7 @@ class OrderController extends Controller
                 'expenses' => $totalExpenses,
                 'cash_sales' => $cashSales,
                 'qris_sales' => $qrisSales,
+                'qris_fee' => $totalQrisFee,
                 'beverage_sales' => $beverageSales,
                 'closing_balance' => $closingBalance,
 
