@@ -40,22 +40,62 @@ class ReportController extends Controller
     }
 
     /**
-     * Generate Sales Summary Report
+     * Generate Enhanced Sales Summary Report
      */
     public function salesSummary(Request $request)
     {
-        // Validate request
-        $request->validate([
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'outlet_id' => 'nullable|exists:outlets,id',
-            'format' => 'required|in:pdf,excel',
+        \Log::info('Sales Summary Request Parameters', [
+            'all_params' => $request->all(),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+            'period_type' => $request->input('period_type'),
+            'outlet_id' => $request->input('outlet_id'),
         ]);
+
+        if ($request->has('date_range') && strpos($request->date_range, ' - ') !== false) {
+            $dates = explode(' - ', $request->date_range);
+            if (count($dates) === 2) {
+                $request->merge([
+                    'start_date' => $dates[0],
+                    'end_date' => $dates[1],
+                ]);
+
+                \Log::info('Override dates from date_range: ' . $request->date_range, [
+                    'new_start_date' => $dates[0],
+                    'new_end_date' => $dates[1],
+                ]);
+            }
+        }
+
+        // Validasi request dengan pesan error spesifik
+        $request->validate(
+            [
+                'start_date' => 'required|date',
+                'end_date' => 'required|date|after_or_equal:start_date',
+                'outlet_id' => 'nullable|exists:outlets,id',
+                'format' => 'required|in:pdf,excel',
+                'period_type' => 'required|in:daily,weekly,monthly',
+            ],
+            [
+                'start_date.required' => 'Tanggal awal diperlukan',
+                'end_date.required' => 'Tanggal akhir diperlukan',
+                'end_date.after_or_equal' => 'Tanggal akhir harus setelah atau sama dengan tanggal awal',
+                'period_type.required' => 'Tipe periode diperlukan',
+            ],
+        );
 
         $startDate = Carbon::parse($request->start_date)->startOfDay();
         $endDate = Carbon::parse($request->end_date)->endOfDay();
         $outletId = $request->outlet_id;
-        $periodType = $request->input('period_type', 'daily'); // Default ke daily
+        $periodType = $request->period_type;
+
+        // Log untuk debugging
+        \Log::info('Laporan dengan parameter', [
+            'start_date' => $startDate->format('Y-m-d'),
+            'end_date' => $endDate->format('Y-m-d'),
+            'period_type' => $periodType,
+            'outlet_id' => $outletId,
+        ]);
 
         // Base query untuk orders
         $query = Order::whereBetween('created_at', [$startDate, $endDate]);
@@ -64,18 +104,15 @@ class ReportController extends Controller
         }
 
         // Data penjualan
-        $totalRevenue = $query->sum('total'); // Hasil penjualan bersih (sudah termasuk pajak dan dikurangi diskon)
-        $totalOrders = $query->count(); // Jumlah transaksi
-        $totalSubTotal = $query->sum('sub_total'); // Penjualan kotor sebelum pajak dan diskon
-        $totalTax = $query->sum('tax'); // Total pajak
-        $totalDiscountAmount = $query->sum('discount_amount'); // Total diskon nominal
-        $avgOrderValue = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0; // Rata-rata nilai transaksi
+        $totalRevenue = $query->sum('total');
+        $totalOrders = $query->count();
+        $totalSubTotal = $query->sum('sub_total');
+        $totalTax = $query->sum('tax');
+        $totalDiscountAmount = $query->sum('discount_amount');
+        $avgOrderValue = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
 
         // Perbaikan perhitungan QRIS fee dengan CAST eksplisit
-        $totalQrisFee = (clone $query)
-            ->where('payment_method', 'qris')
-            ->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as total_fee')
-            ->first()->total_fee;
+        $totalQrisFee = (clone $query)->where('payment_method', 'qris')->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as total_fee')->first()->total_fee ?? 0;
 
         // Data untuk beverage (minuman) - Asumsikan category_id 2 adalah minuman
         $beverageSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -93,12 +130,7 @@ class ReportController extends Controller
             ->when($outletId, function ($query) use ($outletId) {
                 return $query->where('outlet_id', $outletId);
             })
-            ->select(
-                'payment_method',
-                DB::raw('COUNT(*) as count'),
-                DB::raw('SUM(total) as total_amount'),
-                DB::raw('CASE WHEN payment_method = "qris" THEN COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) ELSE 0 END as qris_fees')
-            )
+            ->select('payment_method', DB::raw('COUNT(*) as count'), DB::raw('SUM(total) as total_amount'), DB::raw('CASE WHEN payment_method = "qris" THEN COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) ELSE 0 END as qris_fees'))
             ->groupBy('payment_method')
             ->get();
 
@@ -146,90 +178,197 @@ class ReportController extends Controller
             $dailyCashByDate[$dailyCash->date->format('Y-m-d')] = $dailyCash;
         }
 
-        // Generate rentang tanggal
-        $currentDate = clone $startDate;
-        while ($currentDate <= $endDate) {
-            $currentDateStr = $currentDate->format('Y-m-d');
+        // Data penjualan berdasarkan tipe periode
+        $salesData = [];
 
-            // Query orders harian
-            $dailyOrdersQuery = Order::whereDate('created_at', $currentDateStr);
-            if ($outletId) {
-                $dailyOrdersQuery->where('outlet_id', $outletId);
+        if ($periodType === 'daily') {
+            // Generate rentang tanggal untuk tipe periode harian
+            $currentDate = clone $startDate;
+            while ($currentDate <= $endDate) {
+                $currentDateStr = $currentDate->format('Y-m-d');
+
+                // Query orders harian
+                $dailyOrdersQuery = Order::whereDate('created_at', $currentDateStr);
+                if ($outletId) {
+                    $dailyOrdersQuery->where('outlet_id', $outletId);
+                }
+
+                // Hitung data penjualan harian
+                $dailyRevenue = $dailyOrdersQuery->sum('total');
+                $dailyOrders = $dailyOrdersQuery->count();
+                $dailySubTotal = $dailyOrdersQuery->sum('sub_total');
+                $dailyTax = $dailyOrdersQuery->sum('tax');
+                $dailyDiscountAmount = $dailyOrdersQuery->sum('discount_amount');
+
+                // Perbaikan perhitungan QRIS fee harian
+                $dailyQrisFee = (clone $dailyOrdersQuery)->where('payment_method', 'qris')->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as daily_fee')->first()->daily_fee ?? 0;
+
+                // Data harian metode pembayaran
+                $dailyPaymentMethods = (clone $dailyOrdersQuery)->select('payment_method', DB::raw('SUM(total) as total_amount'))->groupBy('payment_method')->get();
+
+                $dailyCashSales = 0;
+                $dailyQrisSales = 0;
+
+                foreach ($dailyPaymentMethods as $method) {
+                    $method_key = strtolower(trim($method->payment_method));
+                    if (in_array($method_key, ['cash', 'tunai'])) {
+                        $dailyCashSales += $method->total_amount;
+                    } elseif (in_array($method_key, ['qris', 'qriss'])) {
+                        $dailyQrisSales += $method->total_amount;
+                    }
+                }
+
+                // Data DailyCash harian - ambil dari array yang telah dibuat
+                $dailyCashRecord = $dailyCashByDate[$currentDateStr] ?? null;
+                $dailyOpeningBalance = $dailyCashRecord ? $dailyCashRecord->opening_balance : 0;
+                $dailyExpenses = $dailyCashRecord ? $dailyCashRecord->expenses : 0;
+
+                // Hitung saldo akhir harian (kurangi dengan biaya QRIS)
+                $dailyClosingBalance = $dailyOpeningBalance + $dailyCashSales + $dailyQrisSales - $dailyExpenses - $dailyQrisFee;
+
+                // Data minuman harian
+                $dailyBeverageSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->whereDate('orders.created_at', $currentDateStr)
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', 2) // ID kategori minuman
+                    ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+                // Tambahkan ke array data harian
+                $dailyData[] = [
+                    'date' => $currentDateStr,
+                    'day_name' => $currentDate->locale('id')->isoFormat('dddd'),
+                    'revenue' => $dailyRevenue,
+                    'sub_total' => $dailySubTotal,
+                    'tax' => $dailyTax,
+                    'discount_amount' => $dailyDiscountAmount,
+                    'beverage_sales' => $dailyBeverageSales,
+                    'qris_sales' => $dailyQrisSales,
+                    'qris_fee' => $dailyQrisFee,
+                    'cash_sales' => $dailyCashSales,
+                    'expenses' => $dailyExpenses,
+                    'opening_balance' => $dailyOpeningBalance,
+                    'closing_balance' => $dailyClosingBalance,
+                    'orders_count' => $dailyOrders,
+                ];
+
+                $currentDate->addDay();
             }
-
-            // Hitung data penjualan harian
-            $dailyRevenue = $dailyOrdersQuery->sum('total');
-            $dailyOrders = $dailyOrdersQuery->count();
-            $dailySubTotal = $dailyOrdersQuery->sum('sub_total');
-            $dailyTax = $dailyOrdersQuery->sum('tax');
-            $dailyDiscountAmount = $dailyOrdersQuery->sum('discount_amount');
-
-            // Perbaikan perhitungan QRIS fee harian
-            $dailyQrisFee = (clone $dailyOrdersQuery)
-                ->where('payment_method', 'qris')
-                ->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as daily_fee')
-                ->first()->daily_fee;
-
-            // Data harian metode pembayaran
-            $dailyPaymentMethods = (clone $dailyOrdersQuery)
-                ->select('payment_method', DB::raw('SUM(total) as total_amount'))
-                ->groupBy('payment_method')
+        } elseif ($periodType === 'weekly') {
+            // Query untuk data mingguan yang diperbaiki
+            $salesData = Order::select(DB::raw("CONCAT(YEAR(created_at), '-', WEEK(created_at)) as period_key"), DB::raw("CONCAT(DATE_FORMAT(MIN(created_at), '%d/%m/%Y'), ' - ', DATE_FORMAT(MAX(created_at), '%d/%m/%Y')) as period_label"), DB::raw('COUNT(*) as order_count'), DB::raw('SUM(total) as total_sales'), DB::raw('SUM(sub_total) as sub_total'), DB::raw('SUM(tax) as tax'), DB::raw('SUM(discount_amount) as discount_amount'), DB::raw('SUM(CASE WHEN payment_method = "qris" THEN CAST(qris_fee AS DECIMAL(10,2)) ELSE 0 END) as qris_fee'))
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->when($outletId, function ($query) use ($outletId) {
+                    return $query->where('outlet_id', $outletId);
+                })
+                ->groupBy(DB::raw("CONCAT(YEAR(created_at), '-', WEEK(created_at))"))
+                ->orderBy(DB::raw('MIN(created_at)'))
                 ->get();
 
-            $dailyCashSales = 0;
-            $dailyQrisSales = 0;
+            // Get payment data per week
+            foreach ($salesData as $weekData) {
+                list($year, $week) = explode('-', $weekData->period_key);
 
-            foreach ($dailyPaymentMethods as $method) {
-                $method_key = strtolower(trim($method->payment_method));
-                if (in_array($method_key, ['cash', 'tunai'])) {
-                    $dailyCashSales += $method->total_amount;
-                } elseif (in_array($method_key, ['qris', 'qriss'])) {
-                    $dailyQrisSales += $method->total_amount;
+                $weekPayments = Order::select('payment_method', DB::raw('SUM(total) as total_amount'))
+                    ->whereRaw('YEAR(created_at) = ?', [$year])
+                    ->whereRaw('WEEK(created_at) = ?', [$week])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('outlet_id', $outletId);
+                    })
+                    ->groupBy('payment_method')
+                    ->get();
+
+                $weekCashSales = 0;
+                $weekQrisSales = 0;
+
+                foreach ($weekPayments as $method) {
+                    $method_key = strtolower(trim($method->payment_method));
+                    if (in_array($method_key, ['cash', 'tunai'])) {
+                        $weekCashSales += $method->total_amount;
+                    } elseif (in_array($method_key, ['qris', 'qriss'])) {
+                        $weekQrisSales += $method->total_amount;
+                    }
                 }
+
+                $weekData->cash_sales = $weekCashSales;
+                $weekData->qris_sales = $weekQrisSales;
+
+                // Get beverage sales for this week
+                $weekData->beverage_sales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->whereRaw('YEAR(orders.created_at) = ?', [$year])
+                    ->whereRaw('WEEK(orders.created_at) = ?', [$week])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', 2) // ID kategori minuman
+                    ->sum(DB::raw('order_items.quantity * order_items.price'));
             }
-
-            // Data DailyCash harian - ambil dari array yang telah dibuat
-            $dailyCashRecord = $dailyCashByDate[$currentDateStr] ?? null;
-            $dailyOpeningBalance = $dailyCashRecord ? $dailyCashRecord->opening_balance : 0;
-            $dailyExpenses = $dailyCashRecord ? $dailyCashRecord->expenses : 0;
-
-            // Hitung saldo akhir harian (kurangi dengan biaya QRIS)
-            $dailyClosingBalance = $dailyOpeningBalance + $dailyCashSales + $dailyQrisSales - $dailyExpenses - $dailyQrisFee;
-
-            // Data minuman harian
-            $dailyBeverageSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
-                ->join('products', 'products.id', '=', 'order_items.product_id')
-                ->join('categories', 'categories.id', '=', 'products.category_id')
-                ->whereDate('orders.created_at', $currentDateStr)
+        } elseif ($periodType === 'monthly') {
+            // Query untuk data bulanan yang diperbaiki
+            $salesData = Order::select(DB::raw("DATE_FORMAT(created_at, '%Y-%m') as period_key"), DB::raw("DATE_FORMAT(MIN(created_at), '%M %Y') as period_label"), DB::raw('COUNT(*) as order_count'), DB::raw('SUM(total) as total_sales'), DB::raw('SUM(sub_total) as sub_total'), DB::raw('SUM(tax) as tax'), DB::raw('SUM(discount_amount) as discount_amount'), DB::raw('SUM(CASE WHEN payment_method = "qris" THEN CAST(qris_fee AS DECIMAL(10,2)) ELSE 0 END) as qris_fee'))
+                ->whereBetween('created_at', [$startDate, $endDate])
                 ->when($outletId, function ($query) use ($outletId) {
-                    return $query->where('orders.outlet_id', $outletId);
+                    return $query->where('outlet_id', $outletId);
                 })
-                ->where('categories.id', 2) // ID kategori minuman
-                ->sum(DB::raw('order_items.quantity * order_items.price'));
+                ->groupBy(DB::raw("DATE_FORMAT(created_at, '%Y-%m')"))
+                ->orderBy('period_key')
+                ->get();
 
-            // Tambahkan ke array data harian
-            $dailyData[] = [
-                'date' => $currentDateStr,
-                'day_name' => $currentDate->translatedFormat('l'),
-                'revenue' => $dailyRevenue,
-                'sub_total' => $dailySubTotal,
-                'tax' => $dailyTax,
-                'discount_amount' => $dailyDiscountAmount,
-                'beverage_sales' => $dailyBeverageSales,
-                'qris_sales' => $dailyQrisSales,
-                'qris_fee' => $dailyQrisFee,
-                'cash_sales' => $dailyCashSales,
-                'expenses' => $dailyExpenses,
-                'opening_balance' => $dailyOpeningBalance,
-                'closing_balance' => $dailyClosingBalance,
-                'orders_count' => $dailyOrders,
-            ];
+            // Get payment data per month
+            foreach ($salesData as $monthData) {
+                list($year, $month) = explode('-', $monthData->period_key);
 
-            $currentDate->addDay();
+                $monthPayments = Order::select('payment_method', DB::raw('SUM(total) as total_amount'))
+                    ->whereRaw('YEAR(created_at) = ?', [$year])
+                    ->whereRaw('MONTH(created_at) = ?', [$month])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('outlet_id', $outletId);
+                    })
+                    ->groupBy('payment_method')
+                    ->get();
+
+                $monthCashSales = 0;
+                $monthQrisSales = 0;
+
+                foreach ($monthPayments as $method) {
+                    $method_key = strtolower(trim($method->payment_method));
+                    if (in_array($method_key, ['cash', 'tunai'])) {
+                        $monthCashSales += $method->total_amount;
+                    } elseif (in_array($method_key, ['qris', 'qriss'])) {
+                        $monthQrisSales += $method->total_amount;
+                    }
+                }
+
+                $monthData->cash_sales = $monthCashSales;
+                $monthData->qris_sales = $monthQrisSales;
+
+                // Get beverage sales for this month
+                $monthData->beverage_sales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->whereRaw('YEAR(orders.created_at) = ?', [$year])
+                    ->whereRaw('MONTH(orders.created_at) = ?', [$month])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', 2) // ID kategori minuman
+                    ->sum(DB::raw('order_items.quantity * order_items.price'));
+            }
         }
 
-        // Format judul laporan
-        $title = 'Laporan Ringkasan Penjualan';
+        // Format judul laporan berdasarkan tipe periode
+        $periodTypeLabels = [
+            'daily' => 'Harian',
+            'weekly' => 'Mingguan',
+            'monthly' => 'Bulanan',
+        ];
+
+        $title = 'Laporan Ringkasan Penjualan ' . $periodTypeLabels[$periodType];
         $subtitle = 'Periode: ' . $startDate->translatedFormat('d M Y') . ' - ' . $endDate->translatedFormat('d M Y');
 
         if ($outletId) {
@@ -242,193 +381,523 @@ class ReportController extends Controller
         // Generate laporan berdasarkan format yang diminta
         if ($request->format === 'pdf') {
             // Create PDF with custom view data
-            $pdf = PDF::loadView('pages.reports.sales_summary_pdf', compact(
-                'title',
-                'subtitle',
-                'totalRevenue',
-                'totalOrders',
-                'totalSubTotal',
-                'totalTax',
-                'totalDiscountAmount',
-                'beverageSales',
-                'qrisSales',
-                'cashSales',
-                'totalOpeningBalance',
-                'totalExpenses',
-                'totalQrisFee',
-                'closingBalance',
-                'dailyData',
-                'startDate',
-                'endDate',
-                'periodType'
-            ));
+            $pdf = PDF::loadView('pages.reports.sales_summary_pdf', compact('title', 'subtitle', 'totalRevenue', 'totalOrders', 'totalSubTotal', 'totalTax', 'totalDiscountAmount', 'beverageSales', 'qrisSales', 'cashSales', 'totalOpeningBalance', 'totalExpenses', 'totalQrisFee', 'closingBalance', 'dailyData', 'salesData', 'periodType', 'startDate', 'endDate'));
 
             // Set orientation to landscape
             $pdf->setPaper('a4', 'landscape');
 
-            return $pdf->download('laporan_penjualan_' . $startDate->format('Y-m-d') . '_sampai_' . $endDate->format('Y-m-d') . '.pdf');
+            return $pdf->download('laporan_penjualan_' . $periodTypeLabels[$periodType] . '_' . $startDate->format('Y-m-d') . '_sampai_' . $endDate->format('Y-m-d') . '.pdf');
         } else {
-            // Buat spreadsheet Excel
+            // ========= ENHANCED EXCEL REPORT GENERATION (SINGLE SHEET) ==========
+
+            // Create a new spreadsheet
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
-            $sheet->setTitle('Ringkasan Penjualan');
+            $sheet->setTitle('Laporan Penjualan');
 
-            // Set metadata spreadsheet
-            $spreadsheet->getProperties()->setCreator('Seblak Sulthane')->setLastModifiedBy('Seblak Sulthane')->setTitle($title)->setSubject($subtitle)->setDescription('Laporan Ringkasan Penjualan Seblak Sulthane');
+            // Set document properties
+            $spreadsheet->getProperties()
+                ->setCreator('Seblak Sulthane')
+                ->setLastModifiedBy('Seblak Sulthane')
+                ->setTitle($title)
+                ->setSubject($subtitle)
+                ->setDescription('Laporan Ringkasan Penjualan Seblak Sulthane')
+                ->setKeywords('sales, report, seblak, sulthane')
+                ->setCategory('Financial Reports');
 
-            // Format header
-            $sheet->setCellValue('A1', $title);
-            $sheet->setCellValue('A2', $subtitle);
-            $sheet->mergeCells('A1:M1');
-            $sheet->mergeCells('A2:M2');
+            // Set the sheet to be scrollable from the beginning
+            $spreadsheet->getActiveSheet()->getPageSetup()->setFitToWidth(1);
+            $spreadsheet->getActiveSheet()->getPageSetup()->setFitToHeight(0);
 
-            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
-            $sheet->getStyle('A2')->getFont()->setSize(12);
+            // Critical settings to ensure full scrolling ability
+            $spreadsheet->getActiveSheet()->getSheetView()->setZoomScale(100);
+            $spreadsheet->getActiveSheet()->getSheetView()->setZoomScaleNormal(100);
 
-            // Section Ringkasan
-            $sheet->setCellValue('A4', 'RINGKASAN PERIODE');
-            $sheet->getStyle('A4')->getFont()->setBold(true);
-            $sheet->getStyle('A4:M4')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DDEBF7');
+            // Set the active cell to A1 to ensure we start at the top
+            $spreadsheet->getActiveSheet()->setSelectedCell('A1');
 
-            // Data ringkasan periode
-            $sheet->setCellValue('A5', 'Total Hasil Penjualan Bersih:');
-            $sheet->setCellValue('B5', $totalRevenue);
-            $sheet->getStyle('B5')->getNumberFormat()->setFormatCode('#,##0');
+            // Disable any potential split panes
+            $spreadsheet->getActiveSheet()->getPageSetup()->setHorizontalCentered(false);
+            $spreadsheet->getActiveSheet()->getPageSetup()->setVerticalCentered(false);
 
-            $sheet->setCellValue('A6', 'Total Penjualan Kotor:');
-            $sheet->setCellValue('B6', $totalSubTotal);
-            $sheet->getStyle('B6')->getNumberFormat()->setFormatCode('#,##0');
+            // Ensure view settings are normal
+            $spreadsheet->getActiveSheet()->getPageSetup()->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4);
+            $spreadsheet->getActiveSheet()->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
 
-            $sheet->setCellValue('A7', 'Total Discount:');
-            $sheet->setCellValue('B7', $totalDiscountAmount);
-            $sheet->getStyle('B7')->getNumberFormat()->setFormatCode('#,##0');
+            // Define commonly used styles
+            $headerStyle = [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '4472C4'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => 'BFBFBF'],
+                    ],
+                ],
+            ];
 
-            $sheet->setCellValue('A8', 'Total Pajak:');
-            $sheet->setCellValue('B8', $totalTax);
-            $sheet->getStyle('B8')->getNumberFormat()->setFormatCode('#,##0');
+            $sectionStyle = [
+                'font' => [
+                    'bold' => true,
+                    'size' => 12,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '4472C4'],
+                ],
+                'borders' => [
+                    'outline' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => '8EA9DB'],
+                    ],
+                ],
+            ];
 
-            $sheet->setCellValue('A9', 'Total Penjualan Beverage:');
-            $sheet->setCellValue('B9', $beverageSales);
-            $sheet->getStyle('B9')->getNumberFormat()->setFormatCode('#,##0');
+            $tableStyle = [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => 'BFBFBF'],
+                    ],
+                    'outline' => [
+                        'borderStyle' => Border::BORDER_MEDIUM,
+                        'color' => ['rgb' => '8EA9DB'],
+                    ],
+                ],
+            ];
 
-            $sheet->setCellValue('A10', 'Total Penjualan QRIS:');
-            $sheet->setCellValue('B10', $qrisSales);
-            $sheet->getStyle('B10')->getNumberFormat()->setFormatCode('#,##0');
+            $totalsStyle = [
+                'font' => [
+                    'bold' => true,
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'D9E1F2'],
+                ],
+            ];
 
-            $sheet->setCellValue('A11', 'Total Biaya Layanan QRIS (0.3%):');
-            $sheet->setCellValue('B11', $totalQrisFee);
-            $sheet->getStyle('B11')->getNumberFormat()->setFormatCode('#,##0');
+            // Add company header and title
+            $sheet->setCellValue('A1', 'SEBLAK SULTHANE');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(20)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_DARKRED));
 
-            $sheet->setCellValue('A12', 'Total Penjualan CASH:');
-            $sheet->setCellValue('B12', $cashSales);
-            $sheet->getStyle('B12')->getNumberFormat()->setFormatCode('#,##0');
+            // Report title and period
+            $sheet->setCellValue('A3', $title);
+            $sheet->setCellValue('A4', $subtitle);
+            $sheet->mergeCells('A3:F3');
+            $sheet->mergeCells('A4:F4');
+            $sheet->getStyle('A3')->getFont()->setBold(true)->setSize(16);
+            $sheet->getStyle('A4')->getFont()->setSize(12);
 
-            $sheet->setCellValue('A13', 'Total Pengeluaran:');
-            $sheet->setCellValue('B13', $totalExpenses);
-            $sheet->getStyle('B13')->getNumberFormat()->setFormatCode('#,##0');
+            // Add header border
+            $titleBorderStyle = [
+                'borders' => [
+                    'bottom' => [
+                        'borderStyle' => Border::BORDER_MEDIUM,
+                        'color' => ['rgb' => '808080'],
+                    ],
+                ],
+            ];
+            $sheet->getStyle('A1:F4')->applyFromArray($titleBorderStyle);
 
-            $sheet->setCellValue('A14', 'Total Saldo Awal:');
-            $sheet->setCellValue('B14', $totalOpeningBalance);
-            $sheet->getStyle('B14')->getNumberFormat()->setFormatCode('#,##0');
+            // SECTION 1: SUMMARY KPIs
+            $sheet->setCellValue('A6', 'RINGKASAN KPI');
+            $sheet->mergeCells('A6:F6');
+            $sheet->getStyle('A6')->applyFromArray($sectionStyle);
 
-            $sheet->setCellValue('A15', 'Total Saldo Akhir:');
-            $sheet->setCellValue('B15', $closingBalance);
-            $sheet->getStyle('B15')->getNumberFormat()->setFormatCode('#,##0');
-            $sheet->getStyle('B15')->getFont()->setBold(true);
+            $row = 7;
+            // KPI Row 1: Key metrics
+            $sheet->setCellValue('A' . $row, 'Total Penjualan:');
+            $sheet->setCellValue('B' . $row, $totalRevenue);
+            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet->getStyle('B' . $row)->getFont()->setBold(true);
 
-            $sheet->setCellValue('A16', 'Total Jumlah Orderan:');
-            $sheet->setCellValue('B16', $totalOrders);
+            $sheet->setCellValue('D' . $row, 'Jumlah Order:');
+            $sheet->setCellValue('E' . $row, $totalOrders);
+            $sheet->getStyle('E' . $row)->getFont()->setBold(true);
 
-            // Section data harian
-            $row = 18;
-            $sheet->setCellValue('A' . $row, 'BREAKDOWN HARIAN');
-            $sheet
-                ->getStyle('A' . $row)
-                ->getFont()
-                ->setBold(true);
-            $sheet
-                ->getStyle('A' . $row . ':M' . $row)
-                ->getFill()
-                ->setFillType(Fill::FILL_SOLID)
-                ->getStartColor()
-                ->setRGB('DDEBF7');
-
-            // Header tabel data harian
             $row++;
-            $sheet->setCellValue('A' . $row, 'Tanggal');
-            $sheet->setCellValue('B' . $row, 'Hari');
-            $sheet->setCellValue('C' . $row, 'Total Penjualan Bersih');
-            $sheet->setCellValue('D' . $row, 'Total Penjualan Kotor');
-            $sheet->setCellValue('E' . $row, 'Total Discount');
-            $sheet->setCellValue('F' . $row, 'Total Pajak');
-            $sheet->setCellValue('G' . $row, 'Total Beverage');
-            $sheet->setCellValue('H' . $row, 'Total QRIS');
-            $sheet->setCellValue('I' . $row, 'Biaya QRIS (0.3%)');
-            $sheet->setCellValue('J' . $row, 'Total CASH');
-            $sheet->setCellValue('K' . $row, 'Total Pengeluaran');
-            $sheet->setCellValue('L' . $row, 'Saldo Awal');
-            $sheet->setCellValue('M' . $row, 'Saldo Akhir');
-            $sheet
-                ->getStyle('A' . $row . ':M' . $row)
-                ->getFont()
-                ->setBold(true);
+            $sheet->setCellValue('A' . $row, 'Penjualan Kotor:');
+            $sheet->setCellValue('B' . $row, $totalSubTotal);
+            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
 
-            // Data tabel harian
+            $sheet->setCellValue('D' . $row, 'Rata-rata Order:');
+            $sheet->setCellValue('E' . $row, $avgOrderValue);
+            $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
             $row++;
-            foreach ($dailyData as $day) {
-                $sheet->setCellValue('A' . $row, $day['date']);
-                $sheet->setCellValue('B' . $row, $day['day_name']);
-                $sheet->setCellValue('C' . $row, $day['revenue']);
-                $sheet->setCellValue('D' . $row, $day['sub_total']);
-                $sheet->setCellValue('E' . $row, $day['discount_amount']);
-                $sheet->setCellValue('F' . $row, $day['tax']);
-                $sheet->setCellValue('G' . $row, $day['beverage_sales']);
-                $sheet->setCellValue('H' . $row, $day['qris_sales']);
-                $sheet->setCellValue('I' . $row, $day['qris_fee']);
-                $sheet->setCellValue('J' . $row, $day['cash_sales']);
-                $sheet->setCellValue('K' . $row, $day['expenses']);
-                $sheet->setCellValue('L' . $row, $day['opening_balance']);
-                $sheet->setCellValue('M' . $row, $day['closing_balance']);
+            $sheet->setCellValue('A' . $row, 'Total Diskon:');
+            $sheet->setCellValue('B' . $row, $totalDiscountAmount);
+            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
 
-                // Format nomimal
-                $sheet
-                    ->getStyle('C' . $row . ':M' . $row)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
+            $sheet->setCellValue('D' . $row, 'Penjualan Beverage:');
+            $sheet->setCellValue('E' . $row, $beverageSales);
+            $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
 
-                // Alternating row colors
-                if ($row % 2 === 0) {
-                    $sheet
-                        ->getStyle('A' . $row . ':M' . $row)
-                        ->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()
-                        ->setRGB('F2F2F2');
+            $row++;
+            $sheet->setCellValue('A' . $row, 'Total Pajak:');
+            $sheet->setCellValue('B' . $row, $totalTax);
+            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+            // Apply nice borders to KPI section
+            $kpiBoxStyle = [
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'E6F0FF'], // Light blue
+                ],
+            ];
+            $sheet->getStyle('A7:B' . $row)->applyFromArray(array_merge($tableStyle, $kpiBoxStyle));
+            $sheet->getStyle('D7:E' . $row)->applyFromArray(array_merge($tableStyle, $kpiBoxStyle));
+
+            // SECTION 2: PAYMENT METHODS
+            $row += 2;
+            $paymentRow = $row;
+            $sheet->setCellValue('A' . $paymentRow, 'METODE PEMBAYARAN');
+            $sheet->mergeCells('A' . $paymentRow . ':C' . $paymentRow);
+            $sheet->getStyle('A' . $paymentRow)->applyFromArray($sectionStyle);
+
+            $paymentRow++;
+            $sheet->setCellValue('A' . $paymentRow, 'Metode');
+            $sheet->setCellValue('B' . $paymentRow, 'Jumlah (Rp)');
+            $sheet->setCellValue('C' . $paymentRow, 'Persentase');
+            $sheet->getStyle('A' . $paymentRow . ':C' . $paymentRow)->applyFromArray($headerStyle);
+
+            $paymentRow++;
+            // Add payment methods data
+            $startPaymentRow = $paymentRow;
+            foreach ($paymentMethods as $method) {
+                $sheet->setCellValue('A' . $paymentRow, ucfirst($method->payment_method));
+                $sheet->setCellValue('B' . $paymentRow, $method->total_amount);
+                $sheet->getStyle('B' . $paymentRow)->getNumberFormat()->setFormatCode('#,##0');
+
+                // Calculate percentage
+                $percentage = ($totalRevenue > 0) ? ($method->total_amount / $totalRevenue) : 0;
+                $sheet->setCellValue('C' . $paymentRow, $percentage);
+                $sheet->getStyle('C' . $paymentRow)->getNumberFormat()->setFormatCode('0.00%');
+
+                $paymentRow++;
+            }
+
+            // Add total row for payments
+            $sheet->setCellValue('A' . $paymentRow, 'TOTAL');
+            $sheet->setCellValue('B' . $paymentRow, $totalRevenue);
+            $sheet->setCellValue('C' . $paymentRow, '100%');
+            $sheet->getStyle('B' . $paymentRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet->getStyle('A' . $paymentRow . ':C' . $paymentRow)->applyFromArray($totalsStyle);
+
+            // Format payment method table
+            $sheet->getStyle('A' . $startPaymentRow . ':C' . $paymentRow)->applyFromArray($tableStyle);
+
+            // SECTION 3: CASH FLOW
+            $row = $paymentRow + 2;
+            $cashFlowRow = $row;
+            $sheet->setCellValue('A' . $cashFlowRow, 'ARUS KAS');
+            $sheet->mergeCells('A' . $cashFlowRow . ':C' . $cashFlowRow);
+            $sheet->getStyle('A' . $cashFlowRow)->applyFromArray($sectionStyle);
+
+            $cashFlowRow++;
+            $sheet->setCellValue('A' . $cashFlowRow, 'Saldo Awal:');
+            $sheet->setCellValue('B' . $cashFlowRow, $totalOpeningBalance);
+            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+
+            $cashFlowRow++;
+            $sheet->setCellValue('A' . $cashFlowRow, 'Penjualan CASH:');
+            $sheet->setCellValue('B' . $cashFlowRow, $cashSales);
+            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+
+            $cashFlowRow++;
+            $sheet->setCellValue('A' . $cashFlowRow, 'Penjualan QRIS:');
+            $sheet->setCellValue('B' . $cashFlowRow, $qrisSales);
+            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+
+            $cashFlowRow++;
+            $sheet->setCellValue('A' . $cashFlowRow, 'Biaya Layanan QRIS:');
+            $sheet->setCellValue('B' . $cashFlowRow, $totalQrisFee);
+            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+
+            $cashFlowRow++;
+            $sheet->setCellValue('A' . $cashFlowRow, 'Total Pengeluaran:');
+            $sheet->setCellValue('B' . $cashFlowRow, $totalExpenses);
+            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+
+            $cashFlowRow++;
+            $sheet->setCellValue('A' . $cashFlowRow, 'Saldo Akhir:');
+            $sheet->setCellValue('B' . $cashFlowRow, $closingBalance);
+            $sheet->getStyle('A' . $cashFlowRow . ':B' . $cashFlowRow)->getFont()->setBold(true);
+            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+
+            // Highlight negative closing balance
+            if ($closingBalance < 0) {
+                $sheet->getStyle('B' . $cashFlowRow)->getFont()->getColor()->setRGB('FF0000');
+            }
+
+            // Format cash flow table
+            $cashFlowBoxStyle = [
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'E6F0FF'], // Light blue
+                ],
+            ];
+            $sheet->getStyle('A' . ($row + 1) . ':B' . $cashFlowRow)->applyFromArray(array_merge($tableStyle, $cashFlowBoxStyle));
+
+            // SECTION 4: DATA DETAILED BY PERIOD TYPE
+            $row = $cashFlowRow + 2;
+            $detailRow = $row;
+            $sheet->setCellValue('A' . $detailRow, 'DATA ' . strtoupper($periodTypeLabels[$periodType]));
+
+            if ($periodType === 'daily') {
+                $sheet->mergeCells('A' . $detailRow . ':N' . $detailRow);
+            } else {
+                $sheet->mergeCells('A' . $detailRow . ':K' . $detailRow);
+            }
+
+            $sheet->getStyle('A' . $detailRow)->applyFromArray($sectionStyle);
+
+            $detailRow++;
+
+            if ($periodType === 'daily') {
+                // Daily data headers - Added SALDO AWAL column
+                $sheet->setCellValue('A' . $detailRow, 'TANGGAL');
+                $sheet->setCellValue('B' . $detailRow, 'HARI');
+                $sheet->setCellValue('C' . $detailRow, 'JUMLAH ORDER');
+                $sheet->setCellValue('D' . $detailRow, 'PENJUALAN BERSIH');
+                $sheet->setCellValue('E' . $detailRow, 'PENJUALAN KOTOR');
+                $sheet->setCellValue('F' . $detailRow, 'DISKON');
+                $sheet->setCellValue('G' . $detailRow, 'PAJAK');
+                $sheet->setCellValue('H' . $detailRow, 'BEVERAGE');
+                $sheet->setCellValue('I' . $detailRow, 'QRIS');
+                $sheet->setCellValue('J' . $detailRow, 'BIAYA QRIS');
+                $sheet->setCellValue('K' . $detailRow, 'CASH');
+                $sheet->setCellValue('L' . $detailRow, 'SALDO AWAL'); // Added SALDO AWAL column
+                $sheet->setCellValue('M' . $detailRow, 'PENGELUARAN');
+                $sheet->setCellValue('N' . $detailRow, 'SALDO AKHIR');
+
+                $sheet->getStyle('A' . $detailRow . ':N' . $detailRow)->applyFromArray($headerStyle);
+
+                // Sort data by date, newest first for better user experience
+                usort($dailyData, function ($a, $b) {
+                    return strtotime($b['date']) - strtotime($a['date']);
+                });
+
+                // Add data
+                $detailRow++;
+                $startDetailRow = $detailRow;
+                foreach ($dailyData as $day) {
+                    $dateObj = Carbon::parse($day['date']);
+                    $sheet->setCellValue('A' . $detailRow, $dateObj->format('d/m/Y'));
+                    $sheet->setCellValue('B' . $detailRow, $day['day_name']);
+                    $sheet->setCellValue('C' . $detailRow, $day['orders_count']);
+                    $sheet->setCellValue('D' . $detailRow, $day['revenue']);
+                    $sheet->setCellValue('E' . $detailRow, $day['sub_total']);
+                    $sheet->setCellValue('F' . $detailRow, $day['discount_amount']);
+                    $sheet->setCellValue('G' . $detailRow, $day['tax']);
+                    $sheet->setCellValue('H' . $detailRow, $day['beverage_sales']);
+                    $sheet->setCellValue('I' . $detailRow, $day['qris_sales']);
+                    $sheet->setCellValue('J' . $detailRow, $day['qris_fee']);
+                    $sheet->setCellValue('K' . $detailRow, $day['cash_sales']);
+                    $sheet->setCellValue('L' . $detailRow, $day['opening_balance']); // Added SALDO AWAL value
+                    $sheet->setCellValue('M' . $detailRow, $day['expenses']);
+                    $sheet->setCellValue('N' . $detailRow, $day['closing_balance']);
+
+                    // Format numbers
+                    $sheet->getStyle('D' . $detailRow . ':N' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+
+                    // Add weekend highlighting
+                    if (in_array($day['day_name'], ['Sabtu', 'Minggu'])) {
+                        $sheet->getStyle('A' . $detailRow . ':N' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FCE4D6');
+                    }
+
+                    // Highlight negative closing balance
+                    if ($day['closing_balance'] < 0) {
+                        $sheet->getStyle('N' . $detailRow)->getFont()->getColor()->setRGB('FF0000');
+                    }
+
+                    // Add zebra striping for better readability
+                    if ($detailRow % 2 == 0) {
+                        $sheet->getStyle('A' . $detailRow . ':N' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
+                    }
+
+                    $detailRow++;
                 }
 
-                $row++;
+                // Add totals row
+                $sheet->setCellValue('A' . $detailRow, 'TOTAL');
+                $sheet->mergeCells('A' . $detailRow . ':B' . $detailRow);
+                $sheet->setCellValue('C' . $detailRow, $totalOrders);
+                $sheet->setCellValue('D' . $detailRow, $totalRevenue);
+                $sheet->setCellValue('E' . $detailRow, $totalSubTotal);
+                $sheet->setCellValue('F' . $detailRow, $totalDiscountAmount);
+                $sheet->setCellValue('G' . $detailRow, $totalTax);
+                $sheet->setCellValue('H' . $detailRow, $beverageSales);
+                $sheet->setCellValue('I' . $detailRow, $qrisSales);
+                $sheet->setCellValue('J' . $detailRow, $totalQrisFee);
+                $sheet->setCellValue('K' . $detailRow, $cashSales);
+                $sheet->setCellValue('L' . $detailRow, $totalOpeningBalance); // Added total opening balance
+                $sheet->setCellValue('M' . $detailRow, $totalExpenses);
+                $sheet->setCellValue('N' . $detailRow, $closingBalance);
+
+                // Format totals
+                $sheet->getStyle('A' . $detailRow . ':N' . $detailRow)->applyFromArray($totalsStyle);
+                $sheet->getStyle('D' . $detailRow . ':N' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+
+                // Format the entire data table
+                $sheet->getStyle('A' . $startDetailRow . ':N' . $detailRow)->applyFromArray($tableStyle);
+
+                // Enable filtering
+                $sheet->setAutoFilter('A' . ($row + 1) . ':N' . ($detailRow - 1));
+            } elseif ($periodType === 'weekly' || $periodType === 'monthly') {
+                // Column headers for weekly/monthly data
+                $sheet->setCellValue('A' . $detailRow, 'PERIODE');
+                $sheet->setCellValue('B' . $detailRow, 'JUMLAH ORDER');
+                $sheet->setCellValue('C' . $detailRow, 'PENJUALAN BERSIH');
+                $sheet->setCellValue('D' . $detailRow, 'PENJUALAN KOTOR');
+                $sheet->setCellValue('E' . $detailRow, 'DISKON');
+                $sheet->setCellValue('F' . $detailRow, 'PAJAK');
+                $sheet->setCellValue('G' . $detailRow, 'BEVERAGES');
+                $sheet->setCellValue('H' . $detailRow, 'QRIS');
+                $sheet->setCellValue('I' . $detailRow, 'BIAYA QRIS');
+                $sheet->setCellValue('J' . $detailRow, 'CASH');
+                $sheet->setCellValue('K' . $detailRow, 'AVG ORDER VALUE');
+
+                $sheet->getStyle('A' . $detailRow . ':K' . $detailRow)->applyFromArray($headerStyle);
+
+                // Sort data, newest first
+                $salesData = $salesData->sortByDesc(function ($item) {
+                    return $item->period_key;
+                });
+
+                // Add data rows
+                $detailRow++;
+                $startDetailRow = $detailRow;
+                foreach ($salesData as $period) {
+                    $sheet->setCellValue('A' . $detailRow, $period->period_label);
+                    $sheet->setCellValue('B' . $detailRow, $period->order_count);
+                    $sheet->setCellValue('C' . $detailRow, $period->total_sales);
+                    $sheet->setCellValue('D' . $detailRow, $period->sub_total);
+                    $sheet->setCellValue('E' . $detailRow, $period->discount_amount);
+                    $sheet->setCellValue('F' . $detailRow, $period->tax);
+                    $sheet->setCellValue('G' . $detailRow, $period->beverage_sales ?? 0);
+                    $sheet->setCellValue('H' . $detailRow, $period->qris_sales ?? 0);
+                    $sheet->setCellValue('I' . $detailRow, $period->qris_fee);
+                    $sheet->setCellValue('J' . $detailRow, $period->cash_sales ?? 0);
+
+                    // Calculate average order value
+                    $avgValue = $period->order_count > 0 ? $period->total_sales / $period->order_count : 0;
+                    $sheet->setCellValue('K' . $detailRow, $avgValue);
+
+                    // Format numbers
+                    $sheet->getStyle('C' . $detailRow . ':K' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+
+                    // Add zebra striping for better readability
+                    if ($detailRow % 2 == 0) {
+                        $sheet->getStyle('A' . $detailRow . ':K' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
+                    }
+
+                    $detailRow++;
+                }
+
+                // Add totals row
+                $sheet->setCellValue('A' . $detailRow, 'TOTAL');
+                $sheet->setCellValue('B' . $detailRow, $totalOrders);
+                $sheet->setCellValue('C' . $detailRow, $totalRevenue);
+                $sheet->setCellValue('D' . $detailRow, $totalSubTotal);
+                $sheet->setCellValue('E' . $detailRow, $totalDiscountAmount);
+                $sheet->setCellValue('F' . $detailRow, $totalTax);
+                $sheet->setCellValue('G' . $detailRow, $beverageSales);
+                $sheet->setCellValue('H' . $detailRow, $qrisSales);
+                $sheet->setCellValue('I' . $detailRow, $totalQrisFee);
+                $sheet->setCellValue('J' . $detailRow, $cashSales);
+                $sheet->setCellValue('K' . $detailRow, $avgOrderValue);
+
+                // Format totals
+                $sheet->getStyle('A' . $detailRow . ':K' . $detailRow)->applyFromArray($totalsStyle);
+                $sheet->getStyle('C' . $detailRow . ':K' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+
+                // Format the entire data table
+                $sheet->getStyle('A' . $startDetailRow . ':K' . $detailRow)->applyFromArray($tableStyle);
+
+                // Enable filtering
+                $sheet->setAutoFilter('A' . ($row + 1) . ':K' . ($detailRow - 1));
             }
 
-            // Autosize columns
-            foreach (range('A', 'M') as $col) {
-                $sheet->getColumnDimension($col)->setAutoSize(true);
+            // FOOTER SECTION - Generated information
+            $row = $detailRow + 3;
+            $sheet->setCellValue('A' . $row, 'Laporan dibuat pada: ' . now()->format('d M Y H:i'));
+
+            if ($periodType === 'daily') {
+                $sheet->mergeCells('A' . $row . ':N' . $row);
+            } else {
+                $sheet->mergeCells('A' . $row . ':K' . $row);
             }
 
-            // Freeze the header row
-            $sheet->freezePane('A20');
+            $sheet->getStyle('A' . $row)->getFont()->setItalic(true);
 
-            // Set the auto-filter
-            $sheet->setAutoFilter('A19:M' . ($row - 1));
+            // Auto-size columns for better readability
+            if ($periodType === 'daily') {
+                foreach (range('A', 'N') as $col) {
+                    $sheet->getColumnDimension($col)->setAutoSize(true);
+                }
+            } else {
+                foreach (range('A', 'K') as $col) {
+                    $sheet->getColumnDimension($col)->setAutoSize(true);
+                }
+            }
 
-            // Set filename
-            $filename = 'laporan_penjualan_' . $startDate->format('Y-m-d') . '_sampai_' . $endDate->format('Y-m-d') . '.xlsx';
+            // IMPORTANT: Do not use freeze panes at all to ensure full scrolling ability
+            // Instead, we'll use cell styling to make the headers stand out
 
-            // Create the writer and output the file
+            // Remove any existing freeze panes
+            $sheet->unfreezePane();
+
+            // Make sure all headers are bold and stand out even without freezing
+            if ($periodType === 'daily') {
+                $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':N' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
+            } else {
+                $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':K' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
+            }
+
+            // Remove all protection which can interfere with scrolling
+            $sheet->getProtection()->setSheet(false);
+
+            // Configure proper view settings to ensure scrolling works properly
+            $sheet->getSheetView()->setZoomScale(100); // Normal zoom
+            $sheet->getSheetView()->setZoomScaleNormal(100);
+            $sheet->getSheetView()->setView(\PhpOffice\PhpSpreadsheet\Worksheet\SheetView::SHEETVIEW_NORMAL);
+
+            // Set the active cell to A1 to ensure we start at the top
+            $sheet->setSelectedCell('A1');
+
+            // Set filename and headers
+            $filename = 'laporan_penjualan_' . $periodTypeLabels[$periodType] . '_' . $startDate->format('Y-m-d') . '_sampai_' . $endDate->format('Y-m-d') . '.xlsx';
+
+            // Create the writer with additional options to ensure Excel compatibility
             $writer = new Xlsx($spreadsheet);
 
+            // Additional settings to improve Excel compatibility
+            $writer->setOffice2003Compatibility(false);
+            $writer->setPreCalculateFormulas(true);
+
+            // Standard headers
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             header('Content-Disposition: attachment;filename="' . $filename . '"');
             header('Cache-Control: max-age=0');
+            header('Cache-Control: max-age=1');
+
+            // Additional headers to prevent caching issues
+            header('Expires: Mon, 26 Jul 1997 05:00:00 GMT'); // Date in the past
+            header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT'); // Always modified
+            header('Cache-Control: cache, must-revalidate'); // HTTP/1.1
+            header('Pragma: public'); // HTTP/1.0
 
             $writer->save('php://output');
             exit();
@@ -588,6 +1057,380 @@ class ReportController extends Controller
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             header('Content-Disposition: attachment;filename="' . $filename . '"');
             header('Cache-Control: max-age=0');
+
+            $writer->save('php://output');
+            exit();
+        }
+    }
+
+    /**
+     * Generate Raw Materials Purchase Report
+     */
+    public function materialPurchases(Request $request)
+    {
+        // Validate request
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'outlet_id' => 'nullable|exists:outlets,id',
+            'format' => 'required|in:pdf,excel',
+        ]);
+
+        $startDate = Carbon::parse($request->start_date)->startOfDay();
+        $endDate = Carbon::parse($request->end_date)->endOfDay();
+        $outletId = $request->outlet_id;
+
+        // Base query for material orders
+        $query = MaterialOrder::with(['franchise', 'items.rawMaterial'])
+            ->whereBetween('created_at', [$startDate, $endDate]);
+
+        // Filter by outlet if provided
+        if ($outletId) {
+            $query->where('franchise_id', $outletId);
+        } else if (Auth::user()->role !== 'owner') {
+            // If not owner, restrict to user's outlet
+            $query->where('franchise_id', Auth::user()->outlet_id);
+        }
+
+        // Get overview statistics
+        $totalPurchaseAmount = $query->sum('total_amount');
+        $totalOrderCount = $query->count();
+
+        // Get daily breakdown data
+        $dailyData = [];
+        $currentDate = clone $startDate;
+
+        while ($currentDate <= $endDate) {
+            $currentDateStr = $currentDate->format('Y-m-d');
+
+            // Get orders for this date
+            $dailyOrdersQuery = MaterialOrder::with(['items'])
+                ->whereDate('created_at', $currentDateStr);
+
+            if ($outletId) {
+                $dailyOrdersQuery->where('franchise_id', $outletId);
+            } else if (Auth::user()->role !== 'owner') {
+                $dailyOrdersQuery->where('franchise_id', Auth::user()->outlet_id);
+            }
+
+            $dailyOrders = $dailyOrdersQuery->get();
+
+            // Calculate daily stats
+            $dailyTotalAmount = $dailyOrders->sum('total_amount');
+            $dailyOrderCount = $dailyOrders->count();
+
+            // Calculate total items across all orders for this day
+            $dailyItemCount = 0;
+            foreach ($dailyOrders as $order) {
+                $dailyItemCount += $order->items->count();
+            }
+
+            // Collect payment methods used on this day
+            $paymentMethods = $dailyOrders->pluck('payment_method')->unique()->implode(', ');
+
+            // Add to daily data if there were any orders
+            if ($dailyOrderCount > 0) {
+                $dailyData[] = [
+                    'date' => $currentDateStr,
+                    'day_name' => $currentDate->locale('id')->isoFormat('dddd'),
+                    'order_count' => $dailyOrderCount,
+                    'item_count' => $dailyItemCount,
+                    'payment_methods' => $paymentMethods,
+                    'total_amount' => $dailyTotalAmount
+                ];
+            } else {
+                // If no orders on this day, still add the entry with zeros
+                $dailyData[] = [
+                    'date' => $currentDateStr,
+                    'day_name' => $currentDate->locale('id')->isoFormat('dddd'),
+                    'order_count' => 0,
+                    'item_count' => 0,
+                    'payment_methods' => '-',
+                    'total_amount' => 0
+                ];
+            }
+
+            $currentDate->addDay();
+        }
+
+        // Format the report title
+        $title = 'Laporan Pembelian Bahan Baku';
+        $subtitle = 'Periode: ' . $startDate->translatedFormat('d M Y') . ' - ' . $endDate->translatedFormat('d M Y');
+
+        if ($outletId) {
+            $outlet = Outlet::find($outletId);
+            $subtitle .= ' | Outlet: ' . $outlet->name;
+        } else {
+            $subtitle .= ' | ' . (Auth::user()->role === 'owner' ? 'Semua Outlet' : 'Outlet: ' . Auth::user()->outlet->name);
+        }
+
+        // Generate the report based on requested format
+        if ($request->format === 'pdf') {
+            $pdf = PDF::loadView('pages.reports.material_purchases_pdf', compact(
+                'title',
+                'subtitle',
+                'totalPurchaseAmount',
+                'totalOrderCount',
+                'dailyData',
+                'startDate',
+                'endDate'
+            ));
+
+            // Set orientation to landscape
+            $pdf->setPaper('a4', 'landscape');
+
+            return $pdf->download('laporan_pembelian_bahan_baku_' . $startDate->format('Y-m-d') . '_sampai_' . $endDate->format('Y-m-d') . '.pdf');
+        } else {
+            // Create an Excel spreadsheet
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Laporan Bahan Baku');
+
+            // Set document properties
+            $spreadsheet->getProperties()
+                ->setCreator('Seblak Sulthane')
+                ->setLastModifiedBy('Seblak Sulthane')
+                ->setTitle($title)
+                ->setSubject($subtitle)
+                ->setDescription('Laporan Pembelian Bahan Baku Seblak Sulthane')
+                ->setKeywords('materials, report, seblak, sulthane')
+                ->setCategory('Financial Reports');
+
+            // Define commonly used styles
+            $headerStyle = [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '4472C4'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => 'BFBFBF'],
+                    ],
+                ],
+            ];
+
+            $sectionStyle = [
+                'font' => [
+                    'bold' => true,
+                    'size' => 12,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '4472C4'],
+                ],
+                'borders' => [
+                    'outline' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => '8EA9DB'],
+                    ],
+                ],
+            ];
+
+            $tableStyle = [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => 'BFBFBF'],
+                    ],
+                    'outline' => [
+                        'borderStyle' => Border::BORDER_MEDIUM,
+                        'color' => ['rgb' => '8EA9DB'],
+                    ],
+                ],
+            ];
+
+            $totalsStyle = [
+                'font' => [
+                    'bold' => true,
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'D9E1F2'],
+                ],
+            ];
+
+            // Add company header and title
+            $sheet->setCellValue('A1', 'SEBLAK SULTHANE');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(20)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_DARKRED));
+
+            // Report title and period
+            $sheet->setCellValue('A3', $title);
+            $sheet->setCellValue('A4', $subtitle);
+            $sheet->mergeCells('A3:F3');
+            $sheet->mergeCells('A4:F4');
+            $sheet->getStyle('A3')->getFont()->setBold(true)->setSize(16);
+            $sheet->getStyle('A4')->getFont()->setSize(12);
+
+            // Add header border
+            $titleBorderStyle = [
+                'borders' => [
+                    'bottom' => [
+                        'borderStyle' => Border::BORDER_MEDIUM,
+                        'color' => ['rgb' => '808080'],
+                    ],
+                ],
+            ];
+            $sheet->getStyle('A1:F4')->applyFromArray($titleBorderStyle);
+
+            // SECTION 1: SUMMARY KPIs
+            $sheet->setCellValue('A6', 'RINGKASAN');
+            $sheet->mergeCells('A6:F6');
+            $sheet->getStyle('A6')->applyFromArray($sectionStyle);
+
+            $row = 7;
+            // Key metrics
+            $sheet->setCellValue('A' . $row, 'Total Pengeluaran Bahan Baku:');
+            $sheet->setCellValue('B' . $row, $totalPurchaseAmount);
+            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet->getStyle('B' . $row)->getFont()->setBold(true);
+
+            $sheet->setCellValue('D' . $row, 'Jumlah Pemesanan:');
+            $sheet->setCellValue('E' . $row, $totalOrderCount);
+            $sheet->getStyle('E' . $row)->getFont()->setBold(true);
+
+            // Apply nice borders to KPI section
+            $kpiBoxStyle = [
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'E6F0FF'], // Light blue
+                ],
+            ];
+            $sheet->getStyle('A7:B' . $row)->applyFromArray(array_merge($tableStyle, $kpiBoxStyle));
+            $sheet->getStyle('D7:E' . $row)->applyFromArray(array_merge($tableStyle, $kpiBoxStyle));
+
+            // SECTION 2: DAILY BREAKDOWN
+            $row += 2;
+            $detailRow = $row;
+            $sheet->setCellValue('A' . $detailRow, 'DATA HARIAN');
+            $sheet->mergeCells('A' . $detailRow . ':F' . $detailRow);
+            $sheet->getStyle('A' . $detailRow)->applyFromArray($sectionStyle);
+
+            $detailRow++;
+
+            // Headers for daily breakdown
+            $sheet->setCellValue('A' . $detailRow, 'TANGGAL');
+            $sheet->setCellValue('B' . $detailRow, 'HARI');
+            $sheet->setCellValue('C' . $detailRow, 'JUMLAH ORDER');
+            $sheet->setCellValue('D' . $detailRow, 'JUMLAH ITEM');
+            $sheet->setCellValue('E' . $detailRow, 'METODE PEMBAYARAN');
+            $sheet->setCellValue('F' . $detailRow, 'TOTAL PEMBELIAN');
+            $sheet->getStyle('A' . $detailRow . ':F' . $detailRow)->applyFromArray($headerStyle);
+
+            // Sort data by date, newest first for better user experience
+            usort($dailyData, function ($a, $b) {
+                return strtotime($b['date']) - strtotime($a['date']);
+            });
+
+            // Add data
+            $detailRow++;
+            $startDetailRow = $detailRow;
+
+            foreach ($dailyData as $day) {
+                $dateObj = Carbon::parse($day['date']);
+                $sheet->setCellValue('A' . $detailRow, $dateObj->format('d/m/Y'));
+                $sheet->setCellValue('B' . $detailRow, $day['day_name']);
+                $sheet->setCellValue('C' . $detailRow, $day['order_count']);
+                $sheet->setCellValue('D' . $detailRow, $day['item_count']);
+                $sheet->setCellValue('E' . $detailRow, $day['payment_methods']);
+                $sheet->setCellValue('F' . $detailRow, $day['total_amount']);
+
+                // Format numbers
+                $sheet->getStyle('F' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+
+                // Add weekend highlighting
+                if (in_array($day['day_name'], ['Sabtu', 'Minggu'])) {
+                    $sheet->getStyle('A' . $detailRow . ':F' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FCE4D6');
+                }
+
+                // Add zebra striping for better readability
+                if ($detailRow % 2 == 0) {
+                    $sheet->getStyle('A' . $detailRow . ':F' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
+                }
+
+                $detailRow++;
+            }
+
+            // Add totals row
+            $sheet->setCellValue('A' . $detailRow, 'TOTAL');
+            $sheet->mergeCells('A' . $detailRow . ':B' . $detailRow);
+            $sheet->setCellValue('C' . $detailRow, $totalOrderCount);
+
+            // Calculate total items from daily data
+            $totalItems = array_sum(array_column($dailyData, 'item_count'));
+            $sheet->setCellValue('D' . $detailRow, $totalItems);
+
+            $sheet->setCellValue('E' . $detailRow, '-');
+            $sheet->setCellValue('F' . $detailRow, $totalPurchaseAmount);
+
+            // Format totals
+            $sheet->getStyle('A' . $detailRow . ':F' . $detailRow)->applyFromArray($totalsStyle);
+            $sheet->getStyle('F' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+
+            // Format the entire data table
+            $sheet->getStyle('A' . $startDetailRow . ':F' . $detailRow)->applyFromArray($tableStyle);
+
+            // Enable filtering
+            $sheet->setAutoFilter('A' . ($row + 1) . ':F' . ($detailRow - 1));
+
+            // FOOTER SECTION - Generated information
+            $row = $detailRow + 3;
+            $sheet->setCellValue('A' . $row, 'Laporan dibuat pada: ' . now()->format('d M Y H:i'));
+            $sheet->mergeCells('A' . $row . ':F' . $row);
+            $sheet->getStyle('A' . $row)->getFont()->setItalic(true);
+
+            // Auto-size columns for better readability
+            foreach (range('A', 'F') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            // Remove any existing freeze panes
+            $sheet->unfreezePane();
+
+            // Make sure all headers are bold and stand out
+            $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':F' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
+
+            // Remove all protection which can interfere with scrolling
+            $sheet->getProtection()->setSheet(false);
+
+            // Configure proper view settings
+            $sheet->getSheetView()->setZoomScale(100); // Normal zoom
+            $sheet->getSheetView()->setZoomScaleNormal(100);
+            $sheet->getSheetView()->setView(\PhpOffice\PhpSpreadsheet\Worksheet\SheetView::SHEETVIEW_NORMAL);
+
+            // Set the active cell to A1
+            $sheet->setSelectedCell('A1');
+
+            // Set filename and headers
+            $filename = 'laporan_pembelian_bahan_baku_' . $startDate->format('Y-m-d') . '_sampai_' . $endDate->format('Y-m-d') . '.xlsx';
+
+            // Create the writer
+            $writer = new Xlsx($spreadsheet);
+
+            // Additional settings to improve Excel compatibility
+            $writer->setOffice2003Compatibility(false);
+            $writer->setPreCalculateFormulas(true);
+
+            // Standard headers
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment;filename="' . $filename . '"');
+            header('Cache-Control: max-age=0');
+            header('Cache-Control: max-age=1');
+
+            // Additional headers to prevent caching issues
+            header('Expires: Mon, 26 Jul 1997 05:00:00 GMT'); // Date in the past
+            header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT'); // Always modified
+            header('Cache-Control: cache, must-revalidate'); // HTTP/1.1
+            header('Pragma: public'); // HTTP/1.0
 
             $writer->save('php://output');
             exit();
