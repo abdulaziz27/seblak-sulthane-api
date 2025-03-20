@@ -12,42 +12,49 @@
         <section class="section">
             <div class="section-header">
                 <h1>Kategori</h1>
-                <div class="section-header-button d-none d-md-flex">
-                    <a href="{{ route('categories.create') }}" class="btn btn-primary">Tambah Baru</a>
-                    <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
-                        Import Excel
-                    </button>
-                    <a href="{{ route('categories.export') }}" class="btn btn-info ml-2">
-                        Export Excel
-                    </a>
-                    <button type="button" class="btn btn-warning ml-2" data-toggle="modal" data-target="#bulkUpdateModal">
-                        Update Massal
-                    </button>
-                    <button type="button" class="btn btn-danger ml-2" data-toggle="modal" data-target="#deleteAllModal">
-                        Hapus Semua
-                    </button>
-                </div>
+                @if (Auth::user()->role !== 'staff')
+                    <div class="section-header-button d-none d-md-flex">
+                        <a href="{{ route('categories.create') }}" class="btn btn-primary">Tambah Baru</a>
+                        <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
+                            Import Excel
+                        </button>
+                        <a href="{{ route('categories.export') }}" class="btn btn-info ml-2">
+                            Export Excel
+                        </a>
+                        <button type="button" class="btn btn-warning ml-2" data-toggle="modal"
+                            data-target="#bulkUpdateModal">
+                            Update Massal
+                        </button>
+                        <button type="button" class="btn btn-danger ml-2" data-toggle="modal"
+                            data-target="#deleteAllModal">
+                            Hapus Semua
+                        </button>
+                    </div>
+                @endif
             </div>
 
             <div class="section-body">
                 <!-- Responsive action buttons for small screens -->
-                <div class="d-flex d-md-none mb-4 flex-wrap justify-content-center">
-                    <a href="{{ route('categories.create') }}" class="btn btn-primary m-1">
-                        <i class="fas fa-plus mr-1"></i> Tambah
-                    </a>
-                    <button type="button" class="btn btn-success m-1" data-toggle="modal" data-target="#importModal">
-                        <i class="fas fa-file-import mr-1"></i> Import
-                    </button>
-                    <a href="{{ route('categories.export') }}" class="btn btn-info m-1">
-                        <i class="fas fa-file-export mr-1"></i> Export
-                    </a>
-                    <button type="button" class="btn btn-warning m-1" data-toggle="modal" data-target="#bulkUpdateModal">
-                        <i class="fas fa-sync-alt mr-1"></i> Update
-                    </button>
-                    <button type="button" class="btn btn-danger m-1" data-toggle="modal" data-target="#deleteAllModal">
-                        <i class="fas fa-trash mr-1"></i> Hapus
-                    </button>
-                </div>
+                @if (Auth::user()->role !== 'staff')
+                    <div class="d-flex d-md-none mb-4 flex-wrap justify-content-center">
+                        <a href="{{ route('categories.create') }}" class="btn btn-primary m-1">
+                            <i class="fas fa-plus mr-1"></i> Tambah
+                        </a>
+                        <button type="button" class="btn btn-success m-1" data-toggle="modal" data-target="#importModal">
+                            <i class="fas fa-file-import mr-1"></i> Import
+                        </button>
+                        <a href="{{ route('categories.export') }}" class="btn btn-info m-1">
+                            <i class="fas fa-file-export mr-1"></i> Export
+                        </a>
+                        <button type="button" class="btn btn-warning m-1" data-toggle="modal"
+                            data-target="#bulkUpdateModal">
+                            <i class="fas fa-sync-alt mr-1"></i> Update
+                        </button>
+                        <button type="button" class="btn btn-danger m-1" data-toggle="modal" data-target="#deleteAllModal">
+                            <i class="fas fa-trash mr-1"></i> Hapus
+                        </button>
+                    </div>
+                @endif
 
                 @include('layouts.alert')
 
@@ -82,23 +89,27 @@
                                                 <td>{{ $category->description ?? '-' }}</td>
                                                 <td>{{ $category->created_at }}</td>
                                                 <td>
-                                                    <div class="d-flex justify-content-center">
-                                                        <a href='{{ route('categories.edit', $category->id) }}'
-                                                            class="btn btn-sm btn-info btn-icon">
-                                                            <i class="fas fa-edit"></i>
-                                                            Ubah
-                                                        </a>
+                                                    @if (Auth::user()->role !== 'staff')
+                                                        <div class="d-flex justify-content-center">
+                                                            <a href='{{ route('categories.edit', $category->id) }}'
+                                                                class="btn btn-sm btn-info btn-icon">
+                                                                <i class="fas fa-edit"></i>
+                                                                Ubah
+                                                            </a>
 
-                                                        <form action="{{ route('categories.destroy', $category->id) }}"
-                                                            method="POST" class="ml-2">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit"
-                                                                class="btn btn-sm btn-danger btn-icon confirm-delete">
-                                                                <i class="fas fa-times"></i> Hapus
-                                                            </button>
-                                                        </form>
-                                                    </div>
+                                                            <form action="{{ route('categories.destroy', $category->id) }}"
+                                                                method="POST" class="ml-2">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit"
+                                                                    class="btn btn-sm btn-danger btn-icon confirm-delete">
+                                                                    <i class="fas fa-times"></i> Hapus
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    @else
+                                                        <span class="badge badge-secondary">Lihat Saja</span>
+                                                    @endif
                                                 </td>
                                             </tr>
                                         @endforeach
