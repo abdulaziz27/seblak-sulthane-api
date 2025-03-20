@@ -38,7 +38,7 @@
                                 <div class="float-right">
                                     <form method="GET" action="{{ route('users.index') }}">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" placeholder="Cari" name="name">
+                                            <input type="text" class="form-control" placeholder="Cari" name="name" value="{{ request('name') }}">
                                             <div class="input-group-append">
                                                 <button class="btn btn-primary"><i class="fas fa-search"></i></button>
                                             </div>
@@ -51,7 +51,6 @@
                                 <div class="table-responsive">
                                     <table class="table-striped table">
                                         <tr>
-
                                             <th>Nama</th>
                                             <th>Email</th>
                                             <th>Outlet</th>
@@ -61,12 +60,8 @@
                                         </tr>
                                         @foreach ($users as $user)
                                             <tr>
-
-                                                <td>{{ $user->name }}
-                                                </td>
-                                                <td>
-                                                    {{ $user->email }}
-                                                </td>
+                                                <td>{{ $user->name }}</td>
+                                                <td>{{ $user->email }}</td>
                                                 <td>
                                                     @if ($user->outlet)
                                                         {{ $user->outlet->name }}
@@ -74,9 +69,7 @@
                                                         N/A
                                                     @endif
                                                 </td>
-                                                <td>
-                                                    {{ $user->role }}
-                                                </td>
+                                                <td>{{ $user->role }}</td>
                                                 <td>{{ $user->created_at }}</td>
                                                 <td>
                                                     <div class="d-flex justify-content-center">
@@ -99,8 +92,6 @@
                                                 </td>
                                             </tr>
                                         @endforeach
-
-
                                     </table>
                                 </div>
                                 <div class="float-right">
