@@ -91,10 +91,10 @@
 
                                                         <form action="{{ route('categories.destroy', $category->id) }}"
                                                             method="POST" class="ml-2">
-                                                            <input type="hidden" name="_method" value="DELETE" />
-                                                            <input type="hidden" name="_token"
-                                                                value="{{ csrf_token() }}" />
-                                                            <button class="btn btn-sm btn-danger btn-icon confirm-delete">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit"
+                                                                class="btn btn-sm btn-danger btn-icon confirm-delete">
                                                                 <i class="fas fa-times"></i> Hapus
                                                             </button>
                                                         </form>
@@ -136,7 +136,8 @@
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Unduh template <a href="{{ route('categories.template') }}" class="font-weight-bold text-primary">disini</a></li>
+                                <li>Unduh template <a href="{{ route('categories.template') }}"
+                                        class="font-weight-bold text-primary">disini</a></li>
                                 <li>Isi data kategori sesuai template</li>
                                 <li>Simpan dan unggah file</li>
                             </ol>
@@ -164,7 +165,8 @@
                 </div>
                 <div class="modal-body">
                     <p>Apakah Anda yakin ingin menghapus semua kategori? Tindakan ini tidak dapat dibatalkan.</p>
-                    <p class="text-danger"><strong>Peringatan: Ini akan secara permanen menghapus semua kategori dari database!</strong></p>
+                    <p class="text-danger"><strong>Peringatan: Ini akan secara permanen menghapus semua kategori dari
+                            database!</strong></p>
                 </div>
                 <div class="modal-footer">
                     <form action="{{ route('categories.deleteAll') }}" method="POST">
@@ -199,13 +201,14 @@
                         <div class="alert alert-info">
                             <h6>Petunjuk:</h6>
                             <ol>
-                                <li>Unduh template update <a
-                                        href="{{ route('categories.exportForUpdate') }}" class="font-weight-bold text-primary">disini</a></li>
+                                <li>Unduh template update <a href="{{ route('categories.exportForUpdate') }}"
+                                        class="font-weight-bold text-primary">disini</a></li>
                                 <li>Update data kategori sesuai template</li>
                                 <li>Simpan dan unggah file</li>
                             </ol>
                             <p>Urutan kolom: ID, Nama</p>
-                            <p class="text-warning">Catatan: ID kategori tidak boleh diubah karena digunakan sebagai referensi untuk update</p>
+                            <p class="text-warning">Catatan: ID kategori tidak boleh diubah karena digunakan sebagai
+                                referensi untuk update</p>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -222,6 +225,9 @@
     <!-- JS Libraries -->
     <script src="{{ asset('library/selectric/public/jquery.selectric.min.js') }}"></script>
 
+    <!-- SweetAlert Library -->
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+
     <!-- Page Specific JS File -->
     <script src="{{ asset('js/page/features-posts.js') }}"></script>
 
@@ -232,24 +238,24 @@
             if (window.innerWidth < 768) {
                 $('.d-flex.d-md-none .btn').addClass('btn-sm');
             }
-        });
 
-        // Confirm delete functionality
-        $('.confirm-delete').click(function(e) {
-            var form = $(this).closest('form');
-            e.preventDefault();
+            // Confirm delete functionality
+            $('.confirm-delete').click(function(e) {
+                e.preventDefault();
+                var form = $(this).closest('form');
 
-            swal({
-                title: 'Apakah Anda yakin?',
-                text: 'Tindakan ini tidak dapat dibatalkan',
-                icon: 'warning',
-                buttons: true,
-                dangerMode: true,
-            })
-            .then((willDelete) => {
-                if (willDelete) {
-                    form.submit();
-                }
+                swal({
+                        title: 'Apakah Anda yakin?',
+                        text: 'Tindakan ini tidak dapat dibatalkan',
+                        icon: 'warning',
+                        buttons: true,
+                        dangerMode: true,
+                    })
+                    .then(function(willDelete) {
+                        if (willDelete) {
+                            form.submit();
+                        }
+                    });
             });
         });
     </script>
@@ -269,7 +275,7 @@
             }
 
             /* Ensure text doesn't overflow on small screens */
-            .btn i + span {
+            .btn i+span {
                 max-width: 100px;
                 display: inline-block;
                 overflow: hidden;
