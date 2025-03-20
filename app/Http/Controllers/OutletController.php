@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Order;
 use App\Models\Outlet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -95,7 +96,7 @@ class OutletController extends Controller
     }
 
     /**
-     * Soft delete the specified outlet.
+     * Prevent outlet deletion if it has related data
      */
     public function destroy(Outlet $outlet)
     {
@@ -105,11 +106,43 @@ class OutletController extends Controller
         }
 
         try {
-            // Soft delete outlet
+            // Check if outlet has related orders
+            $orderCount = Order::where('outlet_id', $outlet->id)->count();
+
+            if ($orderCount > 0) {
+                return redirect()->route('outlets.index')
+                    ->with('error', "Outlet '{$outlet->name}' tidak dapat dihapus karena memiliki {$orderCount} pesanan terkait. Hapus semua pesanan terkait terlebih dahulu.");
+            }
+
+            // Check for users associated with the outlet
+            $userCount = DB::table('users')->where('outlet_id', $outlet->id)->count();
+
+            if ($userCount > 0) {
+                return redirect()->route('outlets.index')
+                    ->with('error', "Outlet '{$outlet->name}' tidak dapat dihapus karena memiliki {$userCount} pengguna terkait. Pindahkan atau hapus pengguna terlebih dahulu.");
+            }
+
+            // Check for daily cash records
+            $dailyCashCount = DB::table('daily_cash')->where('outlet_id', $outlet->id)->count();
+
+            if ($dailyCashCount > 0) {
+                return redirect()->route('outlets.index')
+                    ->with('error', "Outlet '{$outlet->name}' tidak dapat dihapus karena memiliki {$dailyCashCount} catatan kas harian. Hapus catatan kas terlebih dahulu.");
+            }
+
+            // Check for material orders
+            $materialOrderCount = DB::table('material_orders')->where('franchise_id', $outlet->id)->count();
+
+            if ($materialOrderCount > 0) {
+                return redirect()->route('outlets.index')
+                    ->with('error', "Outlet '{$outlet->name}' tidak dapat dihapus karena memiliki {$materialOrderCount} pesanan bahan baku. Hapus pesanan bahan baku terlebih dahulu.");
+            }
+
+            // If no related data, proceed with deletion
             $outlet->delete();
 
             return redirect()->route('outlets.index')
-                ->with('success', 'Outlet berhasil dihapus');
+                ->with('success', "Outlet '{$outlet->name}' berhasil dihapus");
         } catch (\Exception $e) {
             return redirect()->route('outlets.index')
                 ->with('error', 'Gagal menghapus outlet: ' . $e->getMessage());
@@ -936,20 +969,15 @@ class OutletController extends Controller
     }
 
     /**
-     * Soft delete all outlets without relation checking
+     * Prevent bulk deletion if any outlet has related data
      */
     public function deleteAll()
     {
-        // Ensure only owner can delete all outlets
-        if (Auth::user()->role !== 'owner') {
-            return redirect()->route('outlets.index')
-                ->with('error', 'Hanya owner yang dapat melakukan tindakan ini');
-        }
-
         try {
             DB::beginTransaction();
 
-            // Track how many outlets will be deleted
+            \Log::info('Memulai proses penghapusan semua outlet');
+
             $outletCount = Outlet::count();
 
             if ($outletCount === 0) {
@@ -958,28 +986,108 @@ class OutletController extends Controller
                     ->with('info', 'Tidak ada outlet yang ditemukan untuk dihapus.');
             }
 
-            // Soft delete all outlets without checking relations
+            // Check if any outlet has related data
+            $outletsWithOrders = Outlet::withCount('orders')->having('orders_count', '>', 0)->get();
+
+            if ($outletsWithOrders->count() > 0) {
+                $outletNames = $outletsWithOrders->pluck('name')->take(3)->implode(', ');
+                $totalOutlets = $outletsWithOrders->count();
+                $message = "Tidak dapat menghapus semua outlet karena beberapa outlet memiliki pesanan terkait. ";
+
+                if ($totalOutlets <= 3) {
+                    $message .= "Outlet dengan pesanan: {$outletNames}.";
+                } else {
+                    $message .= "Outlet dengan pesanan: {$outletNames} dan " . ($totalOutlets - 3) . " lainnya.";
+                }
+
+                DB::rollBack();
+                return redirect()->route('outlets.index')->with('error', $message);
+            }
+
+            // Check for users
+            $outletsWithUsers = DB::table('outlets')
+                ->join('users', 'outlets.id', '=', 'users.outlet_id')
+                ->select('outlets.name', DB::raw('count(*) as user_count'))
+                ->groupBy('outlets.id', 'outlets.name')
+                ->get();
+
+            if ($outletsWithUsers->count() > 0) {
+                $outletNames = $outletsWithUsers->pluck('name')->take(3)->implode(', ');
+                $totalOutlets = $outletsWithUsers->count();
+                $message = "Tidak dapat menghapus semua outlet karena beberapa outlet memiliki pengguna terkait. ";
+
+                if ($totalOutlets <= 3) {
+                    $message .= "Outlet dengan pengguna: {$outletNames}.";
+                } else {
+                    $message .= "Outlet dengan pengguna: {$outletNames} dan " . ($totalOutlets - 3) . " lainnya.";
+                }
+
+                DB::rollBack();
+                return redirect()->route('outlets.index')->with('error', $message);
+            }
+
+            // Check for daily cash
+            $outletsWithDailyCash = DB::table('outlets')
+                ->join('daily_cash', 'outlets.id', '=', 'daily_cash.outlet_id')
+                ->select('outlets.name', DB::raw('count(*) as record_count'))
+                ->groupBy('outlets.id', 'outlets.name')
+                ->get();
+
+            if ($outletsWithDailyCash->count() > 0) {
+                $outletNames = $outletsWithDailyCash->pluck('name')->take(3)->implode(', ');
+                $totalOutlets = $outletsWithDailyCash->count();
+                $message = "Tidak dapat menghapus semua outlet karena beberapa outlet memiliki catatan kas harian. ";
+
+                if ($totalOutlets <= 3) {
+                    $message .= "Outlet dengan catatan: {$outletNames}.";
+                } else {
+                    $message .= "Outlet dengan catatan: {$outletNames} dan " . ($totalOutlets - 3) . " lainnya.";
+                }
+
+                DB::rollBack();
+                return redirect()->route('outlets.index')->with('error', $message);
+            }
+
+            // Check for material orders
+            $outletsWithMaterialOrders = DB::table('outlets')
+                ->join('material_orders', 'outlets.id', '=', 'material_orders.franchise_id')
+                ->select('outlets.name', DB::raw('count(*) as order_count'))
+                ->groupBy('outlets.id', 'outlets.name')
+                ->get();
+
+            if ($outletsWithMaterialOrders->count() > 0) {
+                $outletNames = $outletsWithMaterialOrders->pluck('name')->take(3)->implode(', ');
+                $totalOutlets = $outletsWithMaterialOrders->count();
+                $message = "Tidak dapat menghapus semua outlet karena beberapa outlet memiliki pesanan bahan baku. ";
+
+                if ($totalOutlets <= 3) {
+                    $message .= "Outlet dengan pesanan bahan: {$outletNames}.";
+                } else {
+                    $message .= "Outlet dengan pesanan bahan: {$outletNames} dan " . ($totalOutlets - 3) . " lainnya.";
+                }
+
+                DB::rollBack();
+                return redirect()->route('outlets.index')->with('error', $message);
+            }
+
+            // If all checks pass, proceed with deletion
             Outlet::query()->delete();
 
-            // Commit the transaction
             DB::commit();
 
-            // Log successful deletion
-            \Log::info("Berhasil melakukan soft delete pada {$outletCount} outlet");
+            \Log::info("Berhasil menghapus semua {$outletCount} outlet");
 
             return redirect()->route('outlets.index')
-                ->with('success', "Semua {$outletCount} outlet berhasil dihapus.");
+                ->with('success', "Semua {$outletCount} outlet telah berhasil dihapus.");
         } catch (\Exception $e) {
-            // Log error
-            \Log::error('Error dalam deleteAll outlet: ' . $e->getMessage());
+            \Log::error('Error dalam penghapusan outlet: ' . $e->getMessage());
 
-            // Rollback transaction if still active
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
 
             return redirect()->route('outlets.index')
-                ->with('error', 'Kesalahan menghapus outlet: ' . $e->getMessage());
+                ->with('error', 'Terjadi kesalahan saat menghapus outlet: ' . $e->getMessage());
         }
     }
 }
