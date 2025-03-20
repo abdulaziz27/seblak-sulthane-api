@@ -62,3 +62,15 @@
         </div>
     </div>
 @endif
+
+{{-- Status Alert (usually from Password/Fortify) --}}
+@if (session('status'))
+    <div class="alert alert-success alert-dismissible show fade">
+        <div class="alert-body">
+            <button class="close" data-dismiss="alert">
+                <span>×</span>
+            </button>
+            <i class="fas fa-check-circle mr-2"></i> {{ session('status') }}
+        </div>
+    </div>
+@endif

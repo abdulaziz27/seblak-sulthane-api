@@ -20,32 +20,39 @@
 
             <div class="section-body">
                 <div class="row">
+                    <div class="col-12">
+                        @include('layouts.alert')
+                    </div>
+                </div>
+
+                <div class="row">
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
                                 <h4>Ubah Kata Sandi Anda</h4>
                             </div>
                             <div class="card-body">
-                                @if (session('success'))
-                                    <div class="alert alert-success">
-                                        {{ session('success') }}
-                                    </div>
-                                @endif
-
                                 <form method="POST" action="{{ route('password.update.change') }}">
                                     @csrf
                                     @method('PUT')
 
                                     <div class="form-group">
                                         <label for="current_password">Kata Sandi Saat Ini</label>
-                                        <input id="current_password"
-                                            type="password"
-                                            class="form-control @error('current_password') is-invalid @enderror"
-                                            name="current_password"
-                                            tabindex="1"
-                                            required>
+                                        <div class="input-group">
+                                            <input id="current_password"
+                                                type="password"
+                                                class="form-control @error('current_password') is-invalid @enderror"
+                                                name="current_password"
+                                                tabindex="1"
+                                                required>
+                                            <div class="input-group-append">
+                                                <div class="input-group-text toggle-password" data-target="current_password">
+                                                    <i class="fas fa-eye"></i>
+                                                </div>
+                                            </div>
+                                        </div>
                                         @error('current_password')
-                                            <div class="invalid-feedback">
+                                            <div class="invalid-feedback d-block">
                                                 {{ $message }}
                                             </div>
                                         @enderror
@@ -53,20 +60,27 @@
 
                                     <div class="form-group">
                                         <label for="password">Kata Sandi Baru</label>
-                                        <input id="password"
-                                            type="password"
-                                            class="form-control pwstrength @error('password') is-invalid @enderror"
-                                            data-indicator="pwindicator"
-                                            name="password"
-                                            tabindex="2"
-                                            required>
+                                        <div class="input-group">
+                                            <input id="password"
+                                                type="password"
+                                                class="form-control pwstrength @error('password') is-invalid @enderror"
+                                                data-indicator="pwindicator"
+                                                name="password"
+                                                tabindex="2"
+                                                required>
+                                            <div class="input-group-append">
+                                                <div class="input-group-text toggle-password" data-target="password">
+                                                    <i class="fas fa-eye"></i>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div id="pwindicator"
                                             class="pwindicator">
                                             <div class="bar"></div>
                                             <div class="label"></div>
                                         </div>
                                         @error('password')
-                                            <div class="invalid-feedback">
+                                            <div class="invalid-feedback d-block">
                                                 {{ $message }}
                                             </div>
                                         @enderror
@@ -74,12 +88,19 @@
 
                                     <div class="form-group">
                                         <label for="password-confirm">Konfirmasi Kata Sandi</label>
-                                        <input id="password-confirm"
-                                            type="password"
-                                            class="form-control"
-                                            name="password_confirmation"
-                                            tabindex="3"
-                                            required>
+                                        <div class="input-group">
+                                            <input id="password-confirm"
+                                                type="password"
+                                                class="form-control"
+                                                name="password_confirmation"
+                                                tabindex="3"
+                                                required>
+                                            <div class="input-group-append">
+                                                <div class="input-group-text toggle-password" data-target="password-confirm">
+                                                    <i class="fas fa-eye"></i>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="form-group">
@@ -106,4 +127,23 @@
 
     <!-- Page Specific JS File -->
     <script src="{{ asset('js/page/auth-register.js') }}"></script>
+
+    <!-- Script untuk toggle password visibility -->
+    <script>
+        $(document).ready(function() {
+            $('.toggle-password').click(function() {
+                const target = $(this).data('target');
+                const input = $('#' + target);
+                const icon = $(this).find('i');
+
+                if (input.attr('type') === 'password') {
+                    input.attr('type', 'text');
+                    icon.removeClass('fa-eye').addClass('fa-eye-slash');
+                } else {
+                    input.attr('type', 'password');
+                    icon.removeClass('fa-eye-slash').addClass('fa-eye');
+                }
+            });
+        });
+    </script>
 @endpush
