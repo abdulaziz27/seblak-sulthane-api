@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,16 +19,37 @@ use App\Models\OrderItem;
 class ProductController extends Controller
 {
     // index
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::paginate(10);
+        // Buat query dasar dengan eager loading kategori
+        $query = Product::with('category');
+
+        // Filter berdasarkan nama produk
+        if ($request->has('name') && !empty($request->name)) {
+            $search = $request->name;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('category', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Sorting default berdasarkan tanggal pembuatan
+        $query->orderBy('created_at', 'desc');
+
+        // Pagination dengan mempertahankan query string
+        $products = $query->paginate(10)->withQueryString();
+
         return view('pages.products.index', compact('products'));
     }
 
     // create
     public function create()
     {
-        $categories = DB::table('categories')->get();
+        // $categories = DB::table('categories')->get();
+        $categories = Category::withoutTrashed()->get();
         return view('pages.products.create', compact('categories'));
     }
 
@@ -78,7 +100,8 @@ class ProductController extends Controller
     public function edit($id)
     {
         $product = Product::findOrFail($id);
-        $categories = DB::table('categories')->get();
+        // $categories = DB::table('categories')->get();
+        $categories = Category::withoutTrashed()->get();
         return view('pages.products.edit', compact('product', 'categories'));
     }
 
@@ -679,11 +702,15 @@ class ProductController extends Controller
         }
     }
 
-    // Improved bulk update template with consistent styling
+    /**
+     * Generate template for bulk updating products with consistent styling
+     */
     public function exportForUpdate()
     {
         try {
             $products = Product::with('category')->get();
+            // Ambil hanya kategori yang belum dihapus untuk dropdown
+            $categories = Category::withoutTrashed()->pluck('name')->toArray();
 
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
@@ -693,13 +720,10 @@ class ProductController extends Controller
                 ->setCreator('Seblak Sulthane')
                 ->setLastModifiedBy('Seblak Sulthane')
                 ->setTitle('Template Update Massal Produk')
-                ->setSubject('Seblak Sulthane Products')
+                ->setSubject('Update Massal Produk')
                 ->setDescription('Dibuat oleh Sistem Manajemen Seblak Sulthane');
 
-            // Get all categories for the dropdown list
-            $categories = DB::table('categories')->pluck('name')->toArray();
-
-            // Set headers with status and favorite fields
+            // Set headers - Hapus kolom "Favorit"
             $headers = [
                 'ID',
                 'Nama',
@@ -707,9 +731,12 @@ class ProductController extends Controller
                 'Deskripsi',
                 'Harga',
                 'Stok',
-                'Aktif',
-                'Favorit'
+                'Status'
             ];
+
+            foreach ($headers as $index => $header) {
+                $sheet->setCellValue(chr(65 + $index) . '1', $header);
+            }
 
             // Header styling
             $headerStyle = [
@@ -732,22 +759,9 @@ class ProductController extends Controller
                 ],
             ];
 
-            foreach ($headers as $index => $header) {
-                $sheet->setCellValue(chr(65 + $index) . '1', $header);
-            }
-
-            // Apply header styling
-            $sheet->getStyle('A1:H1')->applyFromArray($headerStyle);
+            // Ubah range styling dari A1:H1 menjadi A1:G1 (tanpa kolom Favorit)
+            $sheet->getStyle('A1:G1')->applyFromArray($headerStyle);
             $sheet->getRowDimension(1)->setRowHeight(30);
-
-            // Data row styling
-            $dataRowStyle = [
-                'borders' => [
-                    'allBorders' => [
-                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
-                    ],
-                ],
-            ];
 
             // Add data rows
             $row = 2;
@@ -758,12 +772,19 @@ class ProductController extends Controller
                 $sheet->setCellValue('D' . $row, $product->description);
                 $sheet->setCellValue('E' . $row, $product->price);
                 $sheet->setCellValue('F' . $row, $product->stock);
-
-                // Set TRUE/FALSE for status and favorite fields
                 $sheet->setCellValue('G' . $row, $product->status ? 'BENAR' : 'SALAH');
-                $sheet->setCellValue('H' . $row, $product->is_favorite ? 'BENAR' : 'SALAH');
+                // Hapus pengisian cell untuk is_favorite
 
-                // Add data validation for Category column
+                // Protect the ID cell from editing
+                $sheet->getStyle('A' . $row)->getProtection()
+                    ->setLocked(true);
+
+                // Highlight ID column to indicate it shouldn't be modified
+                $sheet->getStyle('A' . $row)->getFill()
+                    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('D9D9D9'); // Light gray background
+
+                // Add dropdown for Category column - hanya kategori aktif
                 $validation = $sheet->getCell('C' . $row)->getDataValidation();
                 $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
                 $validation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
@@ -779,21 +800,13 @@ class ProductController extends Controller
                 $activeValidation->setShowDropDown(true);
                 $activeValidation->setFormula1('"BENAR,SALAH"');
 
-                // Add TRUE/FALSE dropdown for Favorite column
-                $favoriteValidation = $sheet->getCell('H' . $row)->getDataValidation();
-                $favoriteValidation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
-                $favoriteValidation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
-                $favoriteValidation->setAllowBlank(false);
-                $favoriteValidation->setShowDropDown(true);
-                $favoriteValidation->setFormula1('"BENAR,SALAH"');
-
-                // Alternate row colors
+                // Alternate row colors for data rows
                 if ($row % 2 == 0) {
-                    $sheet->getStyle('A' . $row . ':H' . $row)->getFill()
+                    $sheet->getStyle('B' . $row . ':G' . $row)->getFill()
                         ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F2F2F2');
                 } else {
-                    $sheet->getStyle('A' . $row . ':H' . $row)->getFill()
+                    $sheet->getStyle('B' . $row . ':G' . $row)->getFill()
                         ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('FFFFFF');
                 }
@@ -801,22 +814,19 @@ class ProductController extends Controller
                 $row++;
             }
 
-            // Apply borders to all data cells
-            $sheet->getStyle('A1:H' . ($row - 1))->applyFromArray($dataRowStyle);
-
-            // Set column widths
-            $sheet->getColumnDimension('A')->setWidth(10); // ID
-            $sheet->getColumnDimension('B')->setWidth(30); // Nama
-            $sheet->getColumnDimension('C')->setWidth(20); // Kategori
-            $sheet->getColumnDimension('D')->setWidth(40); // Deskripsi
-            $sheet->getColumnDimension('E')->setWidth(15); // Harga
-            $sheet->getColumnDimension('F')->setWidth(15); // Stok
-            $sheet->getColumnDimension('G')->setWidth(15); // Aktif
-            $sheet->getColumnDimension('H')->setWidth(15); // Favorit
+            // Format the entire data area
+            $borderStyle = [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    ],
+                ],
+            ];
+            $sheet->getStyle('A1:G' . ($row - 1))->applyFromArray($borderStyle);
 
             // Add instructions section
-            $sheet->setCellValue('J1', 'PETUNJUK');
-            $sheet->getStyle('J1')->applyFromArray([
+            $sheet->setCellValue('I1', 'PETUNJUK');
+            $sheet->getStyle('I1')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'size' => 14,
@@ -838,7 +848,7 @@ class ProductController extends Controller
                 "1. JANGAN memodifikasi kolom ID (kolom A)",
                 "2. Untuk Kategori, pilih dari dropdown yang tersedia",
                 "3. Harga dan Stok harus berupa angka",
-                "4. Untuk kolom Aktif dan Favorit, pilih BENAR atau SALAH dari dropdown",
+                "4. Untuk kolom Status, pilih BENAR atau SALAH dari dropdown",
                 "5. Kolom yang tidak ingin diubah bisa dibiarkan apa adanya",
                 "6. Sistem hanya akan mengupdate kolom yang Anda modifikasi",
                 "7. Jangan mengubah baris header",
@@ -846,8 +856,8 @@ class ProductController extends Controller
             ];
 
             $instructionText = implode("\n\n", $instructions);
-            $sheet->setCellValue('J2', $instructionText);
-            $sheet->getStyle('J2:J9')->applyFromArray([
+            $sheet->setCellValue('I2', $instructionText);
+            $sheet->getStyle('I2:I9')->applyFromArray([
                 'font' => [
                     'size' => 12,
                 ],
@@ -865,27 +875,35 @@ class ProductController extends Controller
                     'wrapText' => true
                 ],
             ]);
-            $sheet->mergeCells('J2:J9');
-            $sheet->getColumnDimension('J')->setWidth(50);
+            $sheet->mergeCells('I2:I9');
+            $sheet->getColumnDimension('I')->setWidth(50);
 
-            // Set freeze pane on first row and first column
-            $sheet->freezePane('B2');
+            // Set column widths
+            $sheet->getColumnDimension('A')->setWidth(10);  // ID
+            $sheet->getColumnDimension('B')->setWidth(30);  // Nama
+            $sheet->getColumnDimension('C')->setWidth(20);  // Kategori
+            $sheet->getColumnDimension('D')->setWidth(40);  // Deskripsi
+            $sheet->getColumnDimension('E')->setWidth(15);  // Harga
+            $sheet->getColumnDimension('F')->setWidth(15);  // Stok
+            $sheet->getColumnDimension('G')->setWidth(15);  // Status
 
             // Set the auto-filter
-            $sheet->setAutoFilter('A1:H' . ($row - 1));
+            $sheet->setAutoFilter('A1:G' . ($row - 1));
 
+            // Freeze panes (first row and ID column)
+            $sheet->freezePane('B2');
+
+            // Create the writer and output the file
             $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="produk_untuk_update.xlsx"');
+            header('Content-Disposition: attachment;filename="produk_untuk_update_' . date('Y-m-d') . '.xlsx"');
             header('Cache-Control: max-age=0');
 
             $writer->save('php://output');
-
             exit();
         } catch (\Exception $e) {
-            return redirect()
-                ->route('products.index')
+            return redirect()->route('products.index')
                 ->with('error', 'Gagal mengekspor produk: ' . $e->getMessage());
         }
     }
