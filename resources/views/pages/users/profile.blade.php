@@ -86,9 +86,16 @@
                                     <div class="row">
                                         <div class="form-group col-md-12 col-12">
                                             <label>Kata Sandi Saat Ini <small class="text-muted">(Hanya isi jika ingin mengubah kata sandi)</small></label>
-                                            <input type="password" class="form-control @error('current_password') is-invalid @enderror" name="current_password">
+                                            <div class="input-group">
+                                                <input type="password" class="form-control @error('current_password') is-invalid @enderror" name="current_password" id="current_password">
+                                                <div class="input-group-append">
+                                                    <div class="input-group-text toggle-password" data-target="current_password">
+                                                        <i class="fas fa-eye"></i>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             @error('current_password')
-                                                <div class="invalid-feedback">
+                                                <div class="invalid-feedback d-block">
                                                     {{ $message }}
                                                 </div>
                                             @enderror
@@ -98,18 +105,32 @@
                                     <div class="row">
                                         <div class="form-group col-md-6 col-12">
                                             <label>Kata Sandi Baru</label>
-                                            <input type="password" class="form-control @error('new_password') is-invalid @enderror" name="new_password">
-                                            @error('new_password')
-                                                <div class="invalid-feedback">
+                                            <div class="input-group">
+                                                <input type="password" class="form-control @error('password') is-invalid @enderror" name="password" id="password">
+                                                <div class="input-group-append">
+                                                    <div class="input-group-text toggle-password" data-target="password">
+                                                        <i class="fas fa-eye"></i>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            @error('password')
+                                                <div class="invalid-feedback d-block">
                                                     {{ $message }}
                                                 </div>
                                             @enderror
                                         </div>
                                         <div class="form-group col-md-6 col-12">
                                             <label>Konfirmasi Kata Sandi Baru</label>
-                                            <input type="password" class="form-control @error('new_password_confirmation') is-invalid @enderror" name="new_password_confirmation">
-                                            @error('new_password_confirmation')
-                                                <div class="invalid-feedback">
+                                            <div class="input-group">
+                                                <input type="password" class="form-control @error('password_confirmation') is-invalid @enderror" name="password_confirmation" id="password_confirmation">
+                                                <div class="input-group-append">
+                                                    <div class="input-group-text toggle-password" data-target="password_confirmation">
+                                                        <i class="fas fa-eye"></i>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            @error('password_confirmation')
+                                                <div class="invalid-feedback d-block">
                                                     {{ $message }}
                                                 </div>
                                             @enderror
@@ -153,4 +174,23 @@
 
     <!-- Page Specific JS File -->
     <script src="{{ asset('js/page/forms-advanced-forms.js') }}"></script>
+
+    <!-- Script untuk toggle password visibility -->
+    <script>
+        $(document).ready(function() {
+            $('.toggle-password').click(function() {
+                const target = $(this).data('target');
+                const input = $('#' + target);
+                const icon = $(this).find('i');
+
+                if (input.attr('type') === 'password') {
+                    input.attr('type', 'text');
+                    icon.removeClass('fa-eye').addClass('fa-eye-slash');
+                } else {
+                    input.attr('type', 'password');
+                    icon.removeClass('fa-eye-slash').addClass('fa-eye');
+                }
+            });
+        });
+    </script>
 @endpush

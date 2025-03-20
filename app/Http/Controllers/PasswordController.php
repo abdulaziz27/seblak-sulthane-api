@@ -102,7 +102,7 @@ class PasswordController extends Controller
         ]);
 
         return redirect()
-            ->route('home')
-            ->with('success', 'Password has been changed successfully.');
+            ->route('password.change')
+            ->with('success', 'Kata sandi berhasil diubah.');
     }
 }

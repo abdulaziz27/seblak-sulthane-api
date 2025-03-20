@@ -58,7 +58,7 @@ class UserController extends Controller
         if (Auth::user()->role === 'admin') {
             // Admins can only create staff users
             if ($request->role !== 'staff') {
-                return redirect()->back()->with('error', 'You can only create staff accounts');
+                return redirect()->back()->with('error', 'Anda hanya bisa membuat akun staff');
             }
             // Force outlet_id to admin's outlet
             $request->merge(['outlet_id' => Auth::user()->outlet_id]);
@@ -73,7 +73,7 @@ class UserController extends Controller
             'outlet_id' => $request->outlet_id ?: null,
         ]);
 
-        return redirect()->route('users.index')->with('success', 'User created successfully');
+        return redirect()->route('users.index')->with('success', 'Pengguna berhasil dibuat');
     }
 
     public function edit($id)
@@ -86,7 +86,7 @@ class UserController extends Controller
                 $user->id !== Auth::id() && // Allow editing self
                 ($user->outlet_id !== Auth::user()->outlet_id || $user->role !== 'staff')
             ) {
-                return redirect()->route('users.index')->with('error', 'Unauthorized access');
+                return redirect()->route('users.index')->with('error', 'Akses tidak diizinkan');
             }
         }
 
@@ -113,7 +113,7 @@ class UserController extends Controller
         if (Auth::user()->role === 'admin') {
             if ($user->id !== Auth::id()) { // Not editing self
                 if ($user->outlet_id !== Auth::user()->outlet_id || $user->role !== 'staff') {
-                    return redirect()->route('users.index')->with('error', 'Unauthorized access');
+                    return redirect()->route('users.index')->with('error', 'Akses tidak diizinkan');
                 }
                 // Force outlet_id to admin's outlet for staff
                 $request->merge(['outlet_id' => Auth::user()->outlet_id]);
@@ -139,7 +139,7 @@ class UserController extends Controller
             $user->update(['password' => Hash::make($request->password)]);
         }
 
-        return redirect()->route('users.index')->with('success', 'User updated successfully');
+        return redirect()->route('users.index')->with('success', 'Pengguna berhasil diupdate');
     }
 
     public function destroy($id)
@@ -149,14 +149,14 @@ class UserController extends Controller
         // Check permissions
         if (Auth::user()->role === 'admin') {
             if ($user->outlet_id !== Auth::user()->outlet_id || $user->role !== 'staff') {
-                return redirect()->route('users.index')->with('error', 'Unauthorized access');
+                return redirect()->route('users.index')->with('error', 'Akses tidak diizinkan');
             }
         }
 
         // Prevent deletion of the last owner
         if ($user->role === 'owner' && User::where('role', 'owner')->count() <= 1) {
             return redirect()->route('users.index')
-                ->with('error', 'Cannot delete the last owner account');
+                ->with('error', 'Tidak bisa menghapus akun owner terakhir!');
         }
 
         // Prevent self-deletion
@@ -166,7 +166,7 @@ class UserController extends Controller
         }
 
         $user->delete();
-        return redirect()->route('users.index')->with('success', 'User deleted successfully');
+        return redirect()->route('users.index')->with('success', 'Pengguna berhasil dihapus');
     }
 
     // Profile
@@ -211,7 +211,7 @@ class UserController extends Controller
             if (!Hash::check($request->current_password, $user->password)) {
                 return back()
                     ->withInput()
-                    ->withErrors(['current_password' => 'Current password is incorrect']);
+                    ->withErrors(['current_password' => 'Kata sandi saat ini tidak benar']);
             }
         }
 
@@ -227,6 +227,6 @@ class UserController extends Controller
         $user->save();
 
         return redirect()->route('profile')
-            ->with('success', 'Profile updated successfully');
+            ->with('success', 'Profil berhasil diperbarui');
     }
 }
