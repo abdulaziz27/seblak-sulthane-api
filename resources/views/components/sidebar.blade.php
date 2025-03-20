@@ -15,13 +15,11 @@
                 </a>
             </li>
 
-            @if (Auth::user()->role === 'owner')
             <li class='nav-item'>
                 <a class="nav-link" href="{{ route('reports.index') }}">
                     <i class="fas fa-chart-bar"></i><span>Laporan</span>
                 </a>
             </li>
-            @endif
 
             <!-- Bagian Master Data -->
             <li class="menu-header">Master Data</li>

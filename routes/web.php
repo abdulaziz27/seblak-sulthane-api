@@ -50,13 +50,18 @@ Route::middleware(['auth'])->group(function () {
         ->name('password.update.change');
 
 
-    // Basic viewing routes for all users
+    // Basic viewing routes for all users (view only)
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('orders/{id}', [OrderController::class, 'show'])->name('orders.show');
-    Route::get('outlets', [OutletController::class, 'index'])->name('outlets.index');
-    Route::get('discounts', [DiscountController::class, 'index'])->name('discounts.index');
-    Route::get('members', [MemberController::class, 'index'])->name('members.index');
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('products', [ProductController::class, 'index'])->name('products.index');
+    Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
+    Route::get('discounts', [DiscountController::class, 'index'])->name('discounts.index');
+    Route::get('outlets', [OutletController::class, 'index'])->name('outlets.index');
+
+    // Member only routes
+    Route::resource('members', MemberController::class);
+
 
     // Owner only routes
     Route::middleware('owner-only')->group(function () {
@@ -76,9 +81,10 @@ Route::middleware(['auth'])->group(function () {
     // Routes for admin and owner only
     Route::middleware('prevent-staff')->group(function () {
         Route::resource('users', UserController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
-        Route::resource('products', ProductController::class)->except(['show']);
-        Route::resource('categories', CategoryController::class)->except(['show']);
-        Route::resource('members', MemberController::class);
+        Route::resource('products', ProductController::class)->except(['index', 'show']);
+        Route::resource('categories', CategoryController::class)->except(['index', 'show']);
+        Route::resource('discounts', DiscountController::class)->except('index');
+        Route::resource('outlets', OutletController::class)->except(['index', 'show']);
 
         // Import/Export routes
         Route::post('products/import', [ProductController::class, 'import'])->name('products.import');
@@ -113,14 +119,11 @@ Route::middleware(['auth'])->group(function () {
 
     // Reports
     Route::middleware('prevent-staff')->prefix('reports')->name('reports.')->group(function () {
-        Route::get('/', [ReportController::class, 'index'])->name('index');
-        Route::get('/sales-summary', [ReportController::class, 'salesSummary'])->name('sales-summary');
         Route::get('/outlet-performance', [ReportController::class, 'outletPerformance'])->name('outlet-performance');
         Route::get('/product-performance', [ReportController::class, 'productPerformance'])->name('product-performance');
         Route::get('/customer-insights', [ReportController::class, 'customerInsights'])->name('customer-insights');
         Route::get('/inventory', [ReportController::class, 'inventoryReport'])->name('inventory');
     });
-
 
     Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary'])->name('reports.sales-summary');
     Route::get('/reports/material-purchases', [ReportController::class, 'materialPurchases'])->name('reports.material-purchases');

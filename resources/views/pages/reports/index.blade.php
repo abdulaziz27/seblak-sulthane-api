@@ -56,10 +56,14 @@
                                     <div class="form-group">
                                         <label>Outlet</label>
                                         <select class="form-control select2" name="outlet_id">
-                                            <option value="">Semua Outlet</option>
-                                            @foreach ($outlets as $outlet)
-                                                <option value="{{ $outlet->id }}">{{ $outlet->name }}</option>
-                                            @endforeach
+                                            <option value="">
+                                                {{ Auth::user()->role === 'owner' ? 'Semua Outlet' : Auth::user()->outlet->name }}
+                                            </option>
+                                            @if (Auth::user()->role === 'owner')
+                                                @foreach ($outlets as $outlet)
+                                                    <option value="{{ $outlet->id }}">{{ $outlet->name }}</option>
+                                                @endforeach
+                                            @endif
                                         </select>
                                     </div>
                                     <div class="form-group">

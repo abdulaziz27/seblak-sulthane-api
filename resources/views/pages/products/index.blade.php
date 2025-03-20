@@ -12,6 +12,7 @@
         <section class="section">
             <div class="section-header">
                 <h1>Manajemen Produk</h1>
+                @if(Auth::user()->role !== 'staff')
                 <div class="section-header-button d-none d-md-flex">
                     <a href="{{ route('products.create') }}" class="btn btn-primary">Tambah Produk Baru</a>
                     <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
@@ -27,6 +28,7 @@
                         Hapus Semua Produk
                     </button>
                 </div>
+                @endif
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
                     <div class="breadcrumb-item"><a href="#">Produk</a></div>
@@ -35,6 +37,7 @@
             </div>
             <div class="section-body">
                 <!-- Responsive action buttons for small screens -->
+                @if(Auth::user()->role !== 'staff')
                 <div class="d-flex d-md-none mb-4 flex-wrap justify-content-center">
                     <a href="{{ route('products.create') }}" class="btn btn-primary m-1">
                         <i class="fas fa-plus mr-1"></i> Tambah
@@ -52,6 +55,7 @@
                         <i class="fas fa-trash mr-1"></i> Hapus
                     </button>
                 </div>
+                @endif
 
                 <div class="row">
                     <div class="col-12">
@@ -109,23 +113,28 @@
                                                 </td>
                                                 <td>{{ $product->created_at->format('d M Y H:i') }}</td>
                                                 <td>
-                                                    <div class="d-flex justify-content-center">
-                                                        <a href='{{ route('products.edit', $product->id) }}'
-                                                            class="btn btn-sm btn-info btn-icon">
-                                                            <i class="fas fa-edit"></i>
-                                                            Edit
-                                                        </a>
+                                                    @if (Auth::user()->role !== 'staff')
+                                                        <div class="d-flex justify-content-center">
+                                                            <a href='{{ route('products.edit', $product->id) }}'
+                                                                class="btn btn-sm btn-info btn-icon">
+                                                                <i class="fas fa-edit"></i>
+                                                                Edit
+                                                            </a>
 
-                                                        <form action="{{ route('products.destroy', $product->id) }}"
-                                                            method="POST" class="ml-2">
-                                                            <input type="hidden" name="_method" value="DELETE" />
-                                                            <input type="hidden" name="_token"
-                                                                value="{{ csrf_token() }}" />
-                                                            <button class="btn btn-sm btn-danger btn-icon confirm-delete">
-                                                                <i class="fas fa-times"></i> Hapus
-                                                            </button>
-                                                        </form>
-                                                    </div>
+                                                            <form action="{{ route('products.destroy', $product->id) }}"
+                                                                method="POST" class="ml-2">
+                                                                <input type="hidden" name="_method" value="DELETE" />
+                                                                <input type="hidden" name="_token"
+                                                                    value="{{ csrf_token() }}" />
+                                                                <button
+                                                                    class="btn btn-sm btn-danger btn-icon confirm-delete">
+                                                                    <i class="fas fa-times"></i> Hapus
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    @else
+                                                        <span class="badge badge-secondary">Lihat Saja</span>
+                                                    @endif
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -284,7 +293,7 @@
             }
 
             /* Ensure text doesn't overflow on small screens */
-            .btn i + span {
+            .btn i+span {
                 max-width: 100px;
                 display: inline-block;
                 overflow: hidden;

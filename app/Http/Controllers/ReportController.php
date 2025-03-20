@@ -30,9 +30,9 @@ class ReportController extends Controller
     public function index()
     {
         // Ensure only owner can access
-        if (Auth::user()->role !== 'owner') {
-            return redirect()->route('home')->with('error', 'Anda tidak memiliki akses untuk melihat laporan');
-        }
+        // if (Auth::user()->role !== 'owner') {
+        //     return redirect()->route('home')->with('error', 'Anda tidak memiliki akses untuk melihat laporan');
+        // }
 
         $outlets = Outlet::all();
 
@@ -88,6 +88,13 @@ class ReportController extends Controller
         $endDate = Carbon::parse($request->end_date)->endOfDay();
         $outletId = $request->outlet_id;
         $periodType = $request->period_type;
+
+        // Jika staff, batasi akses ke outlet mereka saja
+        if (Auth::user()->role === 'staff') {
+            $outletId = Auth::user()->outlet_id;
+        } else {
+            $outletId = $request->outlet_id;
+        }
 
         // Log untuk debugging
         \Log::info('Laporan dengan parameter', [
@@ -1078,6 +1085,14 @@ class ReportController extends Controller
 
         $startDate = Carbon::parse($request->start_date)->startOfDay();
         $endDate = Carbon::parse($request->end_date)->endOfDay();
+
+        // Jika staff, batasi akses ke outlet mereka saja
+        if (Auth::user()->role === 'staff') {
+            $outletId = Auth::user()->outlet_id;
+        } else {
+            $outletId = $request->outlet_id;
+        }
+
         $outletId = $request->outlet_id;
 
         // Base query for material orders
