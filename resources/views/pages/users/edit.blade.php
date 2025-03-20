@@ -10,6 +10,16 @@
     <link rel="stylesheet" href="{{ asset('library/selectric/public/selectric.css') }}">
     <link rel="stylesheet" href="{{ asset('library/bootstrap-timepicker/css/bootstrap-timepicker.min.css') }}">
     <link rel="stylesheet" href="{{ asset('library/bootstrap-tagsinput/dist/bootstrap-tagsinput.css') }}">
+    <style>
+        /* Fix untuk dropdown select yang tertutup */
+        .form-control {
+            z-index: 1;
+        }
+        select.form-control {
+            position: relative;
+            z-index: 10;
+        }
+    </style>
 @endpush
 
 @section('main')
@@ -38,9 +48,7 @@
                             <div class="form-group">
                                 <label>Nama</label>
                                 <input type="text"
-                                    class="form-control @error('name')
-                                is-invalid
-                            @enderror"
+                                    class="form-control @error('name') is-invalid @enderror"
                                     name="name" value="{{ $user->name }}">
                                 @error('name')
                                     <div class="invalid-feedback">
@@ -51,9 +59,7 @@
                             <div class="form-group">
                                 <label>Email</label>
                                 <input type="email"
-                                    class="form-control @error('email')
-                                is-invalid
-                            @enderror"
+                                    class="form-control @error('email') is-invalid @enderror"
                                     name="email" value="{{ $user->email }}">
                                 @error('email')
                                     <div class="invalid-feedback">
@@ -70,9 +76,7 @@
                                         </div>
                                     </div>
                                     <input type="password"
-                                        class="form-control @error('password')
-                                is-invalid
-                            @enderror"
+                                        class="form-control @error('password') is-invalid @enderror"
                                         name="password">
                                 </div>
                                 @error('password')
@@ -83,12 +87,12 @@
                             </div>
 
                             {{-- Form group for outlet selection --}}
-                            <div class="form-group">
+                            <div class="form-group position-relative">
                                 <label>Outlet</label>
-                                <select name="outlet_id" class="form-control @error('outlet_id') is-invalid @enderror"
+                                <select name="outlet_id" class="form-control select2 @error('outlet_id') is-invalid @enderror"
                                     {{ Auth::user()->role === 'admin' && (!isset($user) || $user->id !== Auth::id()) ? 'disabled' : '' }}>
                                     <option value="" disabled selected>Pilih Outlet</option>
-                                    <option value="null" {{ $user->outlet_id === null ? 'selected' : '' }}>None (Tidak Ada)</option>
+                                    <option value="">None (Tidak Ada)</option>
                                     @foreach ($outlets as $outlet)
                                         <option value="{{ $outlet->id }}"
                                             {{ (isset($user) && $user->outlet_id === $outlet->id) ||
@@ -105,7 +109,6 @@
                                     </div>
                                 @enderror
                             </div>
-
 
                             {{-- Form group for role selection --}}
                             <div class="form-group">
@@ -142,11 +145,22 @@
                         </div>
                     </form>
                 </div>
-
             </div>
         </section>
     </div>
 @endsection
 
 @push('scripts')
+    <!-- JS Libraries -->
+    <script src="{{ asset('library/select2/dist/js/select2.full.min.js') }}"></script>
+    <script src="{{ asset('library/selectric/public/jquery.selectric.min.js') }}"></script>
+
+    <script>
+        $(document).ready(function() {
+            // Inisialisasi Select2 untuk meningkatkan dropdown
+            $('.select2').select2({
+                width: '100%'
+            });
+        });
+    </script>
 @endpush

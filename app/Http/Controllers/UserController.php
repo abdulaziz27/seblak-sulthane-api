@@ -29,6 +29,14 @@ class UserController extends Controller
             });
         }
 
+        // Sorting by role priority first, then by creation date
+        $query->orderByRaw("CASE
+                        WHEN role = 'owner' THEN 1
+                        WHEN role = 'admin' THEN 2
+                        WHEN role = 'staff' THEN 3
+                        ELSE 4 END")
+            ->orderBy('created_at', 'desc');
+
         $users = $query->paginate(10);
         return view('pages.users.index', compact('users'));
     }
