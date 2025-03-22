@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -45,5 +46,16 @@ class Order extends Model
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    protected static function booted()
+    {
+        static::creating(function ($order) {
+            if (!empty($order->transaction_time)) {
+                $transactionTime = Carbon::parse($order->transaction_time);
+                $order->created_at = $transactionTime;
+                $order->updated_at = $transactionTime;
+            }
+        });
     }
 }
