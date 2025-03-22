@@ -85,14 +85,24 @@ class OrderController extends Controller
     {
         $start_date = $request->input('start_date');
         $end_date = $request->input('end_date');
+
+        $query = Order::query();
+
         if ($start_date && $end_date) {
             $start = Carbon::parse($start_date)->startOfDay();
             $end = Carbon::parse($end_date)->endOfDay();
 
-            $orders = Order::whereBetween('created_at', [$start, $end])->with('outlet')->get();
-        } else {
-            $orders = Order::with('outlet')->get();
+            // Filter berdasarkan created_at karena sudah diselaraskan dengan transaction_time
+            $query->whereBetween('created_at', [$start, $end]);
         }
+
+        // Filter tambahan berdasarkan outlet_id jika diperlukan
+        if ($request->has('outlet_id')) {
+            $query->where('outlet_id', $request->outlet_id);
+        }
+
+        $orders = $query->with('outlet')->get();
+
         return response()->json([
             'status' => 'success',
             'data' => $orders
