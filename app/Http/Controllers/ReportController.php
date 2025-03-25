@@ -90,7 +90,7 @@ class ReportController extends Controller
         $periodType = $request->period_type;
 
         // Jika staff, batasi akses ke outlet mereka saja
-        if (Auth::user()->role === 'staff') {
+        if (Auth::user()->role === 'staff' || Auth::user()->role === 'admin') {
             $outletId = Auth::user()->outlet_id;
         } else {
             $outletId = $request->outlet_id;
@@ -131,6 +131,57 @@ class ReportController extends Controller
             })
             ->where('categories.id', 2) // ID kategori minuman
             ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+        // Get detailed beverage sales breakdown by payment method
+        $beverageSalesByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->select(
+                'orders.payment_method',
+                DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'),
+                DB::raw('SUM(order_items.quantity) as total_quantity')
+            )
+            ->whereBetween('orders.created_at', [$startDate, $endDate])
+            ->when($outletId, function ($query) use ($outletId) {
+                return $query->where('orders.outlet_id', $outletId);
+            })
+            ->where('categories.id', 2) // ID kategori minuman
+            ->groupBy('orders.payment_method')
+            ->get();
+
+        // Initialize beverage sales variables
+        $beverageCashSales = 0;
+        $beverageQrisSales = 0;
+        $beverageCashQuantity = 0;
+        $beverageQrisQuantity = 0;
+
+        // Extract cash and QRIS values
+        foreach ($beverageSalesByPayment as $paymentData) {
+            $paymentMethod = strtolower($paymentData->payment_method);
+            if ($paymentMethod === 'cash') {
+                $beverageCashSales = $paymentData->total_sales;
+                $beverageCashQuantity = $paymentData->total_quantity;
+            } elseif ($paymentMethod === 'qris') {
+                $beverageQrisSales = $paymentData->total_sales;
+                $beverageQrisQuantity = $paymentData->total_quantity;
+            }
+        }
+
+        // Create structured beverage breakdown for API consistency
+        $beveragePaymentBreakdown = [
+            'cash' => [
+                'quantity' => $beverageCashQuantity,
+                'amount' => $beverageCashSales
+            ],
+            'qris' => [
+                'quantity' => $beverageQrisQuantity,
+                'amount' => $beverageQrisSales
+            ],
+            'total' => [
+                'quantity' => $beverageCashQuantity + $beverageQrisQuantity,
+                'amount' => $beverageSales
+            ]
+        ];
 
         // Data berdasarkan metode pembayaran
         $paymentMethods = Order::whereBetween('created_at', [$startDate, $endDate])
@@ -175,6 +226,8 @@ class ReportController extends Controller
 
         // Menghitung saldo akhir (kurangi dengan biaya QRIS)
         $closingBalance = $totalOpeningBalance + $cashSales + $qrisSales - $totalExpenses - $totalQrisFee;
+
+        $finalCashClosing = $totalOpeningBalance + $cashSales - $totalExpenses;
 
         // Persiapan data harian
         $dailyData = [];
@@ -233,6 +286,9 @@ class ReportController extends Controller
                 // Hitung saldo akhir harian (kurangi dengan biaya QRIS)
                 $dailyClosingBalance = $dailyOpeningBalance + $dailyCashSales + $dailyQrisSales - $dailyExpenses - $dailyQrisFee;
 
+                // Calculate daily final cash closing
+                $dailyFinalCashClosing = $dailyOpeningBalance + $dailyCashSales - $dailyExpenses;
+
                 // Data minuman harian
                 $dailyBeverageSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
                     ->join('products', 'products.id', '=', 'order_items.product_id')
@@ -244,6 +300,57 @@ class ReportController extends Controller
                     ->where('categories.id', 2) // ID kategori minuman
                     ->sum(DB::raw('order_items.quantity * order_items.price'));
 
+                // Get daily beverage sales by payment method
+                $dailyBeverageByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->select(
+                        'orders.payment_method',
+                        DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'),
+                        DB::raw('SUM(order_items.quantity) as total_quantity')
+                    )
+                    ->whereDate('orders.created_at', $currentDateStr)
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', 2) // ID kategori minuman
+                    ->groupBy('orders.payment_method')
+                    ->get();
+
+                // Initialize daily beverage variables
+                $dailyBeverageCashSales = 0;
+                $dailyBeverageQrisSales = 0;
+                $dailyBeverageCashQuantity = 0;
+                $dailyBeverageQrisQuantity = 0;
+
+                // Extract daily cash and QRIS values
+                foreach ($dailyBeverageByPayment as $paymentData) {
+                    $paymentMethod = strtolower($paymentData->payment_method);
+                    if ($paymentMethod === 'cash') {
+                        $dailyBeverageCashSales = $paymentData->total_sales;
+                        $dailyBeverageCashQuantity = $paymentData->total_quantity;
+                    } elseif ($paymentMethod === 'qris') {
+                        $dailyBeverageQrisSales = $paymentData->total_sales;
+                        $dailyBeverageQrisQuantity = $paymentData->total_quantity;
+                    }
+                }
+
+                // Create structured daily beverage breakdown for API consistency
+                $dailyBeverageBreakdown = [
+                    'cash' => [
+                        'quantity' => $dailyBeverageCashQuantity,
+                        'amount' => $dailyBeverageCashSales
+                    ],
+                    'qris' => [
+                        'quantity' => $dailyBeverageQrisQuantity,
+                        'amount' => $dailyBeverageQrisSales
+                    ],
+                    'total' => [
+                        'quantity' => $dailyBeverageCashQuantity + $dailyBeverageQrisQuantity,
+                        'amount' => $dailyBeverageSales
+                    ]
+                ];
+
                 // Tambahkan ke array data harian
                 $dailyData[] = [
                     'date' => $currentDateStr,
@@ -253,12 +360,18 @@ class ReportController extends Controller
                     'tax' => $dailyTax,
                     'discount_amount' => $dailyDiscountAmount,
                     'beverage_sales' => $dailyBeverageSales,
+                    'beverage_cash_sales' => $dailyBeverageCashSales,
+                    'beverage_qris_sales' => $dailyBeverageQrisSales,
+                    'beverage_cash_quantity' => $dailyBeverageCashQuantity,
+                    'beverage_qris_quantity' => $dailyBeverageQrisQuantity,
+                    'beverage_breakdown' => $dailyBeverageBreakdown, // Add structured breakdown
                     'qris_sales' => $dailyQrisSales,
                     'qris_fee' => $dailyQrisFee,
                     'cash_sales' => $dailyCashSales,
                     'expenses' => $dailyExpenses,
                     'opening_balance' => $dailyOpeningBalance,
                     'closing_balance' => $dailyClosingBalance,
+                    'final_cash_closing' => $dailyFinalCashClosing,
                     'orders_count' => $dailyOrders,
                 ];
 
@@ -314,6 +427,58 @@ class ReportController extends Controller
                     })
                     ->where('categories.id', 2) // ID kategori minuman
                     ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+                // Get beverage sales by payment method for this week
+                $periodBeverageByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->select(
+                        'orders.payment_method',
+                        DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'),
+                        DB::raw('SUM(order_items.quantity) as total_quantity')
+                    )
+                    ->whereRaw('YEAR(orders.created_at) = ?', [$year])
+                    ->whereRaw('WEEK(orders.created_at) = ?', [$week])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', 2) // ID kategori minuman
+                    ->groupBy('orders.payment_method')
+                    ->get();
+
+                // Initialize period beverage variables
+                $weekData->beverage_cash_sales = 0;
+                $weekData->beverage_qris_sales = 0;
+                $weekData->beverage_cash_quantity = 0;
+                $weekData->beverage_qris_quantity = 0;
+
+                // Extract period cash and QRIS values
+                foreach ($periodBeverageByPayment as $paymentData) {
+                    $paymentMethod = strtolower($paymentData->payment_method);
+                    if ($paymentMethod === 'cash') {
+                        $weekData->beverage_cash_sales = $paymentData->total_sales;
+                        $weekData->beverage_cash_quantity = $paymentData->total_quantity;
+                    } elseif ($paymentMethod === 'qris') {
+                        $weekData->beverage_qris_sales = $paymentData->total_sales;
+                        $weekData->beverage_qris_quantity = $paymentData->total_quantity;
+                    }
+                }
+
+                // Add structured beverage breakdown
+                $weekData->beverage_breakdown = [
+                    'cash' => [
+                        'quantity' => $weekData->beverage_cash_quantity,
+                        'amount' => $weekData->beverage_cash_sales
+                    ],
+                    'qris' => [
+                        'quantity' => $weekData->beverage_qris_quantity,
+                        'amount' => $weekData->beverage_qris_sales
+                    ],
+                    'total' => [
+                        'quantity' => $weekData->beverage_cash_quantity + $weekData->beverage_qris_quantity,
+                        'amount' => $weekData->beverage_sales
+                    ]
+                ];
             }
         } elseif ($periodType === 'monthly') {
             // Query untuk data bulanan yang diperbaiki
@@ -365,6 +530,58 @@ class ReportController extends Controller
                     })
                     ->where('categories.id', 2) // ID kategori minuman
                     ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+                // Get beverage sales by payment method for this month
+                $periodBeverageByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->select(
+                        'orders.payment_method',
+                        DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'),
+                        DB::raw('SUM(order_items.quantity) as total_quantity')
+                    )
+                    ->whereRaw('YEAR(orders.created_at) = ?', [$year])
+                    ->whereRaw('MONTH(orders.created_at) = ?', [$month])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', 2) // ID kategori minuman
+                    ->groupBy('orders.payment_method')
+                    ->get();
+
+                // Initialize period beverage variables
+                $monthData->beverage_cash_sales = 0;
+                $monthData->beverage_qris_sales = 0;
+                $monthData->beverage_cash_quantity = 0;
+                $monthData->beverage_qris_quantity = 0;
+
+                // Extract period cash and QRIS values
+                foreach ($periodBeverageByPayment as $paymentData) {
+                    $paymentMethod = strtolower($paymentData->payment_method);
+                    if ($paymentMethod === 'cash') {
+                        $monthData->beverage_cash_sales = $paymentData->total_sales;
+                        $monthData->beverage_cash_quantity = $paymentData->total_quantity;
+                    } elseif ($paymentMethod === 'qris') {
+                        $monthData->beverage_qris_sales = $paymentData->total_sales;
+                        $monthData->beverage_qris_quantity = $paymentData->total_quantity;
+                    }
+                }
+
+                // Add structured beverage breakdown
+                $monthData->beverage_breakdown = [
+                    'cash' => [
+                        'quantity' => $monthData->beverage_cash_quantity,
+                        'amount' => $monthData->beverage_cash_sales
+                    ],
+                    'qris' => [
+                        'quantity' => $monthData->beverage_qris_quantity,
+                        'amount' => $monthData->beverage_qris_sales
+                    ],
+                    'total' => [
+                        'quantity' => $monthData->beverage_cash_quantity + $monthData->beverage_qris_quantity,
+                        'amount' => $monthData->beverage_sales
+                    ]
+                ];
             }
         }
 
@@ -378,17 +595,49 @@ class ReportController extends Controller
         $title = 'Laporan Ringkasan Penjualan ' . $periodTypeLabels[$periodType];
         $subtitle = 'Periode: ' . $startDate->translatedFormat('d M Y') . ' - ' . $endDate->translatedFormat('d M Y');
 
-        if ($outletId) {
+        // For admin and staff users, always show their outlet name in the subtitle
+        if (Auth::user()->role === 'staff' || Auth::user()->role === 'admin') {
+            $outlet = Outlet::find(Auth::user()->outlet_id);
+            $subtitle .= ' | Outlet: ' . $outlet->name;
+        } else if ($outletId) {
+            // For owner users who selected a specific outlet
             $outlet = Outlet::find($outletId);
             $subtitle .= ' | Outlet: ' . $outlet->name;
         } else {
+            // For owner users who didn't select a specific outlet
             $subtitle .= ' | Semua Outlet';
         }
 
         // Generate laporan berdasarkan format yang diminta
         if ($request->format === 'pdf') {
             // Create PDF with custom view data
-            $pdf = PDF::loadView('pages.reports.sales_summary_pdf', compact('title', 'subtitle', 'totalRevenue', 'totalOrders', 'totalSubTotal', 'totalTax', 'totalDiscountAmount', 'beverageSales', 'qrisSales', 'cashSales', 'totalOpeningBalance', 'totalExpenses', 'totalQrisFee', 'closingBalance', 'dailyData', 'salesData', 'periodType', 'startDate', 'endDate'));
+            $pdf = PDF::loadView('pages.reports.sales_summary_pdf', compact(
+                'title',
+                'subtitle',
+                'totalRevenue',
+                'totalOrders',
+                'totalSubTotal',
+                'totalTax',
+                'totalDiscountAmount',
+                'beverageSales',
+                'beverageCashSales',
+                'beverageQrisSales',
+                'beverageCashQuantity',
+                'beverageQrisQuantity',
+                'beveragePaymentBreakdown', // Add structured breakdown
+                'qrisSales',
+                'cashSales',
+                'totalOpeningBalance',
+                'totalExpenses',
+                'totalQrisFee',
+                'closingBalance',
+                'finalCashClosing',
+                'dailyData',
+                'salesData',
+                'periodType',
+                'startDate',
+                'endDate'
+            ));
 
             // Set orientation to landscape
             $pdf->setPaper('a4', 'landscape');
@@ -566,6 +815,50 @@ class ReportController extends Controller
             $sheet->getStyle('A7:B' . $row)->applyFromArray(array_merge($tableStyle, $kpiBoxStyle));
             $sheet->getStyle('D7:E' . $row)->applyFromArray(array_merge($tableStyle, $kpiBoxStyle));
 
+            // SECTION 1.5: BEVERAGE SALES BREAKDOWN
+            $row += 2;
+            $sheet->setCellValue('A' . $row, 'DETAIL PENJUALAN MINUMAN');
+            $sheet->mergeCells('A' . $row . ':F' . $row);
+            $sheet->getStyle('A' . $row)->applyFromArray($sectionStyle);
+
+            $row++;
+            // Headers for beverage breakdown
+            $sheet->setCellValue('A' . $row, 'Metode Pembayaran');
+            $sheet->setCellValue('B' . $row, 'Jumlah Item');
+            $sheet->setCellValue('C' . $row, 'Total Penjualan');
+            $sheet->getStyle('A' . $row . ':C' . $row)->applyFromArray($headerStyle);
+
+            $row++;
+            // Cash row
+            $sheet->setCellValue('A' . $row, 'CASH');
+            $sheet->setCellValue('B' . $row, $beverageCashQuantity);
+            $sheet->setCellValue('C' . $row, $beverageCashSales);
+            $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+            $row++;
+            // QRIS row
+            $sheet->setCellValue('A' . $row, 'QRIS');
+            $sheet->setCellValue('B' . $row, $beverageQrisQuantity);
+            $sheet->setCellValue('C' . $row, $beverageQrisSales);
+            $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+            $row++;
+            // Total row
+            $sheet->setCellValue('A' . $row, 'TOTAL');
+            $sheet->setCellValue('B' . $row, $beverageCashQuantity + $beverageQrisQuantity);
+            $sheet->setCellValue('C' . $row, $beverageSales);
+            $sheet->getStyle('A' . $row . ':C' . $row)->applyFromArray($totalsStyle);
+            $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+            // Format the beverage details table
+            $beverageBoxStyle = [
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'EBF1DE'], // Light green for beverages
+                ],
+            ];
+            $sheet->getStyle('A' . ($row - 2) . ':C' . $row)->applyFromArray(array_merge($tableStyle, $beverageBoxStyle));
+
             // SECTION 2: PAYMENT METHODS
             $row += 2;
             $paymentRow = $row;
@@ -648,6 +941,18 @@ class ReportController extends Controller
                 $sheet->getStyle('B' . $cashFlowRow)->getFont()->getColor()->setRGB('FF0000');
             }
 
+            // Add Final Cash Closing row
+            $cashFlowRow++;
+            $sheet->setCellValue('A' . $cashFlowRow, 'Final Cash Closing:');
+            $sheet->setCellValue('B' . $cashFlowRow, $finalCashClosing);
+            $sheet->getStyle('A' . $cashFlowRow . ':B' . $cashFlowRow)->getFont()->setBold(true);
+            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+
+            // Highlight negative final cash closing
+            if ($finalCashClosing < 0) {
+                $sheet->getStyle('B' . $cashFlowRow)->getFont()->getColor()->setRGB('FF0000');
+            }
+
             // Format cash flow table
             $cashFlowBoxStyle = [
                 'fill' => [
@@ -663,9 +968,10 @@ class ReportController extends Controller
             $sheet->setCellValue('A' . $detailRow, 'DATA ' . strtoupper($periodTypeLabels[$periodType]));
 
             if ($periodType === 'daily') {
-                $sheet->mergeCells('A' . $detailRow . ':N' . $detailRow);
+                // Update cell merging to include beverage cash/QRIS and final cash closing columns
+                $sheet->mergeCells('A' . $detailRow . ':Q' . $detailRow);
             } else {
-                $sheet->mergeCells('A' . $detailRow . ':K' . $detailRow);
+                $sheet->mergeCells('A' . $detailRow . ':M' . $detailRow);
             }
 
             $sheet->getStyle('A' . $detailRow)->applyFromArray($sectionStyle);
@@ -673,7 +979,7 @@ class ReportController extends Controller
             $detailRow++;
 
             if ($periodType === 'daily') {
-                // Daily data headers - Added SALDO AWAL column
+                // Daily data headers - Add beverage breakdown columns
                 $sheet->setCellValue('A' . $detailRow, 'TANGGAL');
                 $sheet->setCellValue('B' . $detailRow, 'HARI');
                 $sheet->setCellValue('C' . $detailRow, 'JUMLAH ORDER');
@@ -682,14 +988,17 @@ class ReportController extends Controller
                 $sheet->setCellValue('F' . $detailRow, 'DISKON');
                 $sheet->setCellValue('G' . $detailRow, 'PAJAK');
                 $sheet->setCellValue('H' . $detailRow, 'BEVERAGE');
-                $sheet->setCellValue('I' . $detailRow, 'QRIS');
-                $sheet->setCellValue('J' . $detailRow, 'BIAYA QRIS');
-                $sheet->setCellValue('K' . $detailRow, 'CASH');
-                $sheet->setCellValue('L' . $detailRow, 'SALDO AWAL'); // Added SALDO AWAL column
-                $sheet->setCellValue('M' . $detailRow, 'PENGELUARAN');
-                $sheet->setCellValue('N' . $detailRow, 'SALDO AKHIR');
+                $sheet->setCellValue('I' . $detailRow, 'BEVERAGE (CASH)');
+                $sheet->setCellValue('J' . $detailRow, 'BEVERAGE (QRIS)');
+                $sheet->setCellValue('K' . $detailRow, 'QRIS');
+                $sheet->setCellValue('L' . $detailRow, 'BIAYA QRIS');
+                $sheet->setCellValue('M' . $detailRow, 'CASH');
+                $sheet->setCellValue('N' . $detailRow, 'SALDO AWAL');
+                $sheet->setCellValue('O' . $detailRow, 'PENGELUARAN');
+                $sheet->setCellValue('P' . $detailRow, 'SALDO AKHIR');
+                $sheet->setCellValue('Q' . $detailRow, 'FINAL CASH CLOSING');
 
-                $sheet->getStyle('A' . $detailRow . ':N' . $detailRow)->applyFromArray($headerStyle);
+                $sheet->getStyle('A' . $detailRow . ':Q' . $detailRow)->applyFromArray($headerStyle);
 
                 // Sort data by date, newest first for better user experience
                 usort($dailyData, function ($a, $b) {
@@ -709,29 +1018,35 @@ class ReportController extends Controller
                     $sheet->setCellValue('F' . $detailRow, $day['discount_amount']);
                     $sheet->setCellValue('G' . $detailRow, $day['tax']);
                     $sheet->setCellValue('H' . $detailRow, $day['beverage_sales']);
-                    $sheet->setCellValue('I' . $detailRow, $day['qris_sales']);
-                    $sheet->setCellValue('J' . $detailRow, $day['qris_fee']);
-                    $sheet->setCellValue('K' . $detailRow, $day['cash_sales']);
-                    $sheet->setCellValue('L' . $detailRow, $day['opening_balance']); // Added SALDO AWAL value
-                    $sheet->setCellValue('M' . $detailRow, $day['expenses']);
-                    $sheet->setCellValue('N' . $detailRow, $day['closing_balance']);
+                    $sheet->setCellValue('I' . $detailRow, $day['beverage_cash_sales']);
+                    $sheet->setCellValue('J' . $detailRow, $day['beverage_qris_sales']);
+                    $sheet->setCellValue('K' . $detailRow, $day['qris_sales']);
+                    $sheet->setCellValue('L' . $detailRow, $day['qris_fee']);
+                    $sheet->setCellValue('M' . $detailRow, $day['cash_sales']);
+                    $sheet->setCellValue('N' . $detailRow, $day['opening_balance']);
+                    $sheet->setCellValue('O' . $detailRow, $day['expenses']);
+                    $sheet->setCellValue('P' . $detailRow, $day['closing_balance']);
+                    $sheet->setCellValue('Q' . $detailRow, $day['final_cash_closing']);
 
                     // Format numbers
-                    $sheet->getStyle('D' . $detailRow . ':N' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet->getStyle('D' . $detailRow . ':Q' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
 
                     // Add weekend highlighting
                     if (in_array($day['day_name'], ['Sabtu', 'Minggu'])) {
-                        $sheet->getStyle('A' . $detailRow . ':N' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FCE4D6');
+                        $sheet->getStyle('A' . $detailRow . ':Q' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FCE4D6');
                     }
 
-                    // Highlight negative closing balance
+                    // Highlight negative closing balance and final cash closing
                     if ($day['closing_balance'] < 0) {
-                        $sheet->getStyle('N' . $detailRow)->getFont()->getColor()->setRGB('FF0000');
+                        $sheet->getStyle('P' . $detailRow)->getFont()->getColor()->setRGB('FF0000');
+                    }
+                    if ($day['final_cash_closing'] < 0) {
+                        $sheet->getStyle('Q' . $detailRow)->getFont()->getColor()->setRGB('FF0000');
                     }
 
                     // Add zebra striping for better readability
                     if ($detailRow % 2 == 0) {
-                        $sheet->getStyle('A' . $detailRow . ':N' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
+                        $sheet->getStyle('A' . $detailRow . ':Q' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
                     }
 
                     $detailRow++;
@@ -746,22 +1061,25 @@ class ReportController extends Controller
                 $sheet->setCellValue('F' . $detailRow, $totalDiscountAmount);
                 $sheet->setCellValue('G' . $detailRow, $totalTax);
                 $sheet->setCellValue('H' . $detailRow, $beverageSales);
-                $sheet->setCellValue('I' . $detailRow, $qrisSales);
-                $sheet->setCellValue('J' . $detailRow, $totalQrisFee);
-                $sheet->setCellValue('K' . $detailRow, $cashSales);
-                $sheet->setCellValue('L' . $detailRow, $totalOpeningBalance); // Added total opening balance
-                $sheet->setCellValue('M' . $detailRow, $totalExpenses);
-                $sheet->setCellValue('N' . $detailRow, $closingBalance);
+                $sheet->setCellValue('I' . $detailRow, $beverageCashSales);
+                $sheet->setCellValue('J' . $detailRow, $beverageQrisSales);
+                $sheet->setCellValue('K' . $detailRow, $qrisSales);
+                $sheet->setCellValue('L' . $detailRow, $totalQrisFee);
+                $sheet->setCellValue('M' . $detailRow, $cashSales);
+                $sheet->setCellValue('N' . $detailRow, $totalOpeningBalance);
+                $sheet->setCellValue('O' . $detailRow, $totalExpenses);
+                $sheet->setCellValue('P' . $detailRow, $closingBalance);
+                $sheet->setCellValue('Q' . $detailRow, $finalCashClosing);
 
                 // Format totals
-                $sheet->getStyle('A' . $detailRow . ':N' . $detailRow)->applyFromArray($totalsStyle);
-                $sheet->getStyle('D' . $detailRow . ':N' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle('A' . $detailRow . ':Q' . $detailRow)->applyFromArray($totalsStyle);
+                $sheet->getStyle('D' . $detailRow . ':Q' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
 
                 // Format the entire data table
-                $sheet->getStyle('A' . $startDetailRow . ':N' . $detailRow)->applyFromArray($tableStyle);
+                $sheet->getStyle('A' . $startDetailRow . ':Q' . $detailRow)->applyFromArray($tableStyle);
 
                 // Enable filtering
-                $sheet->setAutoFilter('A' . ($row + 1) . ':N' . ($detailRow - 1));
+                $sheet->setAutoFilter('A' . ($row + 1) . ':Q' . ($detailRow - 1));
             } elseif ($periodType === 'weekly' || $periodType === 'monthly') {
                 // Column headers for weekly/monthly data
                 $sheet->setCellValue('A' . $detailRow, 'PERIODE');
@@ -771,12 +1089,14 @@ class ReportController extends Controller
                 $sheet->setCellValue('E' . $detailRow, 'DISKON');
                 $sheet->setCellValue('F' . $detailRow, 'PAJAK');
                 $sheet->setCellValue('G' . $detailRow, 'BEVERAGES');
-                $sheet->setCellValue('H' . $detailRow, 'QRIS');
-                $sheet->setCellValue('I' . $detailRow, 'BIAYA QRIS');
-                $sheet->setCellValue('J' . $detailRow, 'CASH');
-                $sheet->setCellValue('K' . $detailRow, 'AVG ORDER VALUE');
+                $sheet->setCellValue('H' . $detailRow, 'BEVERAGES (CASH)');
+                $sheet->setCellValue('I' . $detailRow, 'BEVERAGES (QRIS)');
+                $sheet->setCellValue('J' . $detailRow, 'QRIS');
+                $sheet->setCellValue('K' . $detailRow, 'BIAYA QRIS');
+                $sheet->setCellValue('L' . $detailRow, 'CASH');
+                $sheet->setCellValue('M' . $detailRow, 'AVG ORDER VALUE');
 
-                $sheet->getStyle('A' . $detailRow . ':K' . $detailRow)->applyFromArray($headerStyle);
+                $sheet->getStyle('A' . $detailRow . ':M' . $detailRow)->applyFromArray($headerStyle);
 
                 // Sort data, newest first
                 $salesData = $salesData->sortByDesc(function ($item) {
@@ -794,20 +1114,22 @@ class ReportController extends Controller
                     $sheet->setCellValue('E' . $detailRow, $period->discount_amount);
                     $sheet->setCellValue('F' . $detailRow, $period->tax);
                     $sheet->setCellValue('G' . $detailRow, $period->beverage_sales ?? 0);
-                    $sheet->setCellValue('H' . $detailRow, $period->qris_sales ?? 0);
-                    $sheet->setCellValue('I' . $detailRow, $period->qris_fee);
-                    $sheet->setCellValue('J' . $detailRow, $period->cash_sales ?? 0);
+                    $sheet->setCellValue('H' . $detailRow, $period->beverage_cash_sales ?? 0);
+                    $sheet->setCellValue('I' . $detailRow, $period->beverage_qris_sales ?? 0);
+                    $sheet->setCellValue('J' . $detailRow, $period->qris_sales ?? 0);
+                    $sheet->setCellValue('K' . $detailRow, $period->qris_fee);
+                    $sheet->setCellValue('L' . $detailRow, $period->cash_sales ?? 0);
 
                     // Calculate average order value
                     $avgValue = $period->order_count > 0 ? $period->total_sales / $period->order_count : 0;
-                    $sheet->setCellValue('K' . $detailRow, $avgValue);
+                    $sheet->setCellValue('M' . $detailRow, $avgValue);
 
                     // Format numbers
-                    $sheet->getStyle('C' . $detailRow . ':K' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet->getStyle('C' . $detailRow . ':M' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
 
                     // Add zebra striping for better readability
                     if ($detailRow % 2 == 0) {
-                        $sheet->getStyle('A' . $detailRow . ':K' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
+                        $sheet->getStyle('A' . $detailRow . ':M' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
                     }
 
                     $detailRow++;
@@ -821,20 +1143,22 @@ class ReportController extends Controller
                 $sheet->setCellValue('E' . $detailRow, $totalDiscountAmount);
                 $sheet->setCellValue('F' . $detailRow, $totalTax);
                 $sheet->setCellValue('G' . $detailRow, $beverageSales);
-                $sheet->setCellValue('H' . $detailRow, $qrisSales);
-                $sheet->setCellValue('I' . $detailRow, $totalQrisFee);
-                $sheet->setCellValue('J' . $detailRow, $cashSales);
-                $sheet->setCellValue('K' . $detailRow, $avgOrderValue);
+                $sheet->setCellValue('H' . $detailRow, $beverageCashSales);
+                $sheet->setCellValue('I' . $detailRow, $beverageQrisSales);
+                $sheet->setCellValue('J' . $detailRow, $qrisSales);
+                $sheet->setCellValue('K' . $detailRow, $totalQrisFee);
+                $sheet->setCellValue('L' . $detailRow, $cashSales);
+                $sheet->setCellValue('M' . $detailRow, $avgOrderValue);
 
                 // Format totals
-                $sheet->getStyle('A' . $detailRow . ':K' . $detailRow)->applyFromArray($totalsStyle);
-                $sheet->getStyle('C' . $detailRow . ':K' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle('A' . $detailRow . ':M' . $detailRow)->applyFromArray($totalsStyle);
+                $sheet->getStyle('C' . $detailRow . ':M' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
 
                 // Format the entire data table
-                $sheet->getStyle('A' . $startDetailRow . ':K' . $detailRow)->applyFromArray($tableStyle);
+                $sheet->getStyle('A' . $startDetailRow . ':M' . $detailRow)->applyFromArray($tableStyle);
 
                 // Enable filtering
-                $sheet->setAutoFilter('A' . ($row + 1) . ':K' . ($detailRow - 1));
+                $sheet->setAutoFilter('A' . ($row + 1) . ':M' . ($detailRow - 1));
             }
 
             // FOOTER SECTION - Generated information
@@ -842,20 +1166,20 @@ class ReportController extends Controller
             $sheet->setCellValue('A' . $row, 'Laporan dibuat pada: ' . now()->format('d M Y H:i'));
 
             if ($periodType === 'daily') {
-                $sheet->mergeCells('A' . $row . ':N' . $row);
+                $sheet->mergeCells('A' . $row . ':Q' . $row);
             } else {
-                $sheet->mergeCells('A' . $row . ':K' . $row);
+                $sheet->mergeCells('A' . $row . ':M' . $row);
             }
 
             $sheet->getStyle('A' . $row)->getFont()->setItalic(true);
 
             // Auto-size columns for better readability
             if ($periodType === 'daily') {
-                foreach (range('A', 'N') as $col) {
+                foreach (range('A', 'Q') as $col) {
                     $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
             } else {
-                foreach (range('A', 'K') as $col) {
+                foreach (range('A', 'M') as $col) {
                     $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
             }
@@ -868,9 +1192,9 @@ class ReportController extends Controller
 
             // Make sure all headers are bold and stand out even without freezing
             if ($periodType === 'daily') {
-                $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':N' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
+                $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':Q' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
             } else {
-                $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':K' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
+                $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':M' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
             }
 
             // Remove all protection which can interfere with scrolling
