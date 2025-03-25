@@ -103,6 +103,7 @@ class DailyCashController extends Controller
                     'expenses' => 0,
                     'expenses_note' => null,
                     'closing_balance' => 0,
+                    'final_cash_closing' => 0,
                 ]
             ]);
         }
@@ -113,7 +114,17 @@ class DailyCashController extends Controller
             ->where('payment_method', 'cash')
             ->sum('total');
 
-        $closingBalance = $dailyCash->opening_balance + $cashSales - $dailyCash->expenses;
+        // Hitung total penjualan termasuk QRIS
+        $qrisSales = Order::where('outlet_id', Auth::user()->outlet_id)
+            ->whereDate('created_at', $date)
+            ->where('payment_method', 'qris')
+            ->sum('total');
+
+
+        $closingBalance = $dailyCash->opening_balance + $cashSales + $qrisSales - $dailyCash->expenses;
+
+        // Calculate final cash closing (only cash payments)
+        $finalCashClosing = $dailyCash->opening_balance + $cashSales - $dailyCash->expenses;
 
         return response()->json([
             'status' => 'success',
@@ -126,6 +137,7 @@ class DailyCashController extends Controller
                 'expenses_note' => $dailyCash->expenses_note,
                 'cash_sales' => $cashSales,
                 'closing_balance' => $closingBalance,
+                'final_cash_closing' => $finalCashClosing,
             ]
         ]);
     }
