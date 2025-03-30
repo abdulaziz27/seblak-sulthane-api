@@ -30,7 +30,8 @@
                                 <h4>Pesanan #{{ $materialOrder->id }}</h4>
                                 <div class="card-header-action">
                                     @if ($materialOrder->status === 'pending')
-                                        <a href="{{ route('material-orders.edit', $materialOrder->id) }}" class="btn btn-primary mr-2">
+                                        <a href="{{ route('material-orders.edit', $materialOrder->id) }}"
+                                            class="btn btn-primary mr-2">
                                             <i class="fas fa-edit"></i> Edit Pesanan
                                         </a>
                                         <form action="{{ route('material-orders.cancel', $materialOrder->id) }}"
@@ -43,7 +44,7 @@
                                         </form>
                                     @endif
 
-                                    @if (Auth::user()->role === 'owner' && $materialOrder->status === 'pending')
+                                    @if ($materialOrder->status === 'pending' && isset($isWarehouse) && $isWarehouse)
                                         <form action="{{ route('material-orders.update-status', $materialOrder->id) }}"
                                             method="POST" class="d-inline ml-2">
                                             @csrf
@@ -54,7 +55,7 @@
                                         </form>
                                     @endif
 
-                                    @if (Auth::user()->role === 'owner' && $materialOrder->status === 'approved')
+                                    @if ($materialOrder->status === 'approved' && isset($isWarehouse) && $isWarehouse)
                                         <form action="{{ route('material-orders.update-status', $materialOrder->id) }}"
                                             method="POST" class="d-inline">
                                             @csrf
@@ -64,6 +65,7 @@
                                             </button>
                                         </form>
                                     @endif
+
                                 </div>
                             </div>
                             <div class="card-body">

@@ -26,7 +26,7 @@
                 </p>
 
                 <div class="row">
-                    <!-- Kartu Laporan Ringkasan Penjualan -->
+                    <!-- Card Laporan Ringkasan Penjualan -->
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
@@ -91,7 +91,7 @@
                         </div>
                     </div>
 
-                    <!-- Kartu Laporan Pembelian Bahan Baku -->
+                    <!-- Card Laporan Pembelian Bahan Baku -->
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
@@ -146,15 +146,16 @@
                         </div>
                     </div>
 
-                    {{--
-                    <!-- Kartu Laporan Kinerja Outlet -->
+                    <!-- Card Laporan Pembelian Bahan dari Supplier -->
+                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
                     <div class="col-12 col-md-6 col-lg-6">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Laporan Kinerja Outlet</h4>
+                                <h4>Laporan Pembelian dari Supplier</h4>
                             </div>
                             <div class="card-body">
-                                <form action="{{ route('reports.outlet-performance') }}" method="GET" target="_blank" id="outlet-performance-form">
+                                <form action="{{ route('reports.supplier-purchases') }}" method="GET" target="_blank"
+                                    id="supplier-purchases-form">
                                     <div class="form-group">
                                         <label>Rentang Tanggal</label>
                                         <div class="input-group">
@@ -163,11 +164,14 @@
                                                     <i class="fas fa-calendar"></i>
                                                 </div>
                                             </div>
-                                            <button type="button" class="form-control text-left daterange-btn" id="outlet-daterange-btn">
+                                            <button type="button" class="form-control text-left daterange-btn"
+                                                id="supplier-daterange-btn">
                                                 <span>Pilih Periode</span>
                                             </button>
-                                            <input type="hidden" name="start_date" id="outlet_start_date" value="{{ now()->subDays(29)->format('Y-m-d') }}">
-                                            <input type="hidden" name="end_date" id="outlet_end_date" value="{{ now()->format('Y-m-d') }}">
+                                            <input type="hidden" name="start_date" id="supplier_start_date"
+                                                value="{{ now()->subDays(29)->format('Y-m-d') }}">
+                                            <input type="hidden" name="end_date" id="supplier_end_date"
+                                                value="{{ now()->format('Y-m-d') }}">
                                         </div>
                                     </div>
                                     <div class="form-group">
@@ -184,115 +188,7 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Kartu Laporan Kinerja Produk -->
-                    <div class="col-12 col-md-6 col-lg-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h4>Laporan Kinerja Produk</h4>
-                            </div>
-                            <div class="card-body">
-                                <form action="{{ route('reports.product-performance') }}" method="GET" target="_blank" id="product-performance-form">
-                                    <div class="form-group">
-                                        <label>Rentang Tanggal</label>
-                                        <div class="input-group">
-                                            <div class="input-group-prepend">
-                                                <div class="input-group-text">
-                                                    <i class="fas fa-calendar"></i>
-                                                </div>
-                                            </div>
-                                            <button type="button" class="form-control text-left daterange-btn" id="product-daterange-btn">
-                                                <span>Pilih Periode</span>
-                                            </button>
-                                            <input type="hidden" name="start_date" id="product_start_date" value="{{ now()->subDays(29)->format('Y-m-d') }}">
-                                            <input type="hidden" name="end_date" id="product_end_date" value="{{ now()->format('Y-m-d') }}">
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Outlet</label>
-                                        <select class="form-control select2" name="outlet_id">
-                                            <option value="">Semua Outlet</option>
-                                            @foreach ($outlets as $outlet)
-                                                <option value="{{ $outlet->id }}">{{ $outlet->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Format</label>
-                                        <select class="form-control" name="format">
-                                            <option value="pdf">PDF</option>
-                                            <option value="excel">Excel</option>
-                                        </select>
-                                    </div>
-                                    <div class="text-right">
-                                        <button type="submit" class="btn btn-primary">Unduh Laporan</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Kartu Laporan Analisis Pelanggan -->
-                    <div class="col-12 col-md-6 col-lg-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h4>Laporan Analisis Pelanggan</h4>
-                            </div>
-                            <div class="card-body">
-                                <form action="{{ route('reports.customer-insights') }}" method="GET" target="_blank" id="customer-insights-form">
-                                    <div class="form-group">
-                                        <label>Rentang Tanggal</label>
-                                        <div class="input-group">
-                                            <div class="input-group-prepend">
-                                                <div class="input-group-text">
-                                                    <i class="fas fa-calendar"></i>
-                                                </div>
-                                            </div>
-                                            <button type="button" class="form-control text-left daterange-btn" id="customer-daterange-btn">
-                                                <span>Pilih Periode</span>
-                                            </button>
-                                            <input type="hidden" name="start_date" id="customer_start_date" value="{{ now()->subDays(29)->format('Y-m-d') }}">
-                                            <input type="hidden" name="end_date" id="customer_end_date" value="{{ now()->format('Y-m-d') }}">
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Format</label>
-                                        <select class="form-control" name="format">
-                                            <option value="pdf">PDF</option>
-                                            <option value="excel">Excel</option>
-                                        </select>
-                                    </div>
-                                    <div class="text-right">
-                                        <button type="submit" class="btn btn-primary">Unduh Laporan</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Kartu Laporan Inventaris -->
-                    <div class="col-12 col-md-6 col-lg-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h4>Laporan Inventaris & Bahan Baku</h4>
-                            </div>
-                            <div class="card-body">
-                                <form action="{{ route('reports.inventory') }}" method="GET" target="_blank">
-                                    <p>Laporan ini menampilkan tingkat inventaris saat ini dan pesanan bahan baku terbaru. Tidak perlu rentang tanggal.</p>
-                                    <div class="form-group">
-                                        <label>Format</label>
-                                        <select class="form-control" name="format">
-                                            <option value="pdf">PDF</option>
-                                            <option value="excel">Excel</option>
-                                        </select>
-                                    </div>
-                                    <div class="text-right">
-                                        <button type="submit" class="btn btn-primary">Unduh Laporan</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div> --}}
+                    @endif
                 </div>
             </div>
         </section>
@@ -313,7 +209,7 @@
             $('.daterange-btn').each(function() {
                 var buttonId = $(this).attr('id');
                 var formPrefix = buttonId.split('-')[
-                0]; // Extract prefix (sales, outlet, product, customer)
+                    0]; // Extract prefix (sales, outlet, product, customer)
 
                 $(this).daterangepicker({
                     ranges: {

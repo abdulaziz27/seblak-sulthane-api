@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\Member;
 use App\Models\MaterialOrder;
 use App\Models\RawMaterial;
+use App\Models\StockAdjustment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -39,6 +40,345 @@ class ReportController extends Controller
         return view('pages.reports.index', compact('outlets'));
     }
 
+    /**
+     * Generate Supplier Purchase Report
+     */
+    public function supplierPurchases(Request $request)
+    {
+        // Validate request
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'format' => 'required|in:pdf,excel',
+        ]);
+
+        $startDate = Carbon::parse($request->start_date)->startOfDay();
+        $endDate = Carbon::parse($request->end_date)->endOfDay();
+
+        // Check permissions
+        if (Auth::user()->role !== 'owner' && Auth::user()->role !== 'admin') {
+            return redirect()->back()->with('error', 'Anda tidak memiliki akses untuk laporan ini');
+        }
+
+        // Ambil data penyesuaian stok dengan tipe 'purchase'
+        $purchases = StockAdjustment::with(['rawMaterial', 'user'])
+            ->where('adjustment_type', 'purchase')
+            ->where('quantity', '>', 0)
+            ->whereBetween('adjustment_date', [$startDate, $endDate])
+            ->orderBy('adjustment_date', 'desc')
+            ->get();
+
+        // Grouped by date
+        $dailyData = [];
+        $dateGroups = $purchases->groupBy(function ($item) {
+            return $item->adjustment_date->format('Y-m-d');
+        });
+
+        // Generate all dates in the range even if no purchases
+        $currentDate = clone $startDate;
+        while ($currentDate <= $endDate) {
+            $dateStr = $currentDate->format('Y-m-d');
+            $adjustments = $dateGroups[$dateStr] ?? collect();
+
+            $orderCount = $adjustments->count();
+            $itemCount = $adjustments->sum('quantity');
+            $purchaseAmount = $adjustments->sum(function ($adj) {
+                return $adj->quantity * $adj->purchase_price;
+            });
+
+            // Create detailed purchases array
+            $detailedPurchases = [];
+            foreach ($adjustments as $index => $adjustment) {
+                $detailedPurchases[] = [
+                    'no' => $index + 1,
+                    'name' => $adjustment->rawMaterial->name,
+                    'unit' => $adjustment->rawMaterial->unit,
+                    'purchase_price' => $adjustment->purchase_price,
+                    'selling_price' => $adjustment->rawMaterial->price,
+                    'quantity' => $adjustment->quantity,
+                    'subtotal' => $adjustment->quantity * $adjustment->purchase_price,
+                    'notes' => $adjustment->notes
+                ];
+            }
+
+            $dailyData[] = [
+                'date' => $dateStr,
+                'day_name' => $currentDate->locale('id')->isoFormat('dddd'),
+                'order_count' => $orderCount,
+                'item_count' => $itemCount,
+                'purchase_amount' => $purchaseAmount,
+                'detailed_purchases' => $detailedPurchases
+            ];
+
+            $currentDate->addDay();
+        }
+
+        // Sort by date (newest first)
+        usort($dailyData, function ($a, $b) {
+            return strcmp($b['date'], $a['date']);
+        });
+
+        // Summary data
+        $summaryData = [
+            'total_purchase_amount' => $purchases->sum(function ($adj) {
+                return $adj->quantity * $adj->purchase_price;
+            }),
+            'total_order_count' => $purchases->count(),
+            'total_item_count' => $purchases->sum('quantity')
+        ];
+
+        // Judul laporan
+        $title = 'Laporan Pembelian dari Supplier';
+        $subtitle = 'Periode: ' . $startDate->translatedFormat('d M Y') . ' - ' . $endDate->translatedFormat('d M Y');
+
+        // Generate laporan berdasarkan format yang diminta
+        if ($request->format === 'pdf') {
+            $pdf = PDF::loadView('pages.reports.supplier_purchases_pdf', compact(
+                'title',
+                'subtitle',
+                'summaryData',
+                'dailyData',
+                'startDate',
+                'endDate'
+            ));
+
+            // Set orientation to landscape
+            $pdf->setPaper('a4', 'landscape');
+
+            return $pdf->download('laporan_pembelian_supplier_' . $startDate->format('Y-m-d') . '_sampai_' . $endDate->format('Y-m-d') . '.pdf');
+        } else {
+            // Excel format implementation
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Pembelian Supplier');
+
+            // Set metadata
+            $spreadsheet->getProperties()
+                ->setCreator('Seblak Sulthane')
+                ->setLastModifiedBy('Seblak Sulthane')
+                ->setTitle($title)
+                ->setSubject($subtitle)
+                ->setDescription('Laporan Pembelian Bahan Baku dari Supplier');
+
+            // Define styles
+            $headerStyle = [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '4472C4'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                    ],
+                ],
+            ];
+
+            $subHeaderStyle = [
+                'font' => [
+                    'bold' => true,
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'D9E1F2'],
+                ],
+            ];
+
+            // Add header
+            $sheet->setCellValue('A1', 'SEBLAK SULTHANE');
+            $sheet->setCellValue('A2', $title);
+            $sheet->setCellValue('A3', $subtitle);
+            $sheet->mergeCells('A2:G2');
+            $sheet->mergeCells('A3:G3');
+            $sheet->getStyle('A2:A3')->getFont()->setBold(true);
+
+            // Add summary section
+            $row = 5;
+            $sheet->setCellValue('A' . $row, 'RINGKASAN PERIODE');
+            $sheet->mergeCells('A' . $row . ':G' . $row);
+            $sheet->getStyle('A' . $row)->applyFromArray($subHeaderStyle);
+
+            $row++;
+            $sheet->setCellValue('A' . $row, 'Total Pembelian Bahan Baku ke Supplier:');
+            $sheet->setCellValue('C' . $row, $summaryData['total_purchase_amount']);
+            $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+            $row++;
+            $sheet->setCellValue('A' . $row, 'Total Jumlah Pemesanan ke Supplier:');
+            $sheet->setCellValue('C' . $row, $summaryData['total_order_count']);
+
+            $row++;
+            $sheet->setCellValue('A' . $row, 'Total Item yang Dipesan:');
+            $sheet->setCellValue('C' . $row, $summaryData['total_item_count']);
+
+            // Add daily data section
+            $row += 2;
+            $sheet->setCellValue('A' . $row, 'DATA HARIAN');
+            $sheet->mergeCells('A' . $row . ':E' . $row);
+            $sheet->getStyle('A' . $row)->applyFromArray($subHeaderStyle);
+
+            $row++;
+            $sheet->setCellValue('A' . $row, 'Tanggal');
+            $sheet->setCellValue('B' . $row, 'Hari');
+            $sheet->setCellValue('C' . $row, 'Jumlah Order');
+            $sheet->setCellValue('D' . $row, 'Jumlah Item');
+            $sheet->setCellValue('E' . $row, 'Total Pembelian');
+            $sheet->getStyle('A' . $row . ':E' . $row)->applyFromArray($headerStyle);
+
+            // Add daily data
+            $startDailyRow = $row + 1;
+            foreach ($dailyData as $day) {
+                $row++;
+                $sheet->setCellValue('A' . $row, Carbon::parse($day['date'])->format('d/m/Y'));
+                $sheet->setCellValue('B' . $row, $day['day_name']);
+                $sheet->setCellValue('C' . $row, $day['order_count']);
+                $sheet->setCellValue('D' . $row, $day['item_count']);
+                $sheet->setCellValue('E' . $row, $day['purchase_amount']);
+
+                // Apply alignment: centered for count data, right-aligned for amounts
+                $sheet->getStyle('C' . $row . ':D' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+                // Add zebra striping for better readability
+                if ($row % 2 == 0) {
+                    $sheet->getStyle('A' . $row . ':E' . $row)->getFill()
+                        ->setFillType(Fill::FILL_SOLID)
+                        ->getStartColor()->setRGB('F2F2F2');
+                }
+            }
+
+            // Total row for daily data
+            $row++;
+            $sheet->setCellValue('A' . $row, 'TOTAL');
+            $sheet->mergeCells('A' . $row . ':B' . $row);
+            $sheet->setCellValue('C' . $row, $summaryData['total_order_count']);
+            $sheet->setCellValue('D' . $row, $summaryData['total_item_count']);
+            $sheet->setCellValue('E' . $row, $summaryData['total_purchase_amount']);
+
+            // Format totals row
+            $sheet->getStyle('A' . $row . ':E' . $row)->applyFromArray($subHeaderStyle);
+            $sheet->getStyle('C' . $row . ':D' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+            // Add border to daily data table
+            $sheet->getStyle('A' . $startDailyRow . ':E' . $row)->applyFromArray([
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                    ],
+                    'outline' => [
+                        'borderStyle' => Border::BORDER_MEDIUM,
+                    ],
+                ],
+            ]);
+
+            // Add detail purchase section
+            $row += 2;
+            $sheet->setCellValue('A' . $row, 'DETAIL PEMBELIAN HARIAN');
+            $sheet->mergeCells('A' . $row . ':G' . $row);
+            $sheet->getStyle('A' . $row)->applyFromArray($subHeaderStyle);
+
+            // Only add detailed purchases for days that have them
+            $daysWithPurchases = array_filter($dailyData, function ($day) {
+                return count($day['detailed_purchases']) > 0;
+            });
+
+            foreach ($daysWithPurchases as $day) {
+                $row += 2;
+                $sheet->setCellValue('A' . $row, 'Detail Pembelian: ' . $day['day_name'] . ', ' . Carbon::parse($day['date'])->format('d M Y'));
+                $sheet->mergeCells('A' . $row . ':G' . $row);
+                $sheet->getStyle('A' . $row)->applyFromArray($subHeaderStyle);
+
+                $row++;
+                $sheet->setCellValue('A' . $row, 'No');
+                $sheet->setCellValue('B' . $row, 'Nama Bahan');
+                $sheet->setCellValue('C' . $row, 'Satuan');
+                $sheet->setCellValue('D' . $row, 'Harga Beli');
+                $sheet->setCellValue('E' . $row, 'Harga Jual');
+                $sheet->setCellValue('F' . $row, 'Quantity');
+                $sheet->setCellValue('G' . $row, 'Total Nilai Beli');
+                $sheet->getStyle('A' . $row . ':G' . $row)->applyFromArray($headerStyle);
+
+                // Track start of the current detail table
+                $startDetailRow = $row + 1;
+
+                foreach ($day['detailed_purchases'] as $purchase) {
+                    $row++;
+                    $sheet->setCellValue('A' . $row, $purchase['no']);
+                    $sheet->setCellValue('B' . $row, $purchase['name']);
+                    $sheet->setCellValue('C' . $row, $purchase['unit']);
+                    $sheet->setCellValue('D' . $row, $purchase['purchase_price']);
+                    $sheet->setCellValue('E' . $row, $purchase['selling_price']);
+                    $sheet->setCellValue('F' . $row, $purchase['quantity']);
+                    $sheet->setCellValue('G' . $row, $purchase['subtotal']);
+
+                    // Apply consistent alignment
+                    $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $sheet->getStyle('C' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $sheet->getStyle('D' . $row . ':E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->getStyle('F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $sheet->getStyle('G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+                    // Format numbers
+                    $sheet->getStyle('D' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+                    // Add zebra striping for better readability
+                    if (($row - $startDetailRow + 1) % 2 == 0) {
+                        $sheet->getStyle('A' . $row . ':G' . $row)->getFill()
+                            ->setFillType(Fill::FILL_SOLID)
+                            ->getStartColor()->setRGB('F2F2F2');
+                    }
+                }
+
+                // Subtotal for this day
+                $row++;
+                $sheet->setCellValue('F' . $row, 'TOTAL');
+                $sheet->setCellValue('G' . $row, $day['purchase_amount']);
+                $sheet->getStyle('F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('F' . $row . ':G' . $row)->applyFromArray($subHeaderStyle);
+                $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+                // Add border to the current detail table
+                $sheet->getStyle('A' . $startDetailRow . ':G' . $row)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                        ],
+                        'outline' => [
+                            'borderStyle' => Border::BORDER_MEDIUM,
+                        ],
+                    ],
+                ]);
+            }
+
+            // Auto-size columns
+            foreach (range('A', 'G') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            // Output Excel file
+            $writer = new Xlsx($spreadsheet);
+
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment;filename="laporan_pembelian_supplier_' . $startDate->format('Y-m-d') . '_sampai_' . $endDate->format('Y-m-d') . '.xlsx"');
+            header('Cache-Control: max-age=0');
+
+            $writer->save('php://output');
+            exit();
+        }
+    }
     /**
      * Generate Enhanced Sales Summary Report
      */
@@ -136,11 +476,7 @@ class ReportController extends Controller
         $beverageSalesByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->join('categories', 'categories.id', '=', 'products.category_id')
-            ->select(
-                'orders.payment_method',
-                DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'),
-                DB::raw('SUM(order_items.quantity) as total_quantity')
-            )
+            ->select('orders.payment_method', DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'), DB::raw('SUM(order_items.quantity) as total_quantity'))
             ->whereBetween('orders.created_at', [$startDate, $endDate])
             ->when($outletId, function ($query) use ($outletId) {
                 return $query->where('orders.outlet_id', $outletId);
@@ -171,16 +507,16 @@ class ReportController extends Controller
         $beveragePaymentBreakdown = [
             'cash' => [
                 'quantity' => $beverageCashQuantity,
-                'amount' => $beverageCashSales
+                'amount' => $beverageCashSales,
             ],
             'qris' => [
                 'quantity' => $beverageQrisQuantity,
-                'amount' => $beverageQrisSales
+                'amount' => $beverageQrisSales,
             ],
             'total' => [
                 'quantity' => $beverageCashQuantity + $beverageQrisQuantity,
-                'amount' => $beverageSales
-            ]
+                'amount' => $beverageSales,
+            ],
         ];
 
         // Data berdasarkan metode pembayaran
@@ -304,11 +640,7 @@ class ReportController extends Controller
                 $dailyBeverageByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
                     ->join('products', 'products.id', '=', 'order_items.product_id')
                     ->join('categories', 'categories.id', '=', 'products.category_id')
-                    ->select(
-                        'orders.payment_method',
-                        DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'),
-                        DB::raw('SUM(order_items.quantity) as total_quantity')
-                    )
+                    ->select('orders.payment_method', DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'), DB::raw('SUM(order_items.quantity) as total_quantity'))
                     ->whereDate('orders.created_at', $currentDateStr)
                     ->when($outletId, function ($query) use ($outletId) {
                         return $query->where('orders.outlet_id', $outletId);
@@ -339,16 +671,16 @@ class ReportController extends Controller
                 $dailyBeverageBreakdown = [
                     'cash' => [
                         'quantity' => $dailyBeverageCashQuantity,
-                        'amount' => $dailyBeverageCashSales
+                        'amount' => $dailyBeverageCashSales,
                     ],
                     'qris' => [
                         'quantity' => $dailyBeverageQrisQuantity,
-                        'amount' => $dailyBeverageQrisSales
+                        'amount' => $dailyBeverageQrisSales,
                     ],
                     'total' => [
                         'quantity' => $dailyBeverageCashQuantity + $dailyBeverageQrisQuantity,
-                        'amount' => $dailyBeverageSales
-                    ]
+                        'amount' => $dailyBeverageSales,
+                    ],
                 ];
 
                 // Tambahkan ke array data harian
@@ -390,7 +722,7 @@ class ReportController extends Controller
 
             // Get payment data per week
             foreach ($salesData as $weekData) {
-                list($year, $week) = explode('-', $weekData->period_key);
+                [$year, $week] = explode('-', $weekData->period_key);
 
                 $weekPayments = Order::select('payment_method', DB::raw('SUM(total) as total_amount'))
                     ->whereRaw('YEAR(created_at) = ?', [$year])
@@ -432,11 +764,7 @@ class ReportController extends Controller
                 $periodBeverageByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
                     ->join('products', 'products.id', '=', 'order_items.product_id')
                     ->join('categories', 'categories.id', '=', 'products.category_id')
-                    ->select(
-                        'orders.payment_method',
-                        DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'),
-                        DB::raw('SUM(order_items.quantity) as total_quantity')
-                    )
+                    ->select('orders.payment_method', DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'), DB::raw('SUM(order_items.quantity) as total_quantity'))
                     ->whereRaw('YEAR(orders.created_at) = ?', [$year])
                     ->whereRaw('WEEK(orders.created_at) = ?', [$week])
                     ->when($outletId, function ($query) use ($outletId) {
@@ -468,16 +796,16 @@ class ReportController extends Controller
                 $weekData->beverage_breakdown = [
                     'cash' => [
                         'quantity' => $weekData->beverage_cash_quantity,
-                        'amount' => $weekData->beverage_cash_sales
+                        'amount' => $weekData->beverage_cash_sales,
                     ],
                     'qris' => [
                         'quantity' => $weekData->beverage_qris_quantity,
-                        'amount' => $weekData->beverage_qris_sales
+                        'amount' => $weekData->beverage_qris_sales,
                     ],
                     'total' => [
                         'quantity' => $weekData->beverage_cash_quantity + $weekData->beverage_qris_quantity,
-                        'amount' => $weekData->beverage_sales
-                    ]
+                        'amount' => $weekData->beverage_sales,
+                    ],
                 ];
             }
         } elseif ($periodType === 'monthly') {
@@ -493,7 +821,7 @@ class ReportController extends Controller
 
             // Get payment data per month
             foreach ($salesData as $monthData) {
-                list($year, $month) = explode('-', $monthData->period_key);
+                [$year, $month] = explode('-', $monthData->period_key);
 
                 $monthPayments = Order::select('payment_method', DB::raw('SUM(total) as total_amount'))
                     ->whereRaw('YEAR(created_at) = ?', [$year])
@@ -535,11 +863,7 @@ class ReportController extends Controller
                 $periodBeverageByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
                     ->join('products', 'products.id', '=', 'order_items.product_id')
                     ->join('categories', 'categories.id', '=', 'products.category_id')
-                    ->select(
-                        'orders.payment_method',
-                        DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'),
-                        DB::raw('SUM(order_items.quantity) as total_quantity')
-                    )
+                    ->select('orders.payment_method', DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'), DB::raw('SUM(order_items.quantity) as total_quantity'))
                     ->whereRaw('YEAR(orders.created_at) = ?', [$year])
                     ->whereRaw('MONTH(orders.created_at) = ?', [$month])
                     ->when($outletId, function ($query) use ($outletId) {
@@ -571,16 +895,16 @@ class ReportController extends Controller
                 $monthData->beverage_breakdown = [
                     'cash' => [
                         'quantity' => $monthData->beverage_cash_quantity,
-                        'amount' => $monthData->beverage_cash_sales
+                        'amount' => $monthData->beverage_cash_sales,
                     ],
                     'qris' => [
                         'quantity' => $monthData->beverage_qris_quantity,
-                        'amount' => $monthData->beverage_qris_sales
+                        'amount' => $monthData->beverage_qris_sales,
                     ],
                     'total' => [
                         'quantity' => $monthData->beverage_cash_quantity + $monthData->beverage_qris_quantity,
-                        'amount' => $monthData->beverage_sales
-                    ]
+                        'amount' => $monthData->beverage_sales,
+                    ],
                 ];
             }
         }
@@ -599,7 +923,7 @@ class ReportController extends Controller
         if (Auth::user()->role === 'staff' || Auth::user()->role === 'admin') {
             $outlet = Outlet::find(Auth::user()->outlet_id);
             $subtitle .= ' | Outlet: ' . $outlet->name;
-        } else if ($outletId) {
+        } elseif ($outletId) {
             // For owner users who selected a specific outlet
             $outlet = Outlet::find($outletId);
             $subtitle .= ' | Outlet: ' . $outlet->name;
@@ -611,33 +935,36 @@ class ReportController extends Controller
         // Generate laporan berdasarkan format yang diminta
         if ($request->format === 'pdf') {
             // Create PDF with custom view data
-            $pdf = PDF::loadView('pages.reports.sales_summary_pdf', compact(
-                'title',
-                'subtitle',
-                'totalRevenue',
-                'totalOrders',
-                'totalSubTotal',
-                'totalTax',
-                'totalDiscountAmount',
-                'beverageSales',
-                'beverageCashSales',
-                'beverageQrisSales',
-                'beverageCashQuantity',
-                'beverageQrisQuantity',
-                'beveragePaymentBreakdown', // Add structured breakdown
-                'qrisSales',
-                'cashSales',
-                'totalOpeningBalance',
-                'totalExpenses',
-                'totalQrisFee',
-                'closingBalance',
-                'finalCashClosing',
-                'dailyData',
-                'salesData',
-                'periodType',
-                'startDate',
-                'endDate'
-            ));
+            $pdf = PDF::loadView(
+                'pages.reports.sales_summary_pdf',
+                compact(
+                    'title',
+                    'subtitle',
+                    'totalRevenue',
+                    'totalOrders',
+                    'totalSubTotal',
+                    'totalTax',
+                    'totalDiscountAmount',
+                    'beverageSales',
+                    'beverageCashSales',
+                    'beverageQrisSales',
+                    'beverageCashQuantity',
+                    'beverageQrisQuantity',
+                    'beveragePaymentBreakdown', // Add structured breakdown
+                    'qrisSales',
+                    'cashSales',
+                    'totalOpeningBalance',
+                    'totalExpenses',
+                    'totalQrisFee',
+                    'closingBalance',
+                    'finalCashClosing',
+                    'dailyData',
+                    'salesData',
+                    'periodType',
+                    'startDate',
+                    'endDate',
+                ),
+            );
 
             // Set orientation to landscape
             $pdf->setPaper('a4', 'landscape');
@@ -652,14 +979,7 @@ class ReportController extends Controller
             $sheet->setTitle('Laporan Penjualan');
 
             // Set document properties
-            $spreadsheet->getProperties()
-                ->setCreator('Seblak Sulthane')
-                ->setLastModifiedBy('Seblak Sulthane')
-                ->setTitle($title)
-                ->setSubject($subtitle)
-                ->setDescription('Laporan Ringkasan Penjualan Seblak Sulthane')
-                ->setKeywords('sales, report, seblak, sulthane')
-                ->setCategory('Financial Reports');
+            $spreadsheet->getProperties()->setCreator('Seblak Sulthane')->setLastModifiedBy('Seblak Sulthane')->setTitle($title)->setSubject($subtitle)->setDescription('Laporan Ringkasan Penjualan Seblak Sulthane')->setKeywords('sales, report, seblak, sulthane')->setCategory('Financial Reports');
 
             // Set the sheet to be scrollable from the beginning
             $spreadsheet->getActiveSheet()->getPageSetup()->setFitToWidth(1);
@@ -745,7 +1065,12 @@ class ReportController extends Controller
 
             // Add company header and title
             $sheet->setCellValue('A1', 'SEBLAK SULTHANE');
-            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(20)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_DARKRED));
+            $sheet
+                ->getStyle('A1')
+                ->getFont()
+                ->setBold(true)
+                ->setSize(20)
+                ->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_DARKRED));
 
             // Report title and period
             $sheet->setCellValue('A3', $title);
@@ -775,35 +1100,59 @@ class ReportController extends Controller
             // KPI Row 1: Key metrics
             $sheet->setCellValue('A' . $row, 'Total Penjualan:');
             $sheet->setCellValue('B' . $row, $totalRevenue);
-            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
-            $sheet->getStyle('B' . $row)->getFont()->setBold(true);
+            $sheet
+                ->getStyle('B' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $row)
+                ->getFont()
+                ->setBold(true);
 
             $sheet->setCellValue('D' . $row, 'Jumlah Order:');
             $sheet->setCellValue('E' . $row, $totalOrders);
-            $sheet->getStyle('E' . $row)->getFont()->setBold(true);
+            $sheet
+                ->getStyle('E' . $row)
+                ->getFont()
+                ->setBold(true);
 
             $row++;
             $sheet->setCellValue('A' . $row, 'Penjualan Kotor:');
             $sheet->setCellValue('B' . $row, $totalSubTotal);
-            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $sheet->setCellValue('D' . $row, 'Rata-rata Order:');
             $sheet->setCellValue('E' . $row, $avgOrderValue);
-            $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('E' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $row++;
             $sheet->setCellValue('A' . $row, 'Total Diskon:');
             $sheet->setCellValue('B' . $row, $totalDiscountAmount);
-            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $sheet->setCellValue('D' . $row, 'Penjualan Beverage:');
             $sheet->setCellValue('E' . $row, $beverageSales);
-            $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('E' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $row++;
             $sheet->setCellValue('A' . $row, 'Total Pajak:');
             $sheet->setCellValue('B' . $row, $totalTax);
-            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             // Apply nice borders to KPI section
             $kpiBoxStyle = [
@@ -833,14 +1182,20 @@ class ReportController extends Controller
             $sheet->setCellValue('A' . $row, 'CASH');
             $sheet->setCellValue('B' . $row, $beverageCashQuantity);
             $sheet->setCellValue('C' . $row, $beverageCashSales);
-            $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('C' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $row++;
             // QRIS row
             $sheet->setCellValue('A' . $row, 'QRIS');
             $sheet->setCellValue('B' . $row, $beverageQrisQuantity);
             $sheet->setCellValue('C' . $row, $beverageQrisSales);
-            $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('C' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $row++;
             // Total row
@@ -848,7 +1203,10 @@ class ReportController extends Controller
             $sheet->setCellValue('B' . $row, $beverageCashQuantity + $beverageQrisQuantity);
             $sheet->setCellValue('C' . $row, $beverageSales);
             $sheet->getStyle('A' . $row . ':C' . $row)->applyFromArray($totalsStyle);
-            $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('C' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             // Format the beverage details table
             $beverageBoxStyle = [
@@ -878,12 +1236,18 @@ class ReportController extends Controller
             foreach ($paymentMethods as $method) {
                 $sheet->setCellValue('A' . $paymentRow, ucfirst($method->payment_method));
                 $sheet->setCellValue('B' . $paymentRow, $method->total_amount);
-                $sheet->getStyle('B' . $paymentRow)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet
+                    ->getStyle('B' . $paymentRow)
+                    ->getNumberFormat()
+                    ->setFormatCode('#,##0');
 
                 // Calculate percentage
-                $percentage = ($totalRevenue > 0) ? ($method->total_amount / $totalRevenue) : 0;
+                $percentage = $totalRevenue > 0 ? $method->total_amount / $totalRevenue : 0;
                 $sheet->setCellValue('C' . $paymentRow, $percentage);
-                $sheet->getStyle('C' . $paymentRow)->getNumberFormat()->setFormatCode('0.00%');
+                $sheet
+                    ->getStyle('C' . $paymentRow)
+                    ->getNumberFormat()
+                    ->setFormatCode('0.00%');
 
                 $paymentRow++;
             }
@@ -892,7 +1256,10 @@ class ReportController extends Controller
             $sheet->setCellValue('A' . $paymentRow, 'TOTAL');
             $sheet->setCellValue('B' . $paymentRow, $totalRevenue);
             $sheet->setCellValue('C' . $paymentRow, '100%');
-            $sheet->getStyle('B' . $paymentRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $paymentRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
             $sheet->getStyle('A' . $paymentRow . ':C' . $paymentRow)->applyFromArray($totalsStyle);
 
             // Format payment method table
@@ -908,49 +1275,84 @@ class ReportController extends Controller
             $cashFlowRow++;
             $sheet->setCellValue('A' . $cashFlowRow, 'Saldo Awal:');
             $sheet->setCellValue('B' . $cashFlowRow, $totalOpeningBalance);
-            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $cashFlowRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $cashFlowRow++;
             $sheet->setCellValue('A' . $cashFlowRow, 'Penjualan CASH:');
             $sheet->setCellValue('B' . $cashFlowRow, $cashSales);
-            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $cashFlowRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $cashFlowRow++;
             $sheet->setCellValue('A' . $cashFlowRow, 'Penjualan QRIS:');
             $sheet->setCellValue('B' . $cashFlowRow, $qrisSales);
-            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $cashFlowRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $cashFlowRow++;
             $sheet->setCellValue('A' . $cashFlowRow, 'Biaya Layanan QRIS:');
             $sheet->setCellValue('B' . $cashFlowRow, $totalQrisFee);
-            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $cashFlowRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $cashFlowRow++;
             $sheet->setCellValue('A' . $cashFlowRow, 'Total Pengeluaran:');
             $sheet->setCellValue('B' . $cashFlowRow, $totalExpenses);
-            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $cashFlowRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             $cashFlowRow++;
             $sheet->setCellValue('A' . $cashFlowRow, 'Saldo Akhir:');
             $sheet->setCellValue('B' . $cashFlowRow, $closingBalance);
-            $sheet->getStyle('A' . $cashFlowRow . ':B' . $cashFlowRow)->getFont()->setBold(true);
-            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('A' . $cashFlowRow . ':B' . $cashFlowRow)
+                ->getFont()
+                ->setBold(true);
+            $sheet
+                ->getStyle('B' . $cashFlowRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             // Highlight negative closing balance
             if ($closingBalance < 0) {
-                $sheet->getStyle('B' . $cashFlowRow)->getFont()->getColor()->setRGB('FF0000');
+                $sheet
+                    ->getStyle('B' . $cashFlowRow)
+                    ->getFont()
+                    ->getColor()
+                    ->setRGB('FF0000');
             }
 
             // Add Final Cash Closing row
             $cashFlowRow++;
             $sheet->setCellValue('A' . $cashFlowRow, 'Final Cash Closing:');
             $sheet->setCellValue('B' . $cashFlowRow, $finalCashClosing);
-            $sheet->getStyle('A' . $cashFlowRow . ':B' . $cashFlowRow)->getFont()->setBold(true);
-            $sheet->getStyle('B' . $cashFlowRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('A' . $cashFlowRow . ':B' . $cashFlowRow)
+                ->getFont()
+                ->setBold(true);
+            $sheet
+                ->getStyle('B' . $cashFlowRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             // Highlight negative final cash closing
             if ($finalCashClosing < 0) {
-                $sheet->getStyle('B' . $cashFlowRow)->getFont()->getColor()->setRGB('FF0000');
+                $sheet
+                    ->getStyle('B' . $cashFlowRow)
+                    ->getFont()
+                    ->getColor()
+                    ->setRGB('FF0000');
             }
 
             // Format cash flow table
@@ -1029,24 +1431,45 @@ class ReportController extends Controller
                     $sheet->setCellValue('Q' . $detailRow, $day['final_cash_closing']);
 
                     // Format numbers
-                    $sheet->getStyle('D' . $detailRow . ':Q' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet
+                        ->getStyle('D' . $detailRow . ':Q' . $detailRow)
+                        ->getNumberFormat()
+                        ->setFormatCode('#,##0');
 
                     // Add weekend highlighting
                     if (in_array($day['day_name'], ['Sabtu', 'Minggu'])) {
-                        $sheet->getStyle('A' . $detailRow . ':Q' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FCE4D6');
+                        $sheet
+                            ->getStyle('A' . $detailRow . ':Q' . $detailRow)
+                            ->getFill()
+                            ->setFillType(Fill::FILL_SOLID)
+                            ->getStartColor()
+                            ->setRGB('FCE4D6');
                     }
 
                     // Highlight negative closing balance and final cash closing
                     if ($day['closing_balance'] < 0) {
-                        $sheet->getStyle('P' . $detailRow)->getFont()->getColor()->setRGB('FF0000');
+                        $sheet
+                            ->getStyle('P' . $detailRow)
+                            ->getFont()
+                            ->getColor()
+                            ->setRGB('FF0000');
                     }
                     if ($day['final_cash_closing'] < 0) {
-                        $sheet->getStyle('Q' . $detailRow)->getFont()->getColor()->setRGB('FF0000');
+                        $sheet
+                            ->getStyle('Q' . $detailRow)
+                            ->getFont()
+                            ->getColor()
+                            ->setRGB('FF0000');
                     }
 
                     // Add zebra striping for better readability
                     if ($detailRow % 2 == 0) {
-                        $sheet->getStyle('A' . $detailRow . ':Q' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
+                        $sheet
+                            ->getStyle('A' . $detailRow . ':Q' . $detailRow)
+                            ->getFill()
+                            ->setFillType(Fill::FILL_SOLID)
+                            ->getStartColor()
+                            ->setRGB('F2F2F2');
                     }
 
                     $detailRow++;
@@ -1073,7 +1496,10 @@ class ReportController extends Controller
 
                 // Format totals
                 $sheet->getStyle('A' . $detailRow . ':Q' . $detailRow)->applyFromArray($totalsStyle);
-                $sheet->getStyle('D' . $detailRow . ':Q' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet
+                    ->getStyle('D' . $detailRow . ':Q' . $detailRow)
+                    ->getNumberFormat()
+                    ->setFormatCode('#,##0');
 
                 // Format the entire data table
                 $sheet->getStyle('A' . $startDetailRow . ':Q' . $detailRow)->applyFromArray($tableStyle);
@@ -1125,11 +1551,19 @@ class ReportController extends Controller
                     $sheet->setCellValue('M' . $detailRow, $avgValue);
 
                     // Format numbers
-                    $sheet->getStyle('C' . $detailRow . ':M' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet
+                        ->getStyle('C' . $detailRow . ':M' . $detailRow)
+                        ->getNumberFormat()
+                        ->setFormatCode('#,##0');
 
                     // Add zebra striping for better readability
                     if ($detailRow % 2 == 0) {
-                        $sheet->getStyle('A' . $detailRow . ':M' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
+                        $sheet
+                            ->getStyle('A' . $detailRow . ':M' . $detailRow)
+                            ->getFill()
+                            ->setFillType(Fill::FILL_SOLID)
+                            ->getStartColor()
+                            ->setRGB('F2F2F2');
                     }
 
                     $detailRow++;
@@ -1152,7 +1586,10 @@ class ReportController extends Controller
 
                 // Format totals
                 $sheet->getStyle('A' . $detailRow . ':M' . $detailRow)->applyFromArray($totalsStyle);
-                $sheet->getStyle('C' . $detailRow . ':M' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet
+                    ->getStyle('C' . $detailRow . ':M' . $detailRow)
+                    ->getNumberFormat()
+                    ->setFormatCode('#,##0');
 
                 // Format the entire data table
                 $sheet->getStyle('A' . $startDetailRow . ':M' . $detailRow)->applyFromArray($tableStyle);
@@ -1171,7 +1608,10 @@ class ReportController extends Controller
                 $sheet->mergeCells('A' . $row . ':M' . $row);
             }
 
-            $sheet->getStyle('A' . $row)->getFont()->setItalic(true);
+            $sheet
+                ->getStyle('A' . $row)
+                ->getFont()
+                ->setItalic(true);
 
             // Auto-size columns for better readability
             if ($periodType === 'daily') {
@@ -1192,9 +1632,15 @@ class ReportController extends Controller
 
             // Make sure all headers are bold and stand out even without freezing
             if ($periodType === 'daily') {
-                $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':Q' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
+                $sheet
+                    ->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':Q' . ($row - $detailRow + $startDetailRow - 1))
+                    ->getFont()
+                    ->setBold(true);
             } else {
-                $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':M' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
+                $sheet
+                    ->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':M' . ($row - $detailRow + $startDetailRow - 1))
+                    ->getFont()
+                    ->setBold(true);
             }
 
             // Remove all protection which can interfere with scrolling
@@ -1236,165 +1682,6 @@ class ReportController extends Controller
     }
 
     /**
-     * Generate Outlet Performance Report
-     */
-    public function outletPerformance(Request $request)
-    {
-        // Validate request
-        $request->validate([
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'format' => 'required|in:pdf,excel',
-        ]);
-
-        $startDate = Carbon::parse($request->start_date)->startOfDay();
-        $endDate = Carbon::parse($request->end_date)->endOfDay();
-
-        // Get performance data for all outlets
-        $outletPerformance = Order::select('outlets.id as outlet_id', 'outlets.name as outlet_name', DB::raw('COUNT(orders.id) as total_orders'), DB::raw('SUM(orders.total) as total_revenue'), DB::raw('SUM(orders.tax) as total_tax'), DB::raw('SUM(orders.discount_amount) as total_discount'), DB::raw('COUNT(DISTINCT orders.member_id) as total_customers'), DB::raw('AVG(orders.total) as avg_order_value'))
-            ->join('outlets', 'outlets.id', '=', 'orders.outlet_id')
-            ->whereBetween('orders.created_at', [$startDate, $endDate])
-            ->groupBy('outlets.id', 'outlets.name')
-            ->orderBy('total_revenue', 'desc')
-            ->get();
-
-        // Get daily trends per outlet
-        $dailyTrends = Order::select('outlets.id as outlet_id', 'outlets.name as outlet_name', DB::raw('DATE(orders.created_at) as date'), DB::raw('SUM(orders.total) as daily_revenue'), DB::raw('COUNT(orders.id) as daily_orders'))
-            ->join('outlets', 'outlets.id', '=', 'orders.outlet_id')
-            ->whereBetween('orders.created_at', [$startDate, $endDate])
-            ->groupBy('outlets.id', 'outlets.name', 'date')
-            ->orderBy('date')
-            ->get()
-            ->groupBy('outlet_id');
-
-        // Format the report title
-        $title = 'Outlet Performance Report';
-        $subtitle = 'Period: ' . $startDate->format('d M Y') . ' - ' . $endDate->format('d M Y');
-
-        // Generate the report based on requested format
-        if ($request->format === 'pdf') {
-            $pdf = PDF::loadView('pages.reports.outlet_performance_pdf', compact('title', 'subtitle', 'outletPerformance', 'dailyTrends', 'startDate', 'endDate'));
-
-            return $pdf->download('outlet_performance_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.pdf');
-        } else {
-            // Create an Excel spreadsheet
-            $spreadsheet = new Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();
-
-            // Set spreadsheet metadata
-            $spreadsheet->getProperties()->setCreator('Seblak Sulthane')->setLastModifiedBy('Seblak Sulthane')->setTitle($title)->setSubject($subtitle)->setDescription('Outlet Performance Report for Seblak Sulthane');
-
-            // Format the header
-            $sheet->setCellValue('A1', $title);
-            $sheet->setCellValue('A2', $subtitle);
-            $sheet->mergeCells('A1:H1');
-            $sheet->mergeCells('A2:H2');
-
-            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
-            $sheet->getStyle('A2')->getFont()->setSize(12);
-
-            // Performance summary section
-            $sheet->setCellValue('A4', 'OUTLET PERFORMANCE SUMMARY');
-            $sheet->getStyle('A4')->getFont()->setBold(true);
-
-            // Headers
-            $sheet->setCellValue('A5', 'Outlet');
-            $sheet->setCellValue('B5', 'Total Orders');
-            $sheet->setCellValue('C5', 'Total Revenue');
-            $sheet->setCellValue('D5', 'Total Tax');
-            $sheet->setCellValue('E5', 'Total Discounts');
-            $sheet->setCellValue('F5', 'Total Customers');
-            $sheet->setCellValue('G5', 'Avg Order Value');
-            $sheet->getStyle('A5:G5')->getFont()->setBold(true);
-
-            // Data rows
-            $row = 6;
-            foreach ($outletPerformance as $outlet) {
-                $sheet->setCellValue('A' . $row, $outlet->outlet_name);
-                $sheet->setCellValue('B' . $row, $outlet->total_orders);
-                $sheet->setCellValue('C' . $row, $outlet->total_revenue);
-                $sheet->setCellValue('D' . $row, $outlet->total_tax);
-                $sheet->setCellValue('E' . $row, $outlet->total_discount);
-                $sheet->setCellValue('F' . $row, $outlet->total_customers);
-                $sheet->setCellValue('G' . $row, $outlet->avg_order_value);
-
-                // Format numbers
-                $sheet
-                    ->getStyle('C' . $row . ':E' . $row)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
-                $sheet
-                    ->getStyle('G' . $row)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
-
-                $row++;
-            }
-
-            // Create separate sheets for each outlet's daily trends
-            foreach ($dailyTrends as $outletId => $trends) {
-                $outletName = $trends->first()->outlet_name;
-                $sheetName = substr(str_replace(' ', '_', $outletName), 0, 30); // Make sure sheet name is valid
-
-                // Create a new sheet for this outlet
-                $trendSheet = $spreadsheet->createSheet();
-                $trendSheet->setTitle($sheetName);
-
-                // Headers
-                $trendSheet->setCellValue('A1', 'Daily Trends: ' . $outletName);
-                $trendSheet->mergeCells('A1:D1');
-                $trendSheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-
-                $trendSheet->setCellValue('A3', 'Date');
-                $trendSheet->setCellValue('B3', 'Revenue');
-                $trendSheet->setCellValue('C3', 'Orders');
-                $trendSheet->getStyle('A3:C3')->getFont()->setBold(true);
-
-                // Data rows
-                $trendRow = 4;
-                foreach ($trends as $trend) {
-                    $trendSheet->setCellValue('A' . $trendRow, $trend->date);
-                    $trendSheet->setCellValue('B' . $trendRow, $trend->daily_revenue);
-                    $trendSheet->setCellValue('C' . $trendRow, $trend->daily_orders);
-
-                    $trendSheet
-                        ->getStyle('B' . $trendRow)
-                        ->getNumberFormat()
-                        ->setFormatCode('#,##0');
-
-                    $trendRow++;
-                }
-
-                // Auto-size columns
-                foreach (range('A', 'C') as $col) {
-                    $trendSheet->getColumnDimension($col)->setAutoSize(true);
-                }
-            }
-
-            // Auto-size columns on main sheet
-            foreach (range('A', 'G') as $col) {
-                $sheet->getColumnDimension($col)->setAutoSize(true);
-            }
-
-            // Set first sheet as active
-            $spreadsheet->setActiveSheetIndex(0);
-
-            // Set filename and headers
-            $filename = 'outlet_performance_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.xlsx';
-
-            // Create the writer and output the file
-            $writer = new Xlsx($spreadsheet);
-
-            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="' . $filename . '"');
-            header('Cache-Control: max-age=0');
-
-            $writer->save('php://output');
-            exit();
-        }
-    }
-
-    /**
      * Generate Raw Materials Purchase Report
      */
     public function materialPurchases(Request $request)
@@ -1420,13 +1707,12 @@ class ReportController extends Controller
         $outletId = $request->outlet_id;
 
         // Base query for material orders
-        $query = MaterialOrder::with(['franchise', 'items.rawMaterial'])
-            ->whereBetween('created_at', [$startDate, $endDate]);
+        $query = MaterialOrder::with(['franchise', 'items.rawMaterial'])->whereBetween('created_at', [$startDate, $endDate]);
 
         // Filter by outlet if provided
         if ($outletId) {
             $query->where('franchise_id', $outletId);
-        } else if (Auth::user()->role !== 'owner') {
+        } elseif (Auth::user()->role !== 'owner') {
             // If not owner, restrict to user's outlet
             $query->where('franchise_id', Auth::user()->outlet_id);
         }
@@ -1443,12 +1729,11 @@ class ReportController extends Controller
             $currentDateStr = $currentDate->format('Y-m-d');
 
             // Get orders for this date
-            $dailyOrdersQuery = MaterialOrder::with(['items'])
-                ->whereDate('created_at', $currentDateStr);
+            $dailyOrdersQuery = MaterialOrder::with(['items'])->whereDate('created_at', $currentDateStr);
 
             if ($outletId) {
                 $dailyOrdersQuery->where('franchise_id', $outletId);
-            } else if (Auth::user()->role !== 'owner') {
+            } elseif (Auth::user()->role !== 'owner') {
                 $dailyOrdersQuery->where('franchise_id', Auth::user()->outlet_id);
             }
 
@@ -1475,7 +1760,7 @@ class ReportController extends Controller
                     'order_count' => $dailyOrderCount,
                     'item_count' => $dailyItemCount,
                     'payment_methods' => $paymentMethods,
-                    'total_amount' => $dailyTotalAmount
+                    'total_amount' => $dailyTotalAmount,
                 ];
             } else {
                 // If no orders on this day, still add the entry with zeros
@@ -1485,7 +1770,7 @@ class ReportController extends Controller
                     'order_count' => 0,
                     'item_count' => 0,
                     'payment_methods' => '-',
-                    'total_amount' => 0
+                    'total_amount' => 0,
                 ];
             }
 
@@ -1505,15 +1790,7 @@ class ReportController extends Controller
 
         // Generate the report based on requested format
         if ($request->format === 'pdf') {
-            $pdf = PDF::loadView('pages.reports.material_purchases_pdf', compact(
-                'title',
-                'subtitle',
-                'totalPurchaseAmount',
-                'totalOrderCount',
-                'dailyData',
-                'startDate',
-                'endDate'
-            ));
+            $pdf = PDF::loadView('pages.reports.material_purchases_pdf', compact('title', 'subtitle', 'totalPurchaseAmount', 'totalOrderCount', 'dailyData', 'startDate', 'endDate'));
 
             // Set orientation to landscape
             $pdf->setPaper('a4', 'landscape');
@@ -1526,14 +1803,7 @@ class ReportController extends Controller
             $sheet->setTitle('Laporan Bahan Baku');
 
             // Set document properties
-            $spreadsheet->getProperties()
-                ->setCreator('Seblak Sulthane')
-                ->setLastModifiedBy('Seblak Sulthane')
-                ->setTitle($title)
-                ->setSubject($subtitle)
-                ->setDescription('Laporan Pembelian Bahan Baku Seblak Sulthane')
-                ->setKeywords('materials, report, seblak, sulthane')
-                ->setCategory('Financial Reports');
+            $spreadsheet->getProperties()->setCreator('Seblak Sulthane')->setLastModifiedBy('Seblak Sulthane')->setTitle($title)->setSubject($subtitle)->setDescription('Laporan Pembelian Bahan Baku Seblak Sulthane')->setKeywords('materials, report, seblak, sulthane')->setCategory('Financial Reports');
 
             // Define commonly used styles
             $headerStyle = [
@@ -1600,7 +1870,12 @@ class ReportController extends Controller
 
             // Add company header and title
             $sheet->setCellValue('A1', 'SEBLAK SULTHANE');
-            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(20)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_DARKRED));
+            $sheet
+                ->getStyle('A1')
+                ->getFont()
+                ->setBold(true)
+                ->setSize(20)
+                ->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_DARKRED));
 
             // Report title and period
             $sheet->setCellValue('A3', $title);
@@ -1630,12 +1905,21 @@ class ReportController extends Controller
             // Key metrics
             $sheet->setCellValue('A' . $row, 'Total Pengeluaran Bahan Baku:');
             $sheet->setCellValue('B' . $row, $totalPurchaseAmount);
-            $sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
-            $sheet->getStyle('B' . $row)->getFont()->setBold(true);
+            $sheet
+                ->getStyle('B' . $row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('B' . $row)
+                ->getFont()
+                ->setBold(true);
 
             $sheet->setCellValue('D' . $row, 'Jumlah Pemesanan:');
             $sheet->setCellValue('E' . $row, $totalOrderCount);
-            $sheet->getStyle('E' . $row)->getFont()->setBold(true);
+            $sheet
+                ->getStyle('E' . $row)
+                ->getFont()
+                ->setBold(true);
 
             // Apply nice borders to KPI section
             $kpiBoxStyle = [
@@ -1684,16 +1968,29 @@ class ReportController extends Controller
                 $sheet->setCellValue('F' . $detailRow, $day['total_amount']);
 
                 // Format numbers
-                $sheet->getStyle('F' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet
+                    ->getStyle('F' . $detailRow)
+                    ->getNumberFormat()
+                    ->setFormatCode('#,##0');
 
                 // Add weekend highlighting
                 if (in_array($day['day_name'], ['Sabtu', 'Minggu'])) {
-                    $sheet->getStyle('A' . $detailRow . ':F' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FCE4D6');
+                    $sheet
+                        ->getStyle('A' . $detailRow . ':F' . $detailRow)
+                        ->getFill()
+                        ->setFillType(Fill::FILL_SOLID)
+                        ->getStartColor()
+                        ->setRGB('FCE4D6');
                 }
 
                 // Add zebra striping for better readability
                 if ($detailRow % 2 == 0) {
-                    $sheet->getStyle('A' . $detailRow . ':F' . $detailRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
+                    $sheet
+                        ->getStyle('A' . $detailRow . ':F' . $detailRow)
+                        ->getFill()
+                        ->setFillType(Fill::FILL_SOLID)
+                        ->getStartColor()
+                        ->setRGB('F2F2F2');
                 }
 
                 $detailRow++;
@@ -1713,7 +2010,10 @@ class ReportController extends Controller
 
             // Format totals
             $sheet->getStyle('A' . $detailRow . ':F' . $detailRow)->applyFromArray($totalsStyle);
-            $sheet->getStyle('F' . $detailRow)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle('F' . $detailRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
 
             // Format the entire data table
             $sheet->getStyle('A' . $startDetailRow . ':F' . $detailRow)->applyFromArray($tableStyle);
@@ -1725,7 +2025,10 @@ class ReportController extends Controller
             $row = $detailRow + 3;
             $sheet->setCellValue('A' . $row, 'Laporan dibuat pada: ' . now()->format('d M Y H:i'));
             $sheet->mergeCells('A' . $row . ':F' . $row);
-            $sheet->getStyle('A' . $row)->getFont()->setItalic(true);
+            $sheet
+                ->getStyle('A' . $row)
+                ->getFont()
+                ->setItalic(true);
 
             // Auto-size columns for better readability
             foreach (range('A', 'F') as $col) {
@@ -1736,7 +2039,10 @@ class ReportController extends Controller
             $sheet->unfreezePane();
 
             // Make sure all headers are bold and stand out
-            $sheet->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':F' . ($row - $detailRow + $startDetailRow - 1))->getFont()->setBold(true);
+            $sheet
+                ->getStyle('A' . ($row - $detailRow + $startDetailRow - 1) . ':F' . ($row - $detailRow + $startDetailRow - 1))
+                ->getFont()
+                ->setBold(true);
 
             // Remove all protection which can interfere with scrolling
             $sheet->getProtection()->setSheet(false);
@@ -1770,592 +2076,6 @@ class ReportController extends Controller
             header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT'); // Always modified
             header('Cache-Control: cache, must-revalidate'); // HTTP/1.1
             header('Pragma: public'); // HTTP/1.0
-
-            $writer->save('php://output');
-            exit();
-        }
-    }
-
-    /**
-     * Generate Product Performance Report
-     */
-    public function productPerformance(Request $request)
-    {
-        // Validate request
-        $request->validate([
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'outlet_id' => 'nullable|exists:outlets,id',
-            'format' => 'required|in:pdf,excel',
-        ]);
-
-        $startDate = Carbon::parse($request->start_date)->startOfDay();
-        $endDate = Carbon::parse($request->end_date)->endOfDay();
-        $outletId = $request->outlet_id;
-
-        // Get product performance data - FIXED QUERY with price instead of price_per_unit
-        $productPerformance = OrderItem::select('products.id as product_id', 'products.name as product_name', 'categories.name as category_name', DB::raw('SUM(order_items.quantity) as total_quantity'), DB::raw('SUM(order_items.quantity * order_items.price) as total_revenue'), DB::raw('COUNT(DISTINCT orders.id) as order_count'))
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->join('products', 'products.id', '=', 'order_items.product_id')
-            ->join('categories', 'categories.id', '=', 'products.category_id')
-            ->whereBetween('orders.created_at', [$startDate, $endDate])
-            ->when($outletId, function ($query) use ($outletId) {
-                return $query->where('orders.outlet_id', $outletId);
-            })
-            ->groupBy('products.id', 'products.name', 'categories.name')
-            ->orderBy('total_quantity', 'desc')
-            ->get();
-
-        // Get category breakdown - FIXED QUERY with price instead of price_per_unit
-        $categoryBreakdown = OrderItem::select('categories.name as category_name', DB::raw('SUM(order_items.quantity) as total_quantity'), DB::raw('SUM(order_items.quantity * order_items.price) as total_revenue'), DB::raw('COUNT(DISTINCT products.id) as product_count'))
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->join('products', 'products.id', '=', 'order_items.product_id')
-            ->join('categories', 'categories.id', '=', 'products.category_id')
-            ->whereBetween('orders.created_at', [$startDate, $endDate])
-            ->when($outletId, function ($query) use ($outletId) {
-                return $query->where('orders.outlet_id', $outletId);
-            })
-            ->groupBy('categories.name')
-            ->orderBy('total_revenue', 'desc')
-            ->get();
-
-        // Format the report title
-        $title = 'Product Performance Report';
-        $subtitle = 'Period: ' . $startDate->format('d M Y') . ' - ' . $endDate->format('d M Y');
-
-        if ($outletId) {
-            $outlet = Outlet::find($outletId);
-            $subtitle .= ' | Outlet: ' . $outlet->name;
-        } else {
-            $subtitle .= ' | All Outlets';
-        }
-
-        // Generate the report based on requested format
-        if ($request->format === 'pdf') {
-            $pdf = PDF::loadView('pages.reports.product_performance_pdf', compact('title', 'subtitle', 'productPerformance', 'categoryBreakdown', 'startDate', 'endDate'));
-
-            return $pdf->download('product_performance_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.pdf');
-        } else {
-            // Create an Excel spreadsheet
-            $spreadsheet = new Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();
-
-            // Set spreadsheet metadata
-            $spreadsheet->getProperties()->setCreator('Seblak Sulthane')->setLastModifiedBy('Seblak Sulthane')->setTitle($title)->setSubject($subtitle)->setDescription('Product Performance Report for Seblak Sulthane');
-
-            // Format the header
-            $sheet->setCellValue('A1', $title);
-            $sheet->setCellValue('A2', $subtitle);
-            $sheet->mergeCells('A1:F1');
-            $sheet->mergeCells('A2:F2');
-
-            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
-            $sheet->getStyle('A2')->getFont()->setSize(12);
-
-            // Category breakdown section
-            $sheet->setCellValue('A4', 'CATEGORY BREAKDOWN');
-            $sheet->getStyle('A4')->getFont()->setBold(true);
-
-            // Headers
-            $sheet->setCellValue('A5', 'Category');
-            $sheet->setCellValue('B5', 'Product Count');
-            $sheet->setCellValue('C5', 'Total Quantity Sold');
-            $sheet->setCellValue('D5', 'Total Revenue');
-            $sheet->getStyle('A5:D5')->getFont()->setBold(true);
-
-            // Data rows
-            $row = 6;
-            foreach ($categoryBreakdown as $category) {
-                $sheet->setCellValue('A' . $row, $category->category_name);
-                $sheet->setCellValue('B' . $row, $category->product_count);
-                $sheet->setCellValue('C' . $row, $category->total_quantity);
-                $sheet->setCellValue('D' . $row, $category->total_revenue);
-
-                // Format numbers
-                $sheet
-                    ->getStyle('D' . $row)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
-
-                $row++;
-            }
-
-            // Product performance section
-            $row += 2;
-            $productRow = $row;
-            $sheet->setCellValue('A' . $productRow, 'PRODUCT PERFORMANCE');
-            $sheet
-                ->getStyle('A' . $productRow)
-                ->getFont()
-                ->setBold(true);
-
-            $productRow++;
-            $sheet->setCellValue('A' . $productRow, 'Product');
-            $sheet->setCellValue('B' . $productRow, 'Category');
-            $sheet->setCellValue('C' . $productRow, 'Quantity Sold');
-            $sheet->setCellValue('D' . $productRow, 'Revenue');
-            $sheet->setCellValue('E' . $productRow, 'Order Count');
-            $sheet
-                ->getStyle('A' . $productRow . ':E' . $productRow)
-                ->getFont()
-                ->setBold(true);
-
-            $productRow++;
-            foreach ($productPerformance as $product) {
-                $sheet->setCellValue('A' . $productRow, $product->product_name);
-                $sheet->setCellValue('B' . $productRow, $product->category_name);
-                $sheet->setCellValue('C' . $productRow, $product->total_quantity);
-                $sheet->setCellValue('D' . $productRow, $product->total_revenue);
-                $sheet->setCellValue('E' . $productRow, $product->order_count);
-
-                // Format numbers
-                $sheet
-                    ->getStyle('D' . $productRow)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
-
-                $productRow++;
-            }
-
-            // Create a sheet for product rankings
-            $rankSheet = $spreadsheet->createSheet();
-            $rankSheet->setTitle('Product Rankings');
-
-            // Headers
-            $rankSheet->setCellValue('A1', 'Product Rankings');
-            $rankSheet->mergeCells('A1:D1');
-            $rankSheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-
-            $rankSheet->setCellValue('A3', 'Rank');
-            $rankSheet->setCellValue('B3', 'Product');
-            $rankSheet->setCellValue('C3', 'Category');
-            $rankSheet->setCellValue('D3', 'Quantity Sold');
-            $rankSheet->getStyle('A3:D3')->getFont()->setBold(true);
-
-            // Data rows
-            $rankRow = 4;
-            $rank = 1;
-            foreach ($productPerformance as $product) {
-                $rankSheet->setCellValue('A' . $rankRow, $rank);
-                $rankSheet->setCellValue('B' . $rankRow, $product->product_name);
-                $rankSheet->setCellValue('C' . $rankRow, $product->category_name);
-                $rankSheet->setCellValue('D' . $rankRow, $product->total_quantity);
-
-                $rank++;
-                $rankRow++;
-            }
-
-            // Auto-size columns on all sheets
-            foreach (range('A', 'E') as $col) {
-                $sheet->getColumnDimension($col)->setAutoSize(true);
-                if ($col <= 'D') {
-                    $rankSheet->getColumnDimension($col)->setAutoSize(true);
-                }
-            }
-
-            // Set first sheet as active
-            $spreadsheet->setActiveSheetIndex(0);
-
-            // Set filename and headers
-            $filename = 'product_performance_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.xlsx';
-
-            // Create the writer and output the file
-            $writer = new Xlsx($spreadsheet);
-
-            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="' . $filename . '"');
-            header('Cache-Control: max-age=0');
-
-            $writer->save('php://output');
-            exit();
-        }
-    }
-
-    /**
-     * Generate Customer Insights Report
-     */
-    public function customerInsights(Request $request)
-    {
-        // Validate request
-        $request->validate([
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'format' => 'required|in:pdf,excel',
-        ]);
-
-        $startDate = Carbon::parse($request->start_date)->startOfDay();
-        $endDate = Carbon::parse($request->end_date)->endOfDay();
-
-        // Get top customers
-        $topCustomers = Order::select('members.id as member_id', 'members.name as member_name', 'members.phone as member_phone', DB::raw('COUNT(orders.id) as total_transactions'), DB::raw('SUM(orders.total) as total_spent'), DB::raw('AVG(orders.total) as avg_order_value'))
-            ->join('members', 'members.id', '=', 'orders.member_id')
-            ->whereBetween('orders.created_at', [$startDate, $endDate])
-            ->groupBy('members.id', 'members.name', 'members.phone')
-            ->orderBy('total_spent', 'desc')
-            ->limit(50)
-            ->get();
-
-        // Get member vs non-member stats
-        $memberStats = Order::select(DB::raw('CASE WHEN member_id IS NULL THEN "Non-Member" ELSE "Member" END as customer_type'), DB::raw('COUNT(*) as order_count'), DB::raw('SUM(total) as total_revenue'), DB::raw('AVG(total) as avg_order_value'))
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->groupBy(DB::raw('CASE WHEN member_id IS NULL THEN "Non-Member" ELSE "Member" END'))
-            ->get();
-
-        // Get member growth
-        $memberGrowth = Member::select(DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'), DB::raw('COUNT(*) as new_members'))
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->groupBy(DB::raw('DATE_FORMAT(created_at, "%Y-%m")'))
-            ->orderBy('month')
-            ->get();
-
-        // Format the report title
-        $title = 'Customer Insights Report';
-        $subtitle = 'Period: ' . $startDate->format('d M Y') . ' - ' . $endDate->format('d M Y');
-
-        // Generate the report based on requested format
-        if ($request->format === 'pdf') {
-            $pdf = PDF::loadView('pages.reports.customer_insights_pdf', compact('title', 'subtitle', 'topCustomers', 'memberStats', 'memberGrowth', 'startDate', 'endDate'));
-
-            return $pdf->download('customer_insights_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.pdf');
-        } else {
-            // Create an Excel spreadsheet
-            $spreadsheet = new Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();
-
-            // Set spreadsheet metadata
-            $spreadsheet->getProperties()->setCreator('Seblak Sulthane')->setLastModifiedBy('Seblak Sulthane')->setTitle($title)->setSubject($subtitle)->setDescription('Customer Insights Report for Seblak Sulthane');
-
-            // Format the header
-            $sheet->setCellValue('A1', $title);
-            $sheet->setCellValue('A2', $subtitle);
-            $sheet->mergeCells('A1:F1');
-            $sheet->mergeCells('A2:F2');
-
-            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
-            $sheet->getStyle('A2')->getFont()->setSize(12);
-
-            // Member vs Non-member section
-            $sheet->setCellValue('A4', 'MEMBER VS NON-MEMBER COMPARISON');
-            $sheet->getStyle('A4')->getFont()->setBold(true);
-
-            // Headers
-            $sheet->setCellValue('A5', 'Customer Type');
-            $sheet->setCellValue('B5', 'Order Count');
-            $sheet->setCellValue('C5', 'Total Revenue');
-            $sheet->setCellValue('D5', 'Avg Order Value');
-            $sheet->getStyle('A5:D5')->getFont()->setBold(true);
-
-            // Data rows
-            $row = 6;
-            foreach ($memberStats as $stat) {
-                $sheet->setCellValue('A' . $row, $stat->customer_type);
-                $sheet->setCellValue('B' . $row, $stat->order_count);
-                $sheet->setCellValue('C' . $row, $stat->total_revenue);
-                $sheet->setCellValue('D' . $row, $stat->avg_order_value);
-
-                // Format numbers
-                $sheet
-                    ->getStyle('C' . $row . ':D' . $row)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
-
-                $row++;
-            }
-
-            // Member growth section
-            $row += 2;
-            $sheet->setCellValue('A' . $row, 'MEMBER GROWTH');
-            $sheet
-                ->getStyle('A' . $row)
-                ->getFont()
-                ->setBold(true);
-
-            $row++;
-            $sheet->setCellValue('A' . $row, 'Month');
-            $sheet->setCellValue('B' . $row, 'New Members');
-            $sheet
-                ->getStyle('A' . $row . ':B' . $row)
-                ->getFont()
-                ->setBold(true);
-
-            $row++;
-            foreach ($memberGrowth as $growth) {
-                $sheet->setCellValue('A' . $row, $growth->month);
-                $sheet->setCellValue('B' . $row, $growth->new_members);
-                $row++;
-            }
-
-            // Top customers section
-            $row += 2;
-            $sheet->setCellValue('A' . $row, 'TOP CUSTOMERS');
-            $sheet
-                ->getStyle('A' . $row)
-                ->getFont()
-                ->setBold(true);
-
-            $row++;
-            $sheet->setCellValue('A' . $row, 'Rank');
-            $sheet->setCellValue('B' . $row, 'Name');
-            $sheet->setCellValue('C' . $row, 'Phone');
-            $sheet->setCellValue('D' . $row, 'Transactions');
-            $sheet->setCellValue('E' . $row, 'Total Spent');
-            $sheet->setCellValue('F' . $row, 'Avg Order Value');
-            $sheet
-                ->getStyle('A' . $row . ':F' . $row)
-                ->getFont()
-                ->setBold(true);
-
-            $row++;
-            $rank = 1;
-            foreach ($topCustomers as $customer) {
-                $sheet->setCellValue('A' . $row, $rank);
-                $sheet->setCellValue('B' . $row, $customer->member_name);
-                $sheet->setCellValue('C' . $row, $customer->member_phone);
-                $sheet->setCellValue('D' . $row, $customer->total_transactions);
-                $sheet->setCellValue('E' . $row, $customer->total_spent);
-                $sheet->setCellValue('F' . $row, $customer->avg_order_value);
-
-                // Format numbers
-                $sheet
-                    ->getStyle('E' . $row . ':F' . $row)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
-
-                $rank++;
-                $row++;
-            }
-
-            // Auto-size columns
-            foreach (range('A', 'F') as $col) {
-                $sheet->getColumnDimension($col)->setAutoSize(true);
-            }
-
-            // Set filename and headers
-            $filename = 'customer_insights_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.xlsx';
-
-            // Create the writer and output the file
-            $writer = new Xlsx($spreadsheet);
-
-            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="' . $filename . '"');
-            header('Cache-Control: max-age=0');
-
-            $writer->save('php://output');
-            exit();
-        }
-    }
-
-    /**
-     * Generate Inventory Report
-     */
-    public function inventoryReport(Request $request)
-    {
-        // Validate request
-        $request->validate([
-            'format' => 'required|in:pdf,excel',
-        ]);
-
-        // Get current inventory status
-        $rawMaterials = RawMaterial::orderBy('name')->get();
-
-        // Get recent material orders (last 30 days)
-        $materialOrders = MaterialOrder::with(['franchise', 'items.rawMaterial'])
-            ->where('created_at', '>=', now()->subDays(30))
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        // Calculate total spending on material orders for each outlet
-        $outletSpending = MaterialOrder::select('outlets.id as outlet_id', 'outlets.name as outlet_name', DB::raw('SUM(material_orders.total_amount) as total_spending'), DB::raw('COUNT(material_orders.id) as order_count'))
-            ->join('outlets', 'outlets.id', '=', 'material_orders.franchise_id')
-            ->where('material_orders.created_at', '>=', now()->subDays(30))
-            ->groupBy('outlets.id', 'outlets.name')
-            ->orderBy('total_spending', 'desc')
-            ->get();
-
-        // Format the report title
-        $title = 'Inventory & Raw Materials Report';
-        $subtitle = 'Generated on: ' . now()->format('d M Y');
-
-        // Generate the report based on requested format
-        if ($request->format === 'pdf') {
-            $pdf = PDF::loadView('pages.reports.inventory_pdf', compact('title', 'subtitle', 'rawMaterials', 'materialOrders', 'outletSpending'));
-
-            return $pdf->download('inventory_report_' . now()->format('Y-m-d') . '.pdf');
-        } else {
-            // Create an Excel spreadsheet
-            $spreadsheet = new Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();
-
-            // Set spreadsheet metadata
-            $spreadsheet->getProperties()->setCreator('Seblak Sulthane')->setLastModifiedBy('Seblak Sulthane')->setTitle($title)->setSubject($subtitle)->setDescription('Inventory Report for Seblak Sulthane');
-
-            // Format the header
-            $sheet->setCellValue('A1', $title);
-            $sheet->setCellValue('A2', $subtitle);
-            $sheet->mergeCells('A1:F1');
-            $sheet->mergeCells('A2:F2');
-
-            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
-            $sheet->getStyle('A2')->getFont()->setSize(12);
-
-            // Current inventory section
-            $sheet->setCellValue('A4', 'CURRENT INVENTORY STATUS');
-            $sheet->getStyle('A4')->getFont()->setBold(true);
-
-            // Headers
-            $sheet->setCellValue('A5', 'Material');
-            $sheet->setCellValue('B5', 'Unit');
-            $sheet->setCellValue('C5', 'Current Stock');
-            $sheet->setCellValue('D5', 'Price per Unit');
-            $sheet->setCellValue('E5', 'Total Value');
-            $sheet->setCellValue('F5', 'Status');
-            $sheet->getStyle('A5:F5')->getFont()->setBold(true);
-
-            // Data rows
-            $row = 6;
-            $totalInventoryValue = 0;
-
-            foreach ($rawMaterials as $material) {
-                $itemValue = $material->stock * $material->price;
-                $totalInventoryValue += $itemValue;
-
-                $sheet->setCellValue('A' . $row, $material->name);
-                $sheet->setCellValue('B' . $row, $material->unit);
-                $sheet->setCellValue('C' . $row, $material->stock);
-                $sheet->setCellValue('D' . $row, $material->price);
-                $sheet->setCellValue('E' . $row, $itemValue);
-                $sheet->setCellValue('F' . $row, $material->is_active ? 'Active' : 'Inactive');
-
-                // Format numbers
-                $sheet
-                    ->getStyle('D' . $row . ':E' . $row)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
-
-                // Format low stock items
-                if ($material->stock < 10) {
-                    $sheet
-                        ->getStyle('C' . $row)
-                        ->getFont()
-                        ->getColor()
-                        ->setARGB('FF0000'); // Red for low stock
-                }
-
-                $row++;
-            }
-
-            // Summary row
-            $row++;
-            $sheet->setCellValue('A' . $row, 'Total Inventory Value:');
-            $sheet->setCellValue('E' . $row, $totalInventoryValue);
-            $sheet
-                ->getStyle('A' . $row)
-                ->getFont()
-                ->setBold(true);
-            $sheet
-                ->getStyle('E' . $row)
-                ->getNumberFormat()
-                ->setFormatCode('#,##0');
-            $sheet
-                ->getStyle('E' . $row)
-                ->getFont()
-                ->setBold(true);
-
-            // Create a sheet for outlet spending
-            $spendingSheet = $spreadsheet->createSheet();
-            $spendingSheet->setTitle('Outlet Spending');
-
-            // Headers
-            $spendingSheet->setCellValue('A1', 'OUTLET MATERIAL SPENDING SUMMARY');
-            $spendingSheet->mergeCells('A1:C1');
-            $spendingSheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-
-            $spendingSheet->setCellValue('A3', 'Outlet');
-            $spendingSheet->setCellValue('B3', 'Order Count');
-            $spendingSheet->setCellValue('C3', 'Total Spending');
-            $spendingSheet->getStyle('A3:C3')->getFont()->setBold(true);
-
-            // Data rows
-            $spendingRow = 4;
-            foreach ($outletSpending as $outlet) {
-                $spendingSheet->setCellValue('A' . $spendingRow, $outlet->outlet_name);
-                $spendingSheet->setCellValue('B' . $spendingRow, $outlet->order_count);
-                $spendingSheet->setCellValue('C' . $spendingRow, $outlet->total_spending);
-
-                // Format numbers
-                $spendingSheet
-                    ->getStyle('C' . $spendingRow)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
-
-                $spendingRow++;
-            }
-
-            // Auto-size columns
-            foreach (range('A', 'C') as $col) {
-                $spendingSheet->getColumnDimension($col)->setAutoSize(true);
-            }
-
-            // Create a sheet for recent orders
-            $orderSheet = $spreadsheet->createSheet();
-            $orderSheet->setTitle('Recent Orders');
-
-            // Headers
-            $orderSheet->setCellValue('A1', 'RECENT MATERIAL ORDERS (LAST 30 DAYS)');
-            $orderSheet->mergeCells('A1:F1');
-            $orderSheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-
-            $orderSheet->setCellValue('A3', 'Order ID');
-            $orderSheet->setCellValue('B3', 'Date');
-            $orderSheet->setCellValue('C3', 'Outlet');
-            $orderSheet->setCellValue('D3', 'Status');
-            $orderSheet->setCellValue('E3', 'Items');
-            $orderSheet->setCellValue('F3', 'Total Amount');
-            $orderSheet->getStyle('A3:F3')->getFont()->setBold(true);
-
-            // Data rows
-            $orderRow = 4;
-            foreach ($materialOrders as $order) {
-                $itemsList = $order->items
-                    ->map(function ($item) {
-                        return $item->quantity . ' ' . $item->rawMaterial->unit . ' ' . $item->rawMaterial->name;
-                    })
-                    ->join(', ');
-
-                $orderSheet->setCellValue('A' . $orderRow, '#' . $order->id);
-                $orderSheet->setCellValue('B' . $orderRow, $order->created_at->format('d M Y'));
-                $orderSheet->setCellValue('C' . $orderRow, $order->franchise->name);
-                $orderSheet->setCellValue('D' . $orderRow, ucfirst($order->status));
-                $orderSheet->setCellValue('E' . $orderRow, $itemsList);
-                $orderSheet->setCellValue('F' . $orderRow, $order->total_amount);
-
-                // Format numbers
-                $orderSheet
-                    ->getStyle('F' . $orderRow)
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
-
-                $orderRow++;
-            }
-
-            // Auto-size columns on all sheets
-            foreach (range('A', 'F') as $col) {
-                $sheet->getColumnDimension($col)->setAutoSize(true);
-                $orderSheet->getColumnDimension($col)->setAutoSize(true);
-            }
-
-            // Set first sheet as active
-            $spreadsheet->setActiveSheetIndex(0);
-
-            // Set filename and headers
-            $filename = 'inventory_report_' . now()->format('Y-m-d') . '.xlsx';
-
-            // Create the writer and output the file
-            $writer = new Xlsx($spreadsheet);
-
-            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="' . $filename . '"');
-            header('Cache-Control: max-age=0');
 
             $writer->save('php://output');
             exit();

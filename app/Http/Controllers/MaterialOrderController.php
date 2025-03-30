@@ -20,10 +20,16 @@ class MaterialOrderController extends Controller
     {
         $query = MaterialOrder::with(['franchise', 'user']);
 
-        // Filter by outlet based on role
-        if (Auth::user()->role !== 'owner') {
-            $query->where('franchise_id', Auth::user()->outlet_id);
+        // Filter by outlet based on role and warehouse status
+        $user = Auth::user();
+        $isWarehouseStaff = $user->isWarehouseStaff();
+
+        // If user is owner or a warehouse staff, they can see all orders
+        if ($user->role !== 'owner' && !$isWarehouseStaff) {
+            // Regular staff/admin only see their outlet's orders
+            $query->where('franchise_id', $user->outlet_id);
         } elseif ($request->franchise_id) {
+            // Filter by selected outlet if a filter is applied (for owner/warehouse staff)
             $query->where('franchise_id', $request->franchise_id);
         }
 
@@ -68,10 +74,13 @@ class MaterialOrderController extends Controller
         // Sort by creation date (newest first by default)
         $query->latest();
 
-        $materialOrders = $query->paginate(10)->withQueryString();
+        $materialOrders = $query->paginate(15)->withQueryString();
         $outlets = Outlet::all();
 
-        return view('pages.material-orders.index', compact('materialOrders', 'outlets'));
+        // Pass warehouse status flag to view for conditional rendering
+        $isWarehouse = $isWarehouseStaff || $user->role === 'owner';
+
+        return view('pages.material-orders.index', compact('materialOrders', 'outlets', 'isWarehouse'));
     }
 
     /**
@@ -110,17 +119,38 @@ class MaterialOrderController extends Controller
             'materials' => 'required|array|min:1',
             'materials.*.raw_material_id' => 'required|exists:raw_materials,id',
             'materials.*.quantity' => 'required|integer|min:1',
+        ], [
+            'franchise_id.required' => 'Outlet harus dipilih',
+            'payment_method.required' => 'Metode pembayaran harus dipilih',
+            'materials.required' => 'Minimal satu bahan baku harus dipilih',
+            'materials.min' => 'Minimal satu bahan baku harus dipilih',
+            'materials.*.quantity.min' => 'Jumlah bahan baku harus minimal 1'
         ]);
 
         DB::beginTransaction();
         try {
             $totalAmount = 0;
+            $errorMessages = [];
 
-            // Calculate total amount and validate each item
-            foreach ($request->materials as $item) {
+            // Validasi stok tersedia untuk setiap bahan baku yang dipesan
+            foreach ($request->materials as $index => $item) {
                 $rawMaterial = RawMaterial::findOrFail($item['raw_material_id']);
-                $subtotal = $rawMaterial->price * $item['quantity'];
-                $totalAmount += $subtotal;
+
+                // Cek apakah jumlah yang diminta melebihi stok yang tersedia
+                if ($item['quantity'] > $rawMaterial->available_stock) {
+                    $errorMessages[] = "Stok tidak cukup untuk <strong>{$rawMaterial->name}</strong>. Tersedia: {$rawMaterial->available_stock} {$rawMaterial->unit}, diminta: {$item['quantity']} {$rawMaterial->unit}";
+                } else {
+                    $subtotal = $rawMaterial->price * $item['quantity'];
+                    $totalAmount += $subtotal;
+                }
+            }
+
+            // Jika ada error stok, tampilkan semua pesan error
+            if (count($errorMessages) > 0) {
+                DB::rollBack();
+                return redirect()->back()
+                    ->with('error', '<strong>Pemesanan Gagal!</strong><br>' . implode('<br>', $errorMessages))
+                    ->withInput();
             }
 
             // Create material order
@@ -133,7 +163,7 @@ class MaterialOrderController extends Controller
                 'notes' => $request->notes,
             ]);
 
-            // Create order items
+            // Create order items dan reservasi stok
             foreach ($request->materials as $item) {
                 $rawMaterial = RawMaterial::findOrFail($item['raw_material_id']);
                 $subtotal = $rawMaterial->price * $item['quantity'];
@@ -145,33 +175,44 @@ class MaterialOrderController extends Controller
                     'price_per_unit' => $rawMaterial->price,
                     'subtotal' => $subtotal,
                 ]);
+
+                // Reservasi stok
+                $rawMaterial->reserved_stock += $item['quantity'];
+                $rawMaterial->save();
             }
 
             DB::commit();
             return redirect()->route('material-orders.index')
-                ->with('success', 'Material order created successfully');
+                ->with('success', 'Pesanan bahan baku berhasil dibuat');
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()
-                ->with('error', 'Failed to create material order: ' . $e->getMessage())
+                ->with('error', 'Gagal membuat pesanan bahan baku: ' . $e->getMessage())
                 ->withInput();
         }
     }
+
 
     /**
      * Display the specified resource.
      */
     public function show(MaterialOrder $materialOrder)
     {
+        $user = Auth::user();
+        $isWarehouseStaff = $user->isWarehouseStaff();
+
         // Authorize that the user can view this order
-        if (Auth::user()->role !== 'owner' && $materialOrder->franchise_id !== Auth::user()->outlet_id) {
+        if ($user->role !== 'owner' && !$isWarehouseStaff && $materialOrder->franchise_id !== $user->outlet_id) {
             return redirect()->route('material-orders.index')
-                ->with('error', 'You do not have permission to view this order');
+                ->with('error', 'Anda tidak memiliki izin untuk melihat pesanan ini');
         }
 
         $materialOrder->load(['franchise', 'user', 'items.rawMaterial']);
 
-        return view('pages.material-orders.show', compact('materialOrder'));
+        // Pass warehouse status to view for conditional rendering of approval buttons
+        $isWarehouse = $isWarehouseStaff || $user->role === 'owner';
+
+        return view('pages.material-orders.show', compact('materialOrder', 'isWarehouse'));
     }
 
     /**
@@ -179,25 +220,28 @@ class MaterialOrderController extends Controller
      */
     public function edit(MaterialOrder $materialOrder)
     {
+        $user = Auth::user();
+        $isWarehouseStaff = $user->isWarehouseStaff();
+
         // Authorize that the user can edit this order
-        if (Auth::user()->role !== 'owner' && $materialOrder->franchise_id !== Auth::user()->outlet_id) {
+        if ($user->role !== 'owner' && !$isWarehouseStaff && $materialOrder->franchise_id !== $user->outlet_id) {
             return redirect()->route('material-orders.index')
-                ->with('error', 'You do not have permission to edit this order');
+                ->with('error', 'Anda tidak memiliki izin untuk mengubah pesanan ini');
         }
 
         // Only pending orders can be edited
         if ($materialOrder->status !== 'pending') {
             return redirect()->route('material-orders.show', $materialOrder)
-                ->with('error', 'Only pending orders can be edited');
+                ->with('error', 'Hanya pesanan dengan status pending yang dapat diubah');
         }
 
         $rawMaterials = RawMaterial::where('is_active', true)->get();
 
-        // For owner, show all outlets; for others, just their own outlet
-        if (Auth::user()->role === 'owner') {
+        // For owner/warehouse users, show all outlets; for others, just their own outlet
+        if ($user->role === 'owner' || $isWarehouseStaff) {
             $outlets = Outlet::all();
         } else {
-            $outlets = Outlet::where('id', Auth::user()->outlet_id)->get();
+            $outlets = Outlet::where('id', $user->outlet_id)->get();
         }
 
         // Payment method options
@@ -217,16 +261,19 @@ class MaterialOrderController extends Controller
      */
     public function update(Request $request, MaterialOrder $materialOrder)
     {
+        $user = Auth::user();
+        $isWarehouseStaff = $user->isWarehouseStaff();
+
         // Authorize that the user can update this order
-        if (Auth::user()->role !== 'owner' && $materialOrder->franchise_id !== Auth::user()->outlet_id) {
+        if ($user->role !== 'owner' && !$isWarehouseStaff && $materialOrder->franchise_id !== $user->outlet_id) {
             return redirect()->route('material-orders.index')
-                ->with('error', 'You do not have permission to update this order');
+                ->with('error', 'Anda tidak memiliki izin untuk mengubah pesanan ini');
         }
 
         // Only pending orders can be updated
         if ($materialOrder->status !== 'pending') {
             return redirect()->route('material-orders.show', $materialOrder)
-                ->with('error', 'Only pending orders can be updated');
+                ->with('error', 'Hanya pesanan dengan status pending yang dapat diubah');
         }
 
         $request->validate([
@@ -236,31 +283,83 @@ class MaterialOrderController extends Controller
             'materials' => 'required|array|min:1',
             'materials.*.raw_material_id' => 'required|exists:raw_materials,id',
             'materials.*.quantity' => 'required|integer|min:1',
+        ], [
+            'franchise_id.required' => 'Outlet harus dipilih',
+            'payment_method.required' => 'Metode pembayaran harus dipilih',
+            'materials.required' => 'Minimal satu bahan baku harus dipilih',
+            'materials.min' => 'Minimal satu bahan baku harus dipilih',
+            'materials.*.quantity.min' => 'Jumlah bahan baku harus minimal 1'
         ]);
 
         DB::beginTransaction();
         try {
             $totalAmount = 0;
+            $errorMessages = [];
 
-            // Calculate total amount and validate each item
-            foreach ($request->materials as $item) {
+            // Simpan informasi item lama untuk bisa membatalkan reservasi
+            $originalItems = collect($materialOrder->items->toArray());
+
+            // Informasi item baru
+            $newItems = collect($request->materials);
+
+            // Validasi stok tersedia untuk setiap bahan baku yang dipesan
+            foreach ($newItems as $item) {
                 $rawMaterial = RawMaterial::findOrFail($item['raw_material_id']);
+
+                // Cari item yang sama di pesanan asli
+                $originalItem = $originalItems->firstWhere('raw_material_id', $item['raw_material_id']);
+                $originalQty = $originalItem ? $originalItem['quantity'] : 0;
+
+                // Hitung selisih kuantitas
+                $qtyDifference = $item['quantity'] - $originalQty;
+
+                // Jika ada penambahan kuantitas, periksa stok tersedia
+                if ($qtyDifference > 0) {
+                    // Cek apakah penambahan melebihi stok yang tersedia
+                    if ($qtyDifference > $rawMaterial->available_stock) {
+                        $errorMessages[] = "Stok tidak cukup untuk <strong>{$rawMaterial->name}</strong>. Tersedia: {$rawMaterial->available_stock} {$rawMaterial->unit}, tambahan diminta: {$qtyDifference} {$rawMaterial->unit}";
+                    }
+                }
+
                 $subtotal = $rawMaterial->price * $item['quantity'];
                 $totalAmount += $subtotal;
             }
 
+            // Jika ada error stok, tampilkan semua pesan error
+            if (count($errorMessages) > 0) {
+                DB::rollBack();
+                return redirect()->back()
+                    ->with('error', '<strong>Pembaruan Pesanan Gagal!</strong><br>' . implode('<br>', $errorMessages))
+                    ->withInput();
+            }
+
+            // If user is warehouse staff and not the original outlet's staff, preserve original franchise_id
+            $franchiseId = $request->franchise_id;
+            if ($isWarehouseStaff && $user->outlet_id !== $materialOrder->franchise_id && $user->role !== 'owner') {
+                $franchiseId = $materialOrder->franchise_id;
+            }
+
             // Update material order
             $materialOrder->update([
-                'franchise_id' => $request->franchise_id,
+                'franchise_id' => $franchiseId,
                 'payment_method' => $request->payment_method,
                 'total_amount' => $totalAmount,
                 'notes' => $request->notes,
             ]);
 
+            // Batalkan reservasi stok untuk semua item lama
+            foreach ($originalItems as $item) {
+                $rawMaterial = RawMaterial::find($item['raw_material_id']);
+                if ($rawMaterial) {
+                    $rawMaterial->reserved_stock -= $item['quantity'];
+                    $rawMaterial->save();
+                }
+            }
+
             // Delete existing order items
             $materialOrder->items()->delete();
 
-            // Create new order items
+            // Create new order items dan reservasi stok baru
             foreach ($request->materials as $item) {
                 $rawMaterial = RawMaterial::findOrFail($item['raw_material_id']);
                 $subtotal = $rawMaterial->price * $item['quantity'];
@@ -272,15 +371,19 @@ class MaterialOrderController extends Controller
                     'price_per_unit' => $rawMaterial->price,
                     'subtotal' => $subtotal,
                 ]);
+
+                // Reservasi stok baru
+                $rawMaterial->reserved_stock += $item['quantity'];
+                $rawMaterial->save();
             }
 
             DB::commit();
             return redirect()->route('material-orders.show', $materialOrder)
-                ->with('success', 'Material order updated successfully');
+                ->with('success', 'Pesanan bahan baku berhasil diperbarui');
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()
-                ->with('error', 'Failed to update material order: ' . $e->getMessage())
+                ->with('error', 'Gagal memperbarui pesanan bahan baku: ' . $e->getMessage())
                 ->withInput();
         }
     }
@@ -290,15 +393,18 @@ class MaterialOrderController extends Controller
      */
     public function updateStatus(Request $request, MaterialOrder $materialOrder)
     {
+        $user = Auth::user();
+        $isWarehouseStaff = $user->isWarehouseStaff();
+
+        // Only owner or warehouse staff can approve/deliver orders
+        if ($user->role !== 'owner' && !$isWarehouseStaff) {
+            return redirect()->route('material-orders.index')
+                ->with('error', 'Anda tidak memiliki izin untuk mengubah status pesanan');
+        }
+
         $request->validate([
             'status' => 'required|in:approved,delivered',
         ]);
-
-        // Only owner can approve/deliver orders
-        if (Auth::user()->role !== 'owner') {
-            return redirect()->back()
-                ->with('error', 'You do not have permission to perform this action');
-        }
 
         DB::beginTransaction();
         try {
@@ -309,20 +415,25 @@ class MaterialOrderController extends Controller
             // Set timestamp for status changes
             if ($request->status === 'approved') {
                 $updateData['approved_at'] = now();
+                // Tidak ada perubahan stok saat approved, hanya status yang berubah
             } else if ($request->status === 'delivered') {
                 $updateData['delivered_at'] = now();
 
-                // Update stock quantities when order is delivered
+                // Saat delivered, kurangi stok aktual dan lepaskan reservasi
                 foreach ($materialOrder->items as $item) {
                     $rawMaterial = $item->rawMaterial;
-                    // Kurangi stok
+
+                    // Kurangi stok aktual
                     $rawMaterial->stock -= $item->quantity;
+
+                    // Lepaskan reservasi
+                    $rawMaterial->reserved_stock -= $item->quantity;
 
                     // Validasi stok tidak boleh negatif
                     if ($rawMaterial->stock < 0) {
                         DB::rollBack();
                         return redirect()->back()
-                            ->with('error', 'Insufficient stock for ' . $rawMaterial->name);
+                            ->with('error', 'Stok ' . $rawMaterial->name . ' tidak boleh negatif');
                     }
 
                     $rawMaterial->save();
@@ -333,11 +444,11 @@ class MaterialOrderController extends Controller
 
             DB::commit();
             return redirect()->route('material-orders.show', $materialOrder)
-                ->with('success', 'Order status updated successfully');
+                ->with('success', 'Order status berhasil diupdate');
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()
-                ->with('error', 'Failed to update order status: ' . $e->getMessage());
+                ->with('error', 'Gagal melakukan update order status: ' . $e->getMessage());
         }
     }
 
@@ -346,25 +457,42 @@ class MaterialOrderController extends Controller
      */
     public function cancel(MaterialOrder $materialOrder)
     {
+        $user = Auth::user();
+        $isWarehouseStaff = $user->isWarehouseStaff();
+
         // Only pending orders can be cancelled
         if ($materialOrder->status !== 'pending') {
             return redirect()->back()
-                ->with('error', 'Only pending orders can be cancelled');
+                ->with('error', 'Hanya pesanan dengan status pending yang dapat dibatalkan');
         }
 
-        // Can only cancel own orders if not owner
-        if (Auth::user()->role !== 'owner' && $materialOrder->user_id !== Auth::id()) {
+        // Can only cancel own orders unless owner/warehouse staff
+        if ($user->role !== 'owner' && !$isWarehouseStaff && $materialOrder->user_id !== $user->id) {
             return redirect()->back()
-                ->with('error', 'You can only cancel your own orders');
+                ->with('error', 'Anda hanya dapat membatalkan pesanan yang Anda buat');
         }
 
+        DB::beginTransaction();
         try {
+            // Lepaskan reservasi stok untuk semua item
+            foreach ($materialOrder->items as $item) {
+                $rawMaterial = $item->rawMaterial;
+                if ($rawMaterial) {
+                    $rawMaterial->reserved_stock -= $item->quantity;
+                    $rawMaterial->save();
+                }
+            }
+
+            // Hapus pesanan
             $materialOrder->delete();
+
+            DB::commit();
             return redirect()->route('material-orders.index')
-                ->with('success', 'Material order cancelled successfully');
+                ->with('success', 'Pesanan bahan baku berhasil dibatalkan');
         } catch (\Exception $e) {
+            DB::rollBack();
             return redirect()->back()
-                ->with('error', 'Failed to cancel order: ' . $e->getMessage());
+                ->with('error', 'Gagal membatalkan pesanan: ' . $e->getMessage());
         }
     }
 

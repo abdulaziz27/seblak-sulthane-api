@@ -153,21 +153,35 @@
                                                         </a>
 
                                                         @if ($order->status === 'pending')
-                                                            <a href="{{ route('material-orders.edit', $order->id) }}"
-                                                                class="btn btn-primary btn-sm">
-                                                                <i class="fas fa-edit"></i>
-                                                            </a>
+                                                            @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff() || $order->user_id === Auth::id())
+                                                                <a href="{{ route('material-orders.edit', $order->id) }}"
+                                                                    class="btn btn-sm btn-primary">
+                                                                    <i class="fas fa-edit"></i>
+                                                                </a>
+                                                                <form
+                                                                    action="{{ route('material-orders.cancel', $order->id) }}"
+                                                                    method="POST" class="d-inline">
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    <button type="submit" class="btn btn-sm btn-danger"
+                                                                        onclick="return confirm('Apakah Anda yakin ingin membatalkan pesanan ini?')">
+                                                                        <i class="fas fa-times"></i>
+                                                                    </button>
+                                                                </form>
+                                                            @endif
 
-                                                            <form
-                                                                action="{{ route('material-orders.cancel', $order->id) }}"
-                                                                method="POST" class="d-inline">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <button type="submit"
-                                                                    class="btn btn-danger btn-sm confirm-delete">
-                                                                    <i class="fas fa-times"></i>
-                                                                </button>
-                                                            </form>
+                                                            {{-- @if ($isWarehouse)
+                                                                <form
+                                                                    action="{{ route('material-orders.update-status', $order->id) }}"
+                                                                    method="POST" class="d-inline">
+                                                                    @csrf
+                                                                    <input type="hidden" name="status" value="approved">
+                                                                    <button type="submit" class="btn btn-sm btn-success"
+                                                                        onclick="return confirm('Setujui pesanan ini?')">
+                                                                        <i class="fas fa-check"></i>
+                                                                    </button>
+                                                                </form>
+                                                            @endif --}}
                                                         @endif
                                                     </td>
                                                 </tr>

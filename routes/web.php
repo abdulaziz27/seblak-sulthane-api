@@ -118,15 +118,36 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('material-orders/{materialOrder}/cancel', [MaterialOrderController::class, 'cancel'])->name('material-orders.cancel');
 
     // Reports
-    Route::middleware('prevent-staff')->prefix('reports')->name('reports.')->group(function () {
-        Route::get('/outlet-performance', [ReportController::class, 'outletPerformance'])->name('outlet-performance');
-        Route::get('/product-performance', [ReportController::class, 'productPerformance'])->name('product-performance');
-        Route::get('/customer-insights', [ReportController::class, 'customerInsights'])->name('customer-insights');
-        Route::get('/inventory', [ReportController::class, 'inventoryReport'])->name('inventory');
-    });
+    // Route::middleware('prevent-staff')->prefix('reports')->name('reports.')->group(function () {
+    //     Route::get('reports/supplier-purchases', [ReportController::class, 'supplierPurchases'])->name('supplier-purchases');
+    // });
 
     Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary'])->name('reports.sales-summary');
     Route::get('/reports/material-purchases', [ReportController::class, 'materialPurchases'])->name('reports.material-purchases');
+
+    // Raw Materials routes that require warehouse access
+    Route::middleware('warehouse-access')->group(function () {
+        Route::delete('raw-materials/delete-all', [RawMaterialController::class, 'deleteAll'])
+            ->name('raw-materials.deleteAll');
+        Route::get('raw-materials/template', [RawMaterialController::class, 'template'])->name('raw-materials.template');
+        Route::post('raw-materials/import', [RawMaterialController::class, 'import'])
+            ->name('raw-materials.import');
+        Route::post('raw-materials/bulk-update', [RawMaterialController::class, 'bulkUpdate'])
+            ->name('raw-materials.bulkUpdate');
+        Route::get('raw-materials/export-for-update', [RawMaterialController::class, 'exportForUpdate'])
+            ->name('raw-materials.exportForUpdate');
+        Route::resource('raw-materials', RawMaterialController::class)->except(['index', 'show']);
+        Route::post('raw-materials/update-stock/{rawMaterial}', [RawMaterialController::class, 'updateStock'])
+            ->name('raw-materials.update-stock');
+
+        // Reports related to warehouse
+        Route::get('reports/supplier-purchases', [ReportController::class, 'supplierPurchases'])
+            ->name('reports.supplier-purchases');
+    });
+
+    Route::get('raw-materials', [RawMaterialController::class, 'index'])->name('raw-materials.index');
+    Route::get('raw-materials/export', [RawMaterialController::class, 'export'])->name('raw-materials.export');
+
 
     // Profile
     Route::get('/profile', [UserController::class, 'profile'])->name('profile');

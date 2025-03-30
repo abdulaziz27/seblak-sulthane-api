@@ -23,6 +23,8 @@ return new class extends Migration
 
             // Modify phone to be nullable
             $table->string('phone')->nullable()->change();
+
+            $table->boolean('is_warehouse')->default(false)->after('notes');
         });
     }
 

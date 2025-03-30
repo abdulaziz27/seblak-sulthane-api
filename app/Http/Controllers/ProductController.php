@@ -40,7 +40,7 @@ class ProductController extends Controller
         $query->orderBy('created_at', 'desc');
 
         // Pagination dengan mempertahankan query string
-        $products = $query->paginate(10)->withQueryString();
+        $products = $query->paginate(50)->withQueryString();
 
         return view('pages.products.index', compact('products'));
     }
@@ -772,7 +772,7 @@ class ProductController extends Controller
                 $sheet->setCellValue('D' . $row, $product->description);
                 $sheet->setCellValue('E' . $row, $product->price);
                 $sheet->setCellValue('F' . $row, $product->stock);
-                $sheet->setCellValue('G' . $row, $product->status ? 'BENAR' : 'SALAH');
+                $sheet->setCellValue('G' . $row, $product->status ? 'AKTIF' : 'NONAKTIF');
                 // Hapus pengisian cell untuk is_favorite
 
                 // Protect the ID cell from editing
@@ -798,7 +798,7 @@ class ProductController extends Controller
                 $activeValidation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
                 $activeValidation->setAllowBlank(false);
                 $activeValidation->setShowDropDown(true);
-                $activeValidation->setFormula1('"BENAR,SALAH"');
+                $activeValidation->setFormula1('"AKTIF,NONAKTIF"');
 
                 // Alternate row colors for data rows
                 if ($row % 2 == 0) {

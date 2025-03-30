@@ -44,7 +44,7 @@ class OrderController extends Controller
             $query->where('payment_method', $request->payment_method);
         }
 
-        $orders = $query->latest()->paginate(10);
+        $orders = $query->latest()->paginate(15);
 
         return view('pages.orders.index', compact('orders', 'outlets'));
     }

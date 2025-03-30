@@ -119,6 +119,18 @@
                                 @enderror
                             </div>
 
+                            <div class="form-group">
+                                <label class="custom-switch mt-2">
+                                    <input type="checkbox" name="is_warehouse" class="custom-switch-input"
+                                        {{ old('is_warehouse') ? 'checked' : '' }}>
+                                    <span class="custom-switch-indicator"></span>
+                                    <span class="custom-switch-description">Outlet Ini Sebagai Gudang</span>
+                                </label>
+                                <small class="form-text text-muted">
+                                    Outlet yang ditandai sebagai gudang memiliki akses penuh ke manajemen bahan baku.
+                                </small>
+                            </div>
+
                         </div>
                         <div class="card-footer text-right">
                             <a href="{{ route('outlets.index') }}" class="btn btn-secondary mr-2">Batal</a>

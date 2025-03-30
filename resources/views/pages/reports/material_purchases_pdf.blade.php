@@ -106,8 +106,15 @@
             <th>Metode Pembayaran</th>
             <th>Total Pembelian</th>
         </tr>
-        @foreach ($dailyData as $day)
-        <tr>
+        @php
+            // Sort dailyData by date, newest first
+            usort($dailyData, function ($a, $b) {
+                return strtotime($b['date']) - strtotime($a['date']);
+            });
+        @endphp
+
+        @foreach ($dailyData as $index => $day)
+        <tr class="{{ in_array($day['day_name'], ['Sabtu', 'Minggu']) ? 'weekend' : '' }} {{ $index % 2 == 0 ? '' : 'even-row' }}">
             <td>{{ \Carbon\Carbon::parse($day['date'])->format('d/m/Y') }}</td>
             <td>{{ $day['day_name'] }}</td>
             <td>{{ $day['order_count'] }}</td>

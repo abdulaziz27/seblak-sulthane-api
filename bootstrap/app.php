@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'prevent-staff' => StaffAccessMiddleware::class,
             'owner-only' => OwnerOnlyMiddleware::class,
+            'warehouse-access' => \App\Http\Middleware\WarehouseAccessMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
