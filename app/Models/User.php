@@ -52,4 +52,14 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Outlet::class)->withTrashed();
     }
+
+    /**
+     * Check if user belongs to a warehouse outlet
+     *
+     * @return bool
+     */
+    public function isWarehouseStaff()
+    {
+        return $this->outlet && $this->outlet->is_warehouse;
+    }
 }

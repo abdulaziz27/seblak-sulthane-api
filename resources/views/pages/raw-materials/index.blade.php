@@ -13,19 +13,27 @@
             <div class="section-header">
                 <h1>Bahan Baku</h1>
                 <div class="section-header-button d-none d-md-flex">
-                    <a href="{{ route('raw-materials.create') }}" class="btn btn-primary">Tambah Baru</a>
-                    <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
-                        Import Excel
-                    </button>
+                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                        <a href="{{ route('raw-materials.create') }}" class="btn btn-primary">Tambah Baru</a>
+                        <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
+                            Import Excel
+                        </button>
+                    @endif
+
                     <a href="{{ route('raw-materials.export') }}" class="btn btn-info ml-2">
                         Ekspor Excel
                     </a>
-                    <button type="button" class="btn btn-warning ml-2" data-toggle="modal" data-target="#bulkUpdateModal">
-                        Update Massal
-                    </button>
-                    <button type="button" class="btn btn-danger ml-2" data-toggle="modal" data-target="#deleteAllModal">
-                        Hapus Semua
-                    </button>
+
+                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                        <button type="button" class="btn btn-warning ml-2" data-toggle="modal"
+                            data-target="#bulkUpdateModal">
+                            Update Massal
+                        </button>
+                        <button type="button" class="btn btn-danger ml-2" data-toggle="modal"
+                            data-target="#deleteAllModal">
+                            Hapus Semua
+                        </button>
+                    @endif
                 </div>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item active"><a href="#">Dashboard</a></div>
@@ -37,21 +45,26 @@
             <div class="section-body">
                 <!-- Responsive action buttons for small screens -->
                 <div class="d-flex d-md-none mb-4 flex-wrap justify-content-center">
-                    <a href="{{ route('raw-materials.create') }}" class="btn btn-primary m-1">
-                        <i class="fas fa-plus mr-1"></i> Tambah
-                    </a>
-                    <button type="button" class="btn btn-success m-1" data-toggle="modal" data-target="#importModal">
-                        <i class="fas fa-file-import mr-1"></i> Import
-                    </button>
+                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                        <a href="{{ route('raw-materials.create') }}" class="btn btn-primary m-1">
+                            <i class="fas fa-plus mr-1"></i> Tambah
+                        </a>
+                        <button type="button" class="btn btn-success m-1" data-toggle="modal" data-target="#importModal">
+                            <i class="fas fa-file-import mr-1"></i> Import
+                        </button>
+                    @endif
                     <a href="{{ route('raw-materials.export') }}" class="btn btn-info m-1">
                         <i class="fas fa-file-export mr-1"></i> Ekspor
                     </a>
-                    <button type="button" class="btn btn-warning m-1" data-toggle="modal" data-target="#bulkUpdateModal">
-                        <i class="fas fa-sync-alt mr-1"></i> Update
-                    </button>
-                    <button type="button" class="btn btn-danger m-1" data-toggle="modal" data-target="#deleteAllModal">
-                        <i class="fas fa-trash mr-1"></i> Hapus
-                    </button>
+                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                        <button type="button" class="btn btn-warning m-1" data-toggle="modal"
+                            data-target="#bulkUpdateModal">
+                            <i class="fas fa-sync-alt mr-1"></i> Update
+                        </button>
+                        <button type="button" class="btn btn-danger m-1" data-toggle="modal" data-target="#deleteAllModal">
+                            <i class="fas fa-trash mr-1"></i> Hapus
+                        </button>
+                    @endif
                 </div>
 
                 @include('layouts.alert')
@@ -152,11 +165,19 @@
                                             <tr>
                                                 <th>Nama</th>
                                                 <th>Satuan</th>
-                                                <th>Harga</th>
-                                                <th>Stok</th>
+                                                <th>Harga Jual</th>
+                                                @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                                                    <th>Harga Beli</th>
+                                                    <th>Margin</th>
+                                                @endif
+                                                <th>Stok Total</th>
+                                                <th>Direservasi</th>
+                                                <th>Tersedia</th>
                                                 <th>Deskripsi</th>
                                                 <th>Status</th>
-                                                <th>Aksi</th>
+                                                @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                                                    <th>Aksi</th>
+                                                @endif
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -165,10 +186,41 @@
                                                     <td>{{ $material->name }}</td>
                                                     <td>{{ $material->unit }}</td>
                                                     <td>Rp {{ number_format($material->price, 0, ',', '.') }}</td>
+                                                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                                                        <td>Rp {{ number_format($material->purchase_price, 0, ',', '.') }}
+                                                        </td>
+                                                        <td>
+                                                            @php
+                                                                $margin = $material->price - $material->purchase_price;
+                                                                $marginPercentage =
+                                                                    $material->purchase_price > 0
+                                                                        ? ($margin / $material->purchase_price) * 100
+                                                                        : 0;
+                                                                $marginClass =
+                                                                    $margin >= 0 ? 'text-success' : 'text-danger';
+                                                            @endphp
+                                                            <span class="{{ $marginClass }}">
+                                                                Rp {{ number_format($margin, 0, ',', '.') }}
+                                                                ({{ number_format($marginPercentage, 2) }}%)
+                                                            </span>
+                                                        </td>
+                                                    @endif
                                                     <td>
                                                         <span
                                                             class="badge {{ $material->stock < 10 ? 'badge-danger' : 'badge-success' }}">
                                                             {{ $material->stock }} {{ $material->unit }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span
+                                                            class="badge {{ $material->reserved_stock > 0 ? 'badge-warning' : 'badge-secondary' }}">
+                                                            {{ $material->reserved_stock }} {{ $material->unit }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span
+                                                            class="badge {{ $material->available_stock < 10 ? 'badge-danger' : 'badge-info' }}">
+                                                            {{ $material->available_stock }} {{ $material->unit }}
                                                         </span>
                                                     </td>
                                                     <td>{{ $material->description ?? '-' }}</td>
@@ -178,30 +230,35 @@
                                                             {{ $material->is_active ? 'Aktif' : 'Nonaktif' }}
                                                         </div>
                                                     </td>
-                                                    <td>
-                                                        <div class="d-flex">
-                                                            <button class="btn btn-sm btn-info mr-1 stock-adjust-btn"
-                                                                data-target="#stockModal{{ $material->id }}"
-                                                                data-id="{{ $material->id }}">
-                                                                <i class="fas fa-boxes"></i>
-                                                            </button>
-                                                            <a href="{{ route('raw-materials.edit', $material->id) }}"
-                                                                class="btn btn-sm btn-primary mr-1">
-                                                                <i class="fas fa-edit"></i>
-                                                            </a>
-                                                            <form
-                                                                action="{{ route('raw-materials.destroy', $material->id) }}"
-                                                                method="POST" class="d-inline">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <button type="submit"
-                                                                    class="btn btn-sm btn-danger confirm-delete"
-                                                                    data-confirm="Apakah Anda yakin?|Tindakan ini tidak dapat dibatalkan.">
-                                                                    <i class="fas fa-trash"></i>
-                                                                </button>
-                                                            </form>
-                                                        </div>
-                                                    </td>
+                                                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                                                        <td>
+                                                            <div class="d-flex">
+                                                                @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                                                                    <button
+                                                                        class="btn btn-sm btn-info mr-1 stock-adjust-btn"
+                                                                        data-target="#stockModal{{ $material->id }}"
+                                                                        data-id="{{ $material->id }}">
+                                                                        <i class="fas fa-boxes"></i>
+                                                                    </button>
+                                                                    <a href="{{ route('raw-materials.edit', $material->id) }}"
+                                                                        class="btn btn-sm btn-primary mr-1">
+                                                                        <i class="fas fa-edit"></i>
+                                                                    </a>
+                                                                    <form
+                                                                        action="{{ route('raw-materials.destroy', $material->id) }}"
+                                                                        method="POST" class="d-inline">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button type="submit"
+                                                                            class="btn btn-sm btn-danger confirm-delete"
+                                                                            data-confirm="Apakah Anda yakin?|Tindakan ini tidak dapat dibatalkan.">
+                                                                            <i class="fas fa-trash"></i>
+                                                                        </button>
+                                                                    </form>
+                                                                @endif
+                                                            </div>
+                                                        </td>
+                                                    @endif
                                                 </tr>
                                             @endforeach
                                         </tbody>
@@ -324,29 +381,73 @@
 
     <!-- Modal Penyesuaian Stok -->
     @foreach ($materials as $material)
-        <div class="modal fade" id="stockModal{{ $material->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-            <div class="modal-dialog" role="document">
+        <div class="modal fade" id="stockModal{{ $material->id }}">
+            <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">
-                            Sesuaikan Stok: {{ $material->name }}
-                        </h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <h5 class="modal-title">Sesuaikan Stok: {{ $material->name }}</h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                     </div>
                     <form action="{{ route('raw-materials.update-stock', $material->id) }}" method="POST">
                         @csrf
                         <div class="modal-body">
                             <div class="form-group">
-                                <label>Stok Saat Ini</label>
-                                <input type="text" class="form-control"
-                                    value="{{ $material->stock }} {{ $material->unit }}" disabled>
+                                <label>Informasi Stok Saat Ini</label>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label class="font-weight-bold">Stok Total</label>
+                                        <input type="text" class="form-control"
+                                            value="{{ $material->stock }} {{ $material->unit }}" disabled>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="font-weight-bold">Direservasi</label>
+                                        <input type="text" class="form-control"
+                                            value="{{ $material->reserved_stock }} {{ $material->unit }}" disabled>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="font-weight-bold">Tersedia</label>
+                                        <input type="text"
+                                            class="form-control {{ $material->available_stock < 10 ? 'text-danger' : 'text-success' }} font-weight-bold"
+                                            value="{{ $material->available_stock }} {{ $material->unit }}" disabled>
+                                    </div>
+                                </div>
+                                <div class="alert alert-info mt-2">
+                                    <i class="fas fa-info-circle"></i> Pengurangan stok hanya bisa dilakukan pada stok yang
+                                    tersedia (tidak direservasi).
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Tanggal Penyesuaian</label>
+                                <input type="date" class="form-control" name="adjustment_date"
+                                    value="{{ date('Y-m-d') }}" required>
+                            </div>
+                            <!-- Adjustment type selection for better categorization -->
+                            <div class="form-group">
+                                <label>Tipe Penyesuaian</label>
+                                <select class="form-control" name="adjustment_type">
+                                    <option value="purchase">Pembelian dari Supplier</option>
+                                    <option value="usage">Penggunaan</option>
+                                    <option value="damage">Rusak/Hilang</option>
+                                    <option value="other">Lainnya</option>
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label>Penyesuaian (positif untuk menambah, negatif untuk mengurangi)</label>
-                                <input type="number" class="form-control" name="adjustment" required>
+                                <input type="number" class="form-control" name="adjustment" required
+                                    id="adjustment-input-{{ $material->id }}" min="{{ -$material->available_stock }}">
+                                <small class="text-muted">Maksimal pengurangan: {{ $material->available_stock }}
+                                    {{ $material->unit }} (stok yang tersedia)</small>
                             </div>
+
+                            <!-- Field tambahan untuk harga beli dari supplier -->
+                            <div class="form-group purchase-price-field" id="purchase-price-field-{{ $material->id }}"
+                                style="display: none;">
+                                <label>Harga Beli dari Supplier (Rp)</label>
+                                <input type="number" class="form-control" name="purchase_price"
+                                    value="{{ $material->purchase_price }}">
+                                <small class="text-muted">Isi jika harga beli dari supplier berubah</small>
+                            </div>
+
                             <div class="form-group">
                                 <label>Catatan</label>
                                 <textarea class="form-control" name="notes" rows="3"></textarea>
@@ -501,6 +602,19 @@
                         form.submit();
                     }
                 });
+        });
+
+        // Show/hide purchase price field based on adjustment value
+        $(document).on('input', '[id^=adjustment-input-]', function() {
+            var materialId = $(this).attr('id').split('-')[2];
+            var adjustment = parseInt($(this).val()) || 0;
+            var purchasePriceField = $('#purchase-price-field-' + materialId);
+
+            if (adjustment > 0) {
+                purchasePriceField.show();
+            } else {
+                purchasePriceField.hide();
+            }
         });
     </script>
 @endpush

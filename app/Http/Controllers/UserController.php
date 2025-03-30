@@ -58,8 +58,9 @@ class UserController extends Controller
             'name' => 'required',
             'email' => 'required|email|unique:users',
             'password' => 'required|min:8',
-            'role' => 'required|in:owner,admin,staff',
-            'outlet_id' => 'required_unless:role,owner|nullable|exists:outlets,id',
+            'role' => 'required|array|min:1',
+            'role.*' => 'in:owner,admin,staff,gudang',
+            'outlet_id' => 'required_unless:role.0,owner|nullable|exists:outlets,id',
         ]);
 
         // Check permissions

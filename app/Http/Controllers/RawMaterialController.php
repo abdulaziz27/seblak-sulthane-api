@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\RawMaterial;
+use App\Models\MaterialOrderItem;
+use App\Models\StockAdjustment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -48,7 +51,7 @@ class RawMaterialController extends Controller
         $lowStockCount = RawMaterial::where('stock', '<', 10)->count();
         $totalValue = RawMaterial::selectRaw('SUM(stock * price) as total_value')->first()->total_value ?? 0;
 
-        $materials = $query->paginate(10);
+        $materials = $query->paginate(70);
 
         return view('pages.raw-materials.index', compact(
             'materials',
@@ -76,15 +79,38 @@ class RawMaterialController extends Controller
             'name' => 'required|string|max:255',
             'unit' => 'required|string|max:50',
             'price' => 'required|numeric|min:0',
+            'purchase_price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'description' => 'nullable|string',
             'is_active' => 'required|boolean',
         ]);
 
-        RawMaterial::create($request->all());
+        DB::beginTransaction();
+        try {
+            // Buat bahan baku
+            $rawMaterial = RawMaterial::create($request->all());
 
-        return redirect()->route('raw-materials.index')
-            ->with('success', 'Bahan baku berhasil ditambahkan');
+            // Jika ada stok awal, catat sebagai pembelian dari supplier
+            if ($request->stock > 0) {
+                StockAdjustment::create([
+                    'raw_material_id' => $rawMaterial->id,
+                    'quantity' => $request->stock,
+                    'purchase_price' => $request->purchase_price,
+                    'adjustment_date' => now(),
+                    'adjustment_type' => 'purchase',
+                    'notes' => 'Stok awal saat pembuatan bahan baku baru',
+                    'user_id' => Auth::id()
+                ]);
+            }
+
+            DB::commit();
+            return redirect()->route('raw-materials.index')
+                ->with('success', 'Bahan baku berhasil ditambahkan');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()
+                ->with('error', 'Gagal menambahkan bahan baku: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -104,15 +130,53 @@ class RawMaterialController extends Controller
             'name' => 'required|string|max:255',
             'unit' => 'required|string|max:50',
             'price' => 'required|numeric|min:0',
+            'purchase_price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'description' => 'nullable|string',
             'is_active' => 'required|boolean',
         ]);
 
-        $rawMaterial->update($request->all());
+        DB::beginTransaction();
+        try {
+            // Cek apakah ada perubahan stok
+            $stockDifference = $request->stock - $rawMaterial->stock;
 
-        return redirect()->route('raw-materials.index')
-            ->with('success', 'Bahan baku berhasil diperbarui');
+            // Update bahan baku
+            $rawMaterial->update($request->all());
+
+            // Jika stok bertambah, catat sebagai pembelian dari supplier
+            if ($stockDifference > 0) {
+                StockAdjustment::create([
+                    'raw_material_id' => $rawMaterial->id,
+                    'quantity' => $stockDifference,
+                    'purchase_price' => $request->purchase_price,
+                    'adjustment_date' => now(),
+                    'adjustment_type' => 'purchase',
+                    'notes' => 'Penambahan stok melalui form edit',
+                    'user_id' => Auth::id()
+                ]);
+            }
+            // Jika stok berkurang, catat sebagai penggunaan
+            elseif ($stockDifference < 0) {
+                StockAdjustment::create([
+                    'raw_material_id' => $rawMaterial->id,
+                    'quantity' => $stockDifference, // Nilai negatif
+                    'purchase_price' => null,
+                    'adjustment_date' => now(),
+                    'adjustment_type' => 'usage',
+                    'notes' => 'Pengurangan stok melalui form edit',
+                    'user_id' => Auth::id()
+                ]);
+            }
+
+            DB::commit();
+            return redirect()->route('raw-materials.index')
+                ->with('success', 'Bahan baku berhasil diperbarui');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()
+                ->with('error', 'Gagal memperbarui bahan baku: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -136,7 +200,9 @@ class RawMaterialController extends Controller
     public function updateStock(Request $request, RawMaterial $rawMaterial)
     {
         $request->validate([
-            'adjustment' => 'required|integer',
+            'adjustment' => 'required|integer', // Hapus batasan lain pada adjustment
+            'purchase_price' => 'nullable|numeric|min:0',
+            'adjustment_date' => 'required|date',
             'notes' => 'nullable|string',
         ]);
 
@@ -144,16 +210,46 @@ class RawMaterialController extends Controller
         try {
             $newStock = $rawMaterial->stock + $request->adjustment;
 
-            if ($newStock < 0) {
-                return redirect()->back()
-                    ->with('error', 'Stok tidak boleh negatif.');
+            // Hanya membatasi pengurangan stok, bukan penambahan
+            if ($request->adjustment < 0) {
+                // Pastikan tidak mengurangi stok yang direservasi
+                $availableStock = $rawMaterial->stock - $rawMaterial->reserved_stock;
+
+                if (abs($request->adjustment) > $availableStock) {
+                    return redirect()->back()->with(
+                        'error',
+                        'Tidak dapat mengurangi stok yang telah direservasi. ' .
+                            'Stok tersedia untuk pengurangan: ' . $availableStock . ' ' . $rawMaterial->unit
+                    );
+                }
             }
 
-            $rawMaterial->update([
-                'stock' => $newStock
-            ]);
+            // Update stok di raw_materials
+            $updateData = ['stock' => $newStock];
 
-            // Create stock movement record (implementation optional)
+            // Jika ini adalah pembelian baru (adjustment positif) dan harga beli diisi
+            if ($request->adjustment > 0 && $request->filled('purchase_price')) {
+                $updateData['purchase_price'] = $request->purchase_price;
+            }
+
+            $rawMaterial->update($updateData);
+
+            // Catat riwayat penyesuaian stok
+            $adjustmentType = $request->adjustment > 0 ? 'purchase' : 'usage';
+            if ($request->has('adjustment_type')) {
+                $adjustmentType = $request->adjustment_type;
+            }
+
+            // Simpan ke tabel stock_adjustments
+            StockAdjustment::create([
+                'raw_material_id' => $rawMaterial->id,
+                'quantity' => abs($request->adjustment), // Pakai abs() untuk pastikan positif
+                'purchase_price' => $request->adjustment > 0 ? $request->purchase_price : null,
+                'adjustment_date' => $request->adjustment_date ?? now(),
+                'adjustment_type' => $adjustmentType,
+                'notes' => $request->notes,
+                'user_id' => Auth::id()
+            ]);
 
             DB::commit();
             return redirect()->route('raw-materials.index')
@@ -164,7 +260,6 @@ class RawMaterialController extends Controller
                 ->with('error', 'Gagal memperbarui stok: ' . $e->getMessage());
         }
     }
-
 
     /**
      * Import raw materials from Excel
@@ -210,7 +305,12 @@ class RawMaterialController extends Controller
                     }
 
                     if (!is_numeric($row[2])) {
-                        $errors[] = "Baris {$rowNumber}: Harga harus berupa angka";
+                        $errors[] = "Baris {$rowNumber}: Harga jual harus berupa angka";
+                        continue;
+                    }
+
+                    if (!is_numeric($row[3])) {
+                        $errors[] = "Baris {$rowNumber}: Harga beli harus berupa angka";
                         continue;
                     }
 
@@ -218,9 +318,10 @@ class RawMaterialController extends Controller
                     $materialData = [
                         'name' => trim($row[0]),
                         'unit' => trim($row[1]),
-                        'price' => (int)$row[2],
-                        'stock' => is_numeric($row[3]) ? (int)$row[3] : 0,
-                        'description' => $row[4] ?? null,
+                        'price' => (int)$row[2],   // Harga jual
+                        'purchase_price' => (int)$row[3],  // Harga beli
+                        'stock' => is_numeric($row[4]) ? (int)$row[4] : 0,
+                        'description' => $row[5] ?? null,
                         'is_active' => 1  // Always set to active by default
                     ];
 
@@ -228,12 +329,48 @@ class RawMaterialController extends Controller
                     $existingMaterial = RawMaterial::where('name', $materialData['name'])->first();
 
                     if ($existingMaterial) {
+                        // Calculate stock difference
+                        $stockDifference = $materialData['stock'] - $existingMaterial->stock;
+
                         // Update existing material
                         $existingMaterial->update($materialData);
+
+                        // Record stock adjustment if stock has changed
+                        if ($stockDifference != 0) {
+                            $type = $stockDifference > 0 ? 'purchase' : 'usage';
+                            $notes = $stockDifference > 0
+                                ? 'Penambahan stok melalui import Excel'
+                                : 'Pengurangan stok melalui import Excel';
+
+                            StockAdjustment::create([
+                                'raw_material_id' => $existingMaterial->id,
+                                'quantity' => abs($stockDifference),
+                                'purchase_price' => $stockDifference > 0 ? $materialData['purchase_price'] : null,
+                                'adjustment_date' => now(),
+                                'adjustment_type' => $type,
+                                'notes' => $notes,
+                                'user_id' => Auth::id()
+                            ]);
+                        }
+
                         $updateCount++;
                     } else {
                         // Create new material
-                        RawMaterial::create($materialData);
+                        $newMaterial = RawMaterial::create($materialData);
+
+                        // Record initial stock as purchase if stock > 0
+                        if ($materialData['stock'] > 0) {
+                            StockAdjustment::create([
+                                'raw_material_id' => $newMaterial->id,
+                                'quantity' => $materialData['stock'],
+                                'purchase_price' => $materialData['purchase_price'],
+                                'adjustment_date' => now(),
+                                'adjustment_type' => 'purchase',
+                                'notes' => 'Stok awal melalui import Excel',
+                                'user_id' => Auth::id()
+                            ]);
+                        }
+
                         $importCount++;
                     }
                 } catch (\Exception $e) {
@@ -294,8 +431,8 @@ class RawMaterialController extends Controller
             ->setSubject('Template untuk Impor Bahan Baku')
             ->setDescription('Dibuat oleh Sistem Manajemen Seblak Sulthane');
 
-        // Add headers - REMOVED Status Aktif column
-        $headers = ['Nama', 'Satuan', 'Harga', 'Stok', 'Deskripsi'];
+        // Add headers with Purchase Price column
+        $headers = ['Nama', 'Satuan', 'Harga Jual', 'Harga Beli', 'Stok', 'Deskripsi'];
         foreach ($headers as $index => $header) {
             $sheet->setCellValue(chr(65 + $index) . '1', $header);
         }
@@ -320,18 +457,20 @@ class RawMaterialController extends Controller
                 'vertical' => Alignment::VERTICAL_CENTER,
             ],
         ];
-        // Update styling range to E instead of F
-        $sheet->getStyle('A1:E1')->applyFromArray($headerStyle);
+
+        $sheet->getStyle('A1:F1')->applyFromArray($headerStyle);
         $sheet->getRowDimension(1)->setRowHeight(30);
 
-        // Add sample row - REMOVED Status Aktif value
+        // Add sample row
         $sampleData = [
             'Bawang Merah',
             'Kg',
-            '25000',
+            '30000', // Harga jual
+            '25000', // Harga beli
             '100',
             'Bawang merah segar'
         ];
+
         foreach ($sampleData as $index => $value) {
             $sheet->setCellValue(chr(65 + $index) . '2', $value);
         }
@@ -348,8 +487,8 @@ class RawMaterialController extends Controller
                 ],
             ],
         ];
-        // Update styling range to E instead of F
-        $sheet->getStyle('A2:E2')->applyFromArray($sampleRowStyle);
+
+        $sheet->getStyle('A2:F2')->applyFromArray($sampleRowStyle);
 
         // Create dropdowns for unit column
         $units = ['Kg', 'Ball', 'Bks', 'Ikat', 'Pcs', 'Dus', 'Pack', 'Renteng', 'Botol', 'Slop', 'Box', 'Peti'];
@@ -372,13 +511,13 @@ class RawMaterialController extends Controller
                 'startColor' => ['rgb' => 'F9F9F9']
             ],
         ];
-        // Update styling range to E instead of F
-        $sheet->getStyle('A3:E300')->applyFromArray($dataRowStyle);
+
+        $sheet->getStyle('A3:F300')->applyFromArray($dataRowStyle);
 
         // Add alternating row colors for empty data rows
         for ($i = 3; $i <= 300; $i++) {
             if ($i % 2 == 1) { // Odd rows
-                $sheet->getStyle('A' . $i . ':E' . $i)->getFill()
+                $sheet->getStyle('A' . $i . ':F' . $i)->getFill()
                     ->setFillType(Fill::FILL_SOLID)
                     ->getStartColor()->setRGB('F2F2F2');
             }
@@ -398,23 +537,26 @@ class RawMaterialController extends Controller
         // Set column widths
         $sheet->getColumnDimension('A')->setWidth(30); // Nama
         $sheet->getColumnDimension('B')->setWidth(15); // Satuan
-        $sheet->getColumnDimension('C')->setWidth(15); // Harga
-        $sheet->getColumnDimension('D')->setWidth(15); // Stok
-        $sheet->getColumnDimension('E')->setWidth(40); // Deskripsi
+        $sheet->getColumnDimension('C')->setWidth(15); // Harga Jual
+        $sheet->getColumnDimension('D')->setWidth(15); // Harga Beli
+        $sheet->getColumnDimension('E')->setWidth(15); // Stok
+        $sheet->getColumnDimension('F')->setWidth(40); // Deskripsi
 
         // Add instructions section
         $instructions = [
             "1. Isi detail bahan baku mulai dari baris 2",
             "2. Untuk kolom Satuan, gunakan dropdown untuk memilih jenis satuan",
-            "3. Harga dan Stok harus berupa angka",
-            "4. Semua kolom wajib diisi kecuali Deskripsi",
-            "5. Template mendukung hingga 300 baris bahan baku",
-            "6. Status Aktif akan otomatis diatur sebagai aktif"
+            "3. Harga Jual adalah harga yang ditampilkan ke outlet",
+            "4. Harga Beli adalah harga pembelian dari supplier (untuk laporan)",
+            "5. Stok adalah jumlah stok awal dan akan dicatat sebagai pembelian dari supplier",
+            "6. Semua kolom wajib diisi kecuali Deskripsi",
+            "7. Template mendukung hingga 300 baris bahan baku",
+            "8. Status Aktif akan otomatis diatur sebagai aktif"
         ];
 
         // Add instructions section
-        $sheet->setCellValue('G1', 'PETUNJUK PENGISIAN');
-        $sheet->getStyle('G1')->applyFromArray([
+        $sheet->setCellValue('H1', 'PETUNJUK PENGISIAN');
+        $sheet->getStyle('H1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'size' => 14,
@@ -433,8 +575,8 @@ class RawMaterialController extends Controller
 
         // Instruction content
         $instructionText = implode("\n\n", $instructions);
-        $sheet->setCellValue('G2', $instructionText);
-        $sheet->getStyle('G2:G7')->applyFromArray([
+        $sheet->setCellValue('H2', $instructionText);
+        $sheet->getStyle('H2:H9')->applyFromArray([
             'font' => [
                 'size' => 12,
             ],
@@ -452,8 +594,8 @@ class RawMaterialController extends Controller
                 'wrapText' => true
             ],
         ]);
-        $sheet->mergeCells('G2:G7');
-        $sheet->getColumnDimension('G')->setWidth(50);
+        $sheet->mergeCells('H2:H9');
+        $sheet->getColumnDimension('H')->setWidth(50);
 
         // Add field explanations
         $fieldExplanationHeaderStyle = [
@@ -471,20 +613,21 @@ class RawMaterialController extends Controller
             ],
         ];
 
-        $sheet->setCellValue('G9', 'PENJELASAN KOLOM');
-        $sheet->getStyle('G9')->applyFromArray($fieldExplanationHeaderStyle);
+        $sheet->setCellValue('H11', 'PENJELASAN KOLOM');
+        $sheet->getStyle('H11')->applyFromArray($fieldExplanationHeaderStyle);
 
         $fieldExplanations = [
             'Nama' => 'Nama bahan baku, contoh: "Bawang Merah"',
             'Satuan' => 'Satuan ukuran - pilih dari dropdown',
-            'Harga' => 'Harga per satuan dalam Rupiah (angka saja)',
-            'Stok' => 'Jumlah stok awal (angka saja)',
+            'Harga Jual' => 'Harga jual ke outlet dalam Rupiah (angka saja)',
+            'Harga Beli' => 'Harga beli dari supplier dalam Rupiah (angka saja)',
+            'Stok' => 'Jumlah stok awal yang akan dicatat sebagai pembelian',
             'Deskripsi' => 'Informasi tambahan (opsional)'
         ];
 
-        $fieldRow = 10;
+        $fieldRow = 12;
         foreach ($fieldExplanations as $field => $explanation) {
-            $sheet->setCellValue('G' . $fieldRow, "$field: $explanation");
+            $sheet->setCellValue('H' . $fieldRow, "$field: $explanation");
             $fieldRow++;
         }
 
@@ -504,10 +647,10 @@ class RawMaterialController extends Controller
             ],
         ];
 
-        $sheet->getStyle('G10:G14')->applyFromArray($fieldExplanationStyle);
+        $sheet->getStyle('H12:H17')->applyFromArray($fieldExplanationStyle);
 
-        // Set the auto-filter for the data - Updated to E instead of F
-        $sheet->setAutoFilter('A1:E300');
+        // Set the auto-filter for the data
+        $sheet->setAutoFilter('A1:F300');
 
         // Freeze the header row and first column
         $sheet->freezePane('B2');
@@ -523,17 +666,18 @@ class RawMaterialController extends Controller
     }
 
     /**
-     * Export raw materials to Excel with consistent styling
+     * Export bahan baku ke Excel dengan styling yang konsisten
      */
     public function export()
     {
         try {
             $materials = RawMaterial::all();
+            $isWarehouse = Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff();
 
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
 
-            // Set spreadsheet metadata
+            // Set metadata spreadsheet
             $spreadsheet->getProperties()
                 ->setCreator('Seblak Sulthane')
                 ->setLastModifiedBy('Seblak Sulthane')
@@ -541,13 +685,22 @@ class RawMaterialController extends Controller
                 ->setSubject('Data Bahan Baku')
                 ->setDescription('Dibuat oleh Sistem Manajemen Seblak Sulthane');
 
-            // Add headers
-            $headers = ['ID', 'Nama', 'Satuan', 'Harga', 'Stok', 'Nilai Total', 'Deskripsi', 'Status'];
+            // Tambahkan header - Disesuaikan berdasarkan peran pengguna
+            if ($isWarehouse) {
+                // Header lengkap untuk staf gudang
+                $headers = ['ID', 'Nama', 'Satuan', 'Harga Jual', 'Harga Beli', 'Margin', 'Margin (%)', 'Stok', 'Nilai Total', 'Deskripsi', 'Status'];
+                $lastCol = 'K';
+            } else {
+                // Header terbatas untuk pengguna biasa (tanpa harga beli dan margin)
+                $headers = ['ID', 'Nama', 'Satuan', 'Harga Jual', 'Stok', 'Nilai Total', 'Deskripsi', 'Status'];
+                $lastCol = 'H';
+            }
+
             foreach ($headers as $index => $header) {
                 $sheet->setCellValue(chr(65 + $index) . '1', $header);
             }
 
-            // Header styling
+            // Styling header
             $headerStyle = [
                 'font' => [
                     'bold' => true,
@@ -567,10 +720,10 @@ class RawMaterialController extends Controller
                     'vertical' => Alignment::VERTICAL_CENTER,
                 ],
             ];
-            $sheet->getStyle('A1:H1')->applyFromArray($headerStyle);
+            $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray($headerStyle);
             $sheet->getRowDimension(1)->setRowHeight(25);
 
-            // Data rows
+            // Data baris
             $row = 2;
             $totalInventoryValue = 0;
 
@@ -578,84 +731,139 @@ class RawMaterialController extends Controller
                 $itemValue = $material->stock * $material->price;
                 $totalInventoryValue += $itemValue;
 
-                $sheet->setCellValue('A' . $row, $material->id);
-                $sheet->setCellValue('B' . $row, $material->name);
-                $sheet->setCellValue('C' . $row, $material->unit);
-                $sheet->setCellValue('D' . $row, $material->price);
-                $sheet->setCellValue('E' . $row, $material->stock);
-                $sheet->setCellValue('F' . $row, $itemValue);
-                $sheet->setCellValue('G' . $row, $material->description);
-                $sheet->setCellValue('H' . $row, $material->is_active ? 'Aktif' : 'Tidak Aktif');
+                if ($isWarehouse) {
+                    // Data lengkap untuk staf gudang
+                    $marginAmount = $material->price - $material->purchase_price;
+                    $marginPercentage = $material->purchase_price > 0 ?
+                        ($marginAmount / $material->purchase_price) * 100 : 0;
 
-                // Format numbers
-                $sheet->getStyle('D' . $row . ':F' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet->setCellValue('A' . $row, $material->id);
+                    $sheet->setCellValue('B' . $row, $material->name);
+                    $sheet->setCellValue('C' . $row, $material->unit);
+                    $sheet->setCellValue('D' . $row, $material->price);
+                    $sheet->setCellValue('E' . $row, $material->purchase_price);
+                    $sheet->setCellValue('F' . $row, $marginAmount);
+                    $sheet->setCellValue('G' . $row, $marginPercentage);
+                    $sheet->setCellValue('H' . $row, $material->stock);
+                    $sheet->setCellValue('I' . $row, $itemValue);
+                    $sheet->setCellValue('J' . $row, $material->description);
+                    $sheet->setCellValue('K' . $row, $material->is_active ? 'Aktif' : 'Tidak Aktif');
 
-                // Format low stock items
-                if ($material->stock < 10) {
-                    $sheet->getStyle('E' . $row)
-                        ->getFont()
-                        ->getColor()
-                        ->setARGB('FF0000'); // Red color for low stock
-                }
+                    // Format angka
+                    $sheet->getStyle('D' . $row . ':F' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('#,##0.00"%"');
+                    $sheet->getStyle('I' . $row)->getNumberFormat()->setFormatCode('#,##0');
 
-                // Alternate row colors
-                if ($row % 2 == 0) {
-                    $sheet->getStyle('A' . $row . ':H' . $row)->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()->setRGB('F2F2F2');
+                    // Sorot stok rendah
+                    if ($material->stock < 10) {
+                        $sheet->getStyle('H' . $row)
+                            ->getFont()
+                            ->getColor()
+                            ->setARGB('FF0000');
+                    }
+
+                    // Warna baris selang-seling
+                    if ($row % 2 == 0) {
+                        $sheet->getStyle('A' . $row . ':K' . $row)->getFill()
+                            ->setFillType(Fill::FILL_SOLID)
+                            ->getStartColor()->setRGB('F2F2F2');
+                    }
+                } else {
+                    // Data terbatas untuk pengguna biasa
+                    $sheet->setCellValue('A' . $row, $material->id);
+                    $sheet->setCellValue('B' . $row, $material->name);
+                    $sheet->setCellValue('C' . $row, $material->unit);
+                    $sheet->setCellValue('D' . $row, $material->price);
+                    $sheet->setCellValue('E' . $row, $material->stock);
+                    $sheet->setCellValue('F' . $row, $itemValue);
+                    $sheet->setCellValue('G' . $row, $material->description);
+                    $sheet->setCellValue('H' . $row, $material->is_active ? 'Aktif' : 'Tidak Aktif');
+
+                    // Format angka
+                    $sheet->getStyle('D' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet->getStyle('F' . $row)->getNumberFormat()->setFormatCode('#,##0');
+
+                    // Sorot stok rendah
+                    if ($material->stock < 10) {
+                        $sheet->getStyle('E' . $row)
+                            ->getFont()
+                            ->getColor()
+                            ->setARGB('FF0000');
+                    }
+
+                    // Warna baris selang-seling
+                    if ($row % 2 == 0) {
+                        $sheet->getStyle('A' . $row . ':H' . $row)->getFill()
+                            ->setFillType(Fill::FILL_SOLID)
+                            ->getStartColor()->setRGB('F2F2F2');
+                    }
                 }
 
                 $row++;
             }
 
-            // Add total row
+            // Tambah baris total
             $sheet->setCellValue('A' . $row, 'TOTAL');
-            $sheet->setCellValue('F' . $row, $totalInventoryValue);
-            $sheet->getStyle('A' . $row)->getFont()->setBold(true);
-            $sheet->getStyle('F' . $row)->getFont()->setBold(true);
-            $sheet->getStyle('F' . $row)->getNumberFormat()->setFormatCode('#,##0');
-            $sheet->getStyle('A' . $row . ':H' . $row)->getFill()
-                ->setFillType(Fill::FILL_SOLID)
-                ->getStartColor()->setRGB('DDEBF7'); // Light blue
 
-            // Set border for all data
-            $borderStyle = [
-                'borders' => [
-                    'allBorders' => [
-                        'borderStyle' => Border::BORDER_THIN,
+            if ($isWarehouse) {
+                $sheet->setCellValue('I' . $row, $totalInventoryValue);
+                $sheet->getStyle('I' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle('A' . $row . ':K' . $row)->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('DDEBF7');
+
+                // Set border untuk semua data
+                $sheet->getStyle('A1:K' . $row)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                        ],
                     ],
-                ],
-            ];
-            $sheet->getStyle('A1:H' . $row)->applyFromArray($borderStyle);
+                ]);
 
-            // Set column widths
-            $sheet->getColumnDimension('A')->setWidth(10);  // ID
-            $sheet->getColumnDimension('B')->setWidth(30);  // Nama
-            $sheet->getColumnDimension('C')->setWidth(15);  // Satuan
-            $sheet->getColumnDimension('D')->setWidth(15);  // Harga
-            $sheet->getColumnDimension('E')->setWidth(15);  // Stok
-            $sheet->getColumnDimension('F')->setWidth(20);  // Total Value
-            $sheet->getColumnDimension('G')->setWidth(40);  // Deskripsi
-            $sheet->getColumnDimension('H')->setWidth(15);  // Status
+                // Set auto-filter
+                $sheet->setAutoFilter('A1:K' . ($row - 1));
+            } else {
+                $sheet->setCellValue('F' . $row, $totalInventoryValue);
+                $sheet->getStyle('F' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle('A' . $row . ':H' . $row)->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('DDEBF7');
 
-            // Add export info on the right side
-            $sheet->setCellValue('J1', 'Export Information');
-            $sheet->getStyle('J1')->getFont()->setBold(true);
-            $sheet->getStyle('J1')->getFill()
+                // Set border untuk semua data
+                $sheet->getStyle('A1:H' . $row)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                        ],
+                    ],
+                ]);
+
+                // Set auto-filter
+                $sheet->setAutoFilter('A1:H' . ($row - 1));
+            }
+
+            $sheet->getStyle('A' . $row)->getFont()->setBold(true);
+
+            // Tambahkan informasi ekspor di sisi kanan
+            $infoCol = $isWarehouse ? 'M' : 'J';
+            $sheet->setCellValue($infoCol . '1', 'Informasi Ekspor');
+            $sheet->getStyle($infoCol . '1')->getFont()->setBold(true);
+            $sheet->getStyle($infoCol . '1')->getFill()
                 ->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()->setRGB('4472C4');
-            $sheet->getStyle('J1')->getFont()->getColor()->setARGB('FFFFFF');
-            $sheet->getStyle('J1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle($infoCol . '1')->getFont()->getColor()->setARGB('FFFFFF');
+            $sheet->getStyle($infoCol . '1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            $sheet->setCellValue('J2', 'Generated on: ' . now()->format('d M Y H:i:s'));
-            $sheet->setCellValue('J3', 'Total Materials: ' . ($row - 2));
-            $sheet->setCellValue('J4', 'Total Inventory Value: Rp ' . number_format($totalInventoryValue, 0, ',', '.'));
-            $sheet->setCellValue('J5', 'Low Stock Items: ' . $materials->where('stock', '<', 10)->count());
+            $sheet->setCellValue($infoCol . '2', 'Dibuat pada: ' . now()->format('d M Y H:i:s'));
+            $sheet->setCellValue($infoCol . '3', 'Total Bahan Baku: ' . ($row - 2));
+            $sheet->setCellValue($infoCol . '4', 'Total Nilai Inventaris: Rp ' . number_format($totalInventoryValue, 0, ',', '.'));
+            $sheet->setCellValue($infoCol . '5', 'Bahan Stok Rendah: ' . $materials->where('stock', '<', 10)->count());
 
             $exportInfoStyle = [
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'DDEBF7'] // Light blue background
+                    'startColor' => ['rgb' => 'DDEBF7'] // Latar belakang biru muda
                 ],
                 'borders' => [
                     'allBorders' => [
@@ -663,20 +871,41 @@ class RawMaterialController extends Controller
                     ],
                 ],
             ];
-            $sheet->getStyle('J2:J5')->applyFromArray($exportInfoStyle);
-            $sheet->getStyle('J5')->getFont()->getColor()->setARGB('FF0000'); // Red color for low stock warning
-            $sheet->getColumnDimension('J')->setWidth(40);
+            $sheet->getStyle($infoCol . '2:' . $infoCol . '5')->applyFromArray($exportInfoStyle);
+            $sheet->getStyle($infoCol . '5')->getFont()->getColor()->setARGB('FF0000'); // Warna merah untuk peringatan stok rendah
+            $sheet->getColumnDimension($infoCol)->setWidth(40);
 
-            // Set the auto-filter
-            $sheet->setAutoFilter('A1:H' . ($row - 1));
+            // Set lebar kolom berdasarkan peran pengguna
+            if ($isWarehouse) {
+                $sheet->getColumnDimension('A')->setWidth(10);  // ID
+                $sheet->getColumnDimension('B')->setWidth(30);  // Nama
+                $sheet->getColumnDimension('C')->setWidth(15);  // Satuan
+                $sheet->getColumnDimension('D')->setWidth(15);  // Harga Jual
+                $sheet->getColumnDimension('E')->setWidth(15);  // Harga Beli
+                $sheet->getColumnDimension('F')->setWidth(15);  // Margin
+                $sheet->getColumnDimension('G')->setWidth(15);  // Margin (%)
+                $sheet->getColumnDimension('H')->setWidth(15);  // Stok
+                $sheet->getColumnDimension('I')->setWidth(20);  // Nilai Total
+                $sheet->getColumnDimension('J')->setWidth(40);  // Deskripsi
+                $sheet->getColumnDimension('K')->setWidth(15);  // Status
+            } else {
+                $sheet->getColumnDimension('A')->setWidth(10);  // ID
+                $sheet->getColumnDimension('B')->setWidth(30);  // Nama
+                $sheet->getColumnDimension('C')->setWidth(15);  // Satuan
+                $sheet->getColumnDimension('D')->setWidth(15);  // Harga Jual
+                $sheet->getColumnDimension('E')->setWidth(15);  // Stok
+                $sheet->getColumnDimension('F')->setWidth(20);  // Nilai Total
+                $sheet->getColumnDimension('G')->setWidth(40);  // Deskripsi
+                $sheet->getColumnDimension('H')->setWidth(15);  // Status
+            }
 
-            // Freeze the header row and ID column
+            // Bekukan baris header dan kolom ID
             $sheet->freezePane('B2');
 
             $writer = new Xlsx($spreadsheet);
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="raw_materials_export_' . date('Y-m-d') . '.xlsx"');
+            header('Content-Disposition: attachment;filename="ekspor_bahan_baku_' . date('Y-m-d') . '.xlsx"');
             header('Cache-Control: max-age=0');
 
             $writer->save('php://output');
@@ -706,8 +935,8 @@ class RawMaterialController extends Controller
                 ->setSubject('Update Massal Bahan Baku')
                 ->setDescription('Dibuat oleh Sistem Manajemen Seblak Sulthane');
 
-            // Add headers
-            $headers = ['ID', 'Nama', 'Satuan', 'Harga', 'Stok', 'Deskripsi', 'Status Aktif'];
+            // Add headers including purchase price column
+            $headers = ['ID', 'Nama', 'Satuan', 'Harga Jual', 'Harga Beli', 'Stok', 'Deskripsi', 'Status Aktif'];
             foreach ($headers as $index => $header) {
                 $sheet->setCellValue(chr(65 + $index) . '1', $header);
             }
@@ -732,7 +961,7 @@ class RawMaterialController extends Controller
                     'vertical' => Alignment::VERTICAL_CENTER,
                 ],
             ];
-            $sheet->getStyle('A1:G1')->applyFromArray($headerStyle);
+            $sheet->getStyle('A1:H1')->applyFromArray($headerStyle);
             $sheet->getRowDimension(1)->setRowHeight(25);
 
             // Data rows
@@ -742,9 +971,10 @@ class RawMaterialController extends Controller
                 $sheet->setCellValue('B' . $row, $material->name);
                 $sheet->setCellValue('C' . $row, $material->unit);
                 $sheet->setCellValue('D' . $row, $material->price);
-                $sheet->setCellValue('E' . $row, $material->stock);
-                $sheet->setCellValue('F' . $row, $material->description);
-                $sheet->setCellValue('G' . $row, $material->is_active ? 'TRUE' : 'FALSE');
+                $sheet->setCellValue('E' . $row, $material->purchase_price);
+                $sheet->setCellValue('F' . $row, $material->stock);
+                $sheet->setCellValue('G' . $row, $material->description);
+                $sheet->setCellValue('H' . $row, $material->is_active ? 'AKTIF' : 'NONAKTIF');
 
                 // Protect the ID cell from editing
                 $sheet->getStyle('A' . $row)->getProtection()
@@ -756,12 +986,12 @@ class RawMaterialController extends Controller
                     ->getStartColor()->setRGB('D9D9D9'); // Light gray background
 
                 // Create dropdown for Active column
-                $validation = $sheet->getCell('G' . $row)->getDataValidation();
+                $validation = $sheet->getCell('H' . $row)->getDataValidation();
                 $validation->setType(DataValidation::TYPE_LIST);
                 $validation->setErrorStyle(DataValidation::STYLE_INFORMATION);
                 $validation->setAllowBlank(false);
                 $validation->setShowDropDown(true);
-                $validation->setFormula1('"TRUE,FALSE"');
+                $validation->setFormula1('"AKTIF,NONAKTIF"');
 
                 // Create dropdown for unit column
                 $unitValidation = $sheet->getCell('C' . $row)->getDataValidation();
@@ -773,27 +1003,17 @@ class RawMaterialController extends Controller
 
                 // Alternate row colors for data rows
                 if ($row % 2 == 0) {
-                    $sheet->getStyle('B' . $row . ':G' . $row)->getFill()
+                    $sheet->getStyle('B' . $row . ':H' . $row)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F2F2F2');
                 } else {
-                    $sheet->getStyle('B' . $row . ':G' . $row)->getFill()
+                    $sheet->getStyle('B' . $row . ':H' . $row)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('FFFFFF');
                 }
 
                 $row++;
             }
-
-            // Add warning about ID column
-            $extraRow = $row + 1;
-            $sheet->setCellValue('A' . $extraRow, 'PERHATIAN: Jangan mengubah kolom ID karena akan digunakan sebagai referensi.');
-            $sheet->mergeCells('A' . $extraRow . ':G' . $extraRow);
-            $sheet->getStyle('A' . $extraRow)->getFont()->setBold(true);
-            $sheet->getStyle('A' . $extraRow)->getFont()->getColor()->setARGB('FF0000'); // Red color
-            $sheet->getStyle('A' . $extraRow)->getFill()
-                ->setFillType(Fill::FILL_SOLID)
-                ->getStartColor()->setRGB('FFE6E6'); // Light red background
 
             // Format the entire data area
             $borderStyle = [
@@ -803,11 +1023,11 @@ class RawMaterialController extends Controller
                     ],
                 ],
             ];
-            $sheet->getStyle('A1:G' . ($row - 1))->applyFromArray($borderStyle);
+            $sheet->getStyle('A1:H' . ($row - 1))->applyFromArray($borderStyle);
 
             // Add instructions section
-            $sheet->setCellValue('I1', 'PETUNJUK PENGISIAN');
-            $sheet->getStyle('I1')->applyFromArray([
+            $sheet->setCellValue('J1', 'PETUNJUK PENGISIAN');
+            $sheet->getStyle('J1')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'size' => 14,
@@ -830,12 +1050,14 @@ class RawMaterialController extends Controller
                 "3. Update data dengan mengubah nilai pada kolom yang ingin diperbarui",
                 "4. Kolom Nama dan Satuan wajib diisi",
                 "5. Untuk Satuan dan Status Aktif, gunakan dropdown untuk memilih",
-                "6. Setelah selesai mengupdate, simpan file dan upload kembali"
+                "6. Penambahan stok akan dicatat sebagai pembelian dari supplier",
+                "7. Pengurangan stok akan dicatat sebagai penggunaan stok",
+                "8. Setelah selesai mengupdate, simpan file dan upload kembali"
             ];
 
             $instructionText = implode("\n\n", $instructions);
-            $sheet->setCellValue('I2', $instructionText);
-            $sheet->getStyle('I2:I7')->applyFromArray([
+            $sheet->setCellValue('J2', $instructionText);
+            $sheet->getStyle('J2:J9')->applyFromArray([
                 'font' => [
                     'size' => 12,
                 ],
@@ -853,20 +1075,58 @@ class RawMaterialController extends Controller
                     'wrapText' => true
                 ],
             ]);
-            $sheet->mergeCells('I2:I7');
-            $sheet->getColumnDimension('I')->setWidth(50);
+            $sheet->mergeCells('J2:J9');
+            $sheet->getColumnDimension('J')->setWidth(50);
+
+            // Warning for ID column
+            $warningStyle = [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'C65911'] // Orange header
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+            ];
+
+            $sheet->setCellValue('J12', 'PERHATIAN');
+            $sheet->getStyle('J12')->applyFromArray($warningStyle);
+
+            $sheet->setCellValue('J13', 'Jangan mengubah kolom ID karena akan digunakan sebagai referensi.');
+            $sheet->setCellValue('J14', 'Perubahan pada nilai stok akan dicatat sebagai penyesuaian stok.');
+            $warningTextStyle = [
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'FCE4D6'] // Light orange background
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                    ],
+                ],
+                'alignment' => [
+                    'wrapText' => true,
+                ],
+            ];
+            $sheet->getStyle('J13:J14')->applyFromArray($warningTextStyle);
 
             // Set column widths
             $sheet->getColumnDimension('A')->setWidth(10);  // ID
             $sheet->getColumnDimension('B')->setWidth(30);  // Nama
             $sheet->getColumnDimension('C')->setWidth(15);  // Satuan
-            $sheet->getColumnDimension('D')->setWidth(15);  // Harga
-            $sheet->getColumnDimension('E')->setWidth(15);  // Stok
-            $sheet->getColumnDimension('F')->setWidth(40);  // Deskripsi
-            $sheet->getColumnDimension('G')->setWidth(15);  // Status Aktif
+            $sheet->getColumnDimension('D')->setWidth(15);  // Harga Jual
+            $sheet->getColumnDimension('E')->setWidth(15);  // Harga Beli
+            $sheet->getColumnDimension('F')->setWidth(15);  // Stok
+            $sheet->getColumnDimension('G')->setWidth(40);  // Deskripsi
+            $sheet->getColumnDimension('H')->setWidth(15);  // Status Aktif
 
             // Set the auto-filter
-            $sheet->setAutoFilter('A1:G' . ($row - 1));
+            $sheet->setAutoFilter('A1:H' . ($row - 1));
 
             // Freeze panes (first row and ID column)
             $sheet->freezePane('B2');
@@ -887,7 +1147,7 @@ class RawMaterialController extends Controller
     }
 
     /**
-     * Bulk update raw materials from Excel file
+     * Bulk update raw materials from Excel
      */
     public function bulkUpdate(Request $request)
     {
@@ -958,21 +1218,31 @@ class RawMaterialController extends Controller
                         $hasChanges = true;
                     }
 
-                    // Check and update stock if changed and valid
-                    if (isset($row[4]) && is_numeric($row[4]) && (int)$row[4] !== (int)$material->stock) {
-                        $updates['stock'] = (int)$row[4];
+                    // Check and update purchase price if changed and valid
+                    if (isset($row[4]) && is_numeric($row[4]) && (float)$row[4] !== (float)$material->purchase_price) {
+                        $updates['purchase_price'] = (float)$row[4];
+                        $hasChanges = true;
+                    }
+
+                    // Calculate stock difference if stock value is different
+                    $oldStock = $material->stock;
+                    $newStock = isset($row[5]) && is_numeric($row[5]) ? (int)$row[5] : $oldStock;
+                    $stockDifference = $newStock - $oldStock;
+
+                    if ($stockDifference != 0) {
+                        $updates['stock'] = $newStock;
                         $hasChanges = true;
                     }
 
                     // Check and update description if changed
-                    if (isset($row[5]) && $row[5] !== $material->description) {
-                        $updates['description'] = $row[5];
+                    if (isset($row[6]) && $row[6] !== $material->description) {
+                        $updates['description'] = $row[6];
                         $hasChanges = true;
                     }
 
                     // Check and update active status if changed
-                    if (isset($row[6])) {
-                        $newStatus = strtoupper($row[6]) === 'TRUE' ? 1 : 0;
+                    if (isset($row[7])) {
+                        $newStatus = strtoupper($row[7]) === 'TRUE' ? 1 : 0;
                         if ($newStatus !== $material->is_active) {
                             $updates['is_active'] = $newStatus;
                             $hasChanges = true;
@@ -982,6 +1252,25 @@ class RawMaterialController extends Controller
                     // Only update if there are changes
                     if ($hasChanges) {
                         $material->update($updates);
+
+                        // Record stock adjustment if stock has changed
+                        if ($stockDifference != 0) {
+                            $type = $stockDifference > 0 ? 'purchase' : 'usage';
+                            $notes = $stockDifference > 0
+                                ? 'Penambahan stok melalui bulk update Excel'
+                                : 'Pengurangan stok melalui bulk update Excel';
+
+                            StockAdjustment::create([
+                                'raw_material_id' => $material->id,
+                                'quantity' => abs($stockDifference),
+                                'purchase_price' => $stockDifference > 0 ? $material->purchase_price : null,
+                                'adjustment_date' => now(),
+                                'adjustment_type' => $type,
+                                'notes' => $notes,
+                                'user_id' => Auth::id()
+                            ]);
+                        }
+
                         $updateCount++;
                     } else {
                         $unchangedCount++;
@@ -1020,7 +1309,7 @@ class RawMaterialController extends Controller
     }
 
     /**
-     * Soft delete all raw materials without relation checking
+     * Soft delete all raw materials
      */
     public function deleteAll()
     {
@@ -1036,21 +1325,15 @@ class RawMaterialController extends Controller
                     ->with('info', 'Tidak ada bahan baku yang ditemukan untuk dihapus.');
             }
 
-            // Soft delete all materials without checking relations
+            // Soft delete all materials but don't delete stock adjustments
+            // This will keep the purchase history intact
             RawMaterial::query()->delete();
 
-            // Commit the transaction
             DB::commit();
-
-            // Log successful deletion
-            \Log::info("Berhasil melakukan soft delete pada {$materialCount} bahan baku");
 
             return redirect()->route('raw-materials.index')
                 ->with('success', "Semua {$materialCount} bahan baku berhasil dihapus.");
         } catch (\Exception $e) {
-            // Log error
-            \Log::error('Error dalam deleteAll bahan baku: ' . $e->getMessage());
-
             // Rollback transaction if still active
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();

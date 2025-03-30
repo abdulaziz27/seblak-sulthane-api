@@ -50,7 +50,8 @@
                         <a href="{{ route('outlets.export') }}" class="btn btn-info m-1">
                             <i class="fas fa-file-export mr-1"></i> Export
                         </a>
-                        <button type="button" class="btn btn-warning m-1" data-toggle="modal" data-target="#bulkUpdateModal">
+                        <button type="button" class="btn btn-warning m-1" data-toggle="modal"
+                            data-target="#bulkUpdateModal">
                             <i class="fas fa-sync-alt mr-1"></i> Update
                         </button>
                         <button type="button" class="btn btn-danger m-1" data-toggle="modal" data-target="#deleteAllModal">
@@ -89,7 +90,9 @@
                                             <th>Alamat</th>
                                             <th>Telepon</th>
                                             <th>Pimpinan</th>
-                                            <th>Dibuat Pada</th>
+                                            <th>Gudang</th>
+
+                                            {{-- <th>Dibuat Pada</th> --}}
                                             @if (Auth::user()->role === 'owner')
                                                 <th>Aksi</th>
                                             @endif
@@ -105,7 +108,14 @@
                                                 </td>
                                                 <td>{{ $outlet->phone }}</td>
                                                 <td>{{ $outlet->leader }}</td>
-                                                <td>{{ $outlet->created_at->format('d M Y') }}</td>
+                                                <td>
+                                                    @if ($outlet->is_warehouse)
+                                                        <div class="badge badge-success">Ya</div>
+                                                    @else
+                                                        <div class="badge badge-secondary">Tidak</div>
+                                                    @endif
+                                                </td>
+                                                {{-- <td>{{ $outlet->created_at->format('d M Y') }}</td> --}}
                                                 @if (Auth::user()->role === 'owner')
                                                     <td>
                                                         <div class="d-flex justify-content-center">
@@ -302,7 +312,7 @@
             }
 
             /* Ensure text doesn't overflow on small screens */
-            .btn i + span {
+            .btn i+span {
                 max-width: 100px;
                 display: inline-block;
                 overflow: hidden;

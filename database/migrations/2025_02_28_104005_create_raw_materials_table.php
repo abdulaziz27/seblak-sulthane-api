@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('unit');
             $table->integer('price');
             $table->integer('stock')->default(0);
+            $table->integer('reserved_stock')->default(0);
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();

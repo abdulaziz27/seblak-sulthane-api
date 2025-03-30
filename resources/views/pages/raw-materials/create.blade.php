@@ -74,13 +74,24 @@
                                     </div>
 
                                     <div class="form-group row mb-4">
-                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Harga (Rp) <span class="text-danger">*</span></label>
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Harga Jual (Rp) <span class="text-danger">*</span></label>
                                         <div class="col-sm-12 col-md-7">
-                                            <input type="number" class="form-control @error('price') is-invalid @enderror" name="price" value="{{ old('price') }}" required>
+                                            <input type="number" class="form-control @error('price') is-invalid @enderror" name="price" value="{{ old('price', 0) }}" required>
                                             @error('price')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
-                                            <small class="form-text text-muted">Harga per satuan dalam Rupiah (Rp).</small>
+                                            <small class="form-text text-muted">Harga jual ke outlet dalam Rupiah (Rp).</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group row mb-4">
+                                        <label class="col-form-label text-md-right col-12 col-md-3 col-lg-3">Harga Beli (Rp) <span class="text-danger">*</span></label>
+                                        <div class="col-sm-12 col-md-7">
+                                            <input type="number" class="form-control @error('purchase_price') is-invalid @enderror" name="purchase_price" value="{{ old('purchase_price', 0) }}" required>
+                                            @error('purchase_price')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                            <small class="form-text text-muted">Harga beli dari supplier dalam Rupiah (Rp).</small>
                                         </div>
                                     </div>
 
@@ -146,4 +157,40 @@
 
     <!-- Page Specific JS File -->
     <script src="{{ asset('js/page/forms-advanced-forms.js') }}"></script>
+
+    <script>
+        // Calculate margin when price or purchase_price changes
+        $(document).ready(function() {
+            function calculateMargin() {
+                var price = parseFloat($('input[name="price"]').val()) || 0;
+                var purchasePrice = parseFloat($('input[name="purchase_price"]').val()) || 0;
+
+                if (purchasePrice > 0) {
+                    var marginAmount = price - purchasePrice;
+                    var marginPercentage = (marginAmount / purchasePrice) * 100;
+
+                    // Display margin info
+                    var marginInfo = marginAmount.toLocaleString('id-ID') + ' (' + marginPercentage.toFixed(2) + '%)';
+
+                    // If margin info element doesn't exist, create it
+                    if ($('#margin-info').length === 0) {
+                        $('input[name="price"]').parent().append('<div id="margin-info" class="mt-2"></div>');
+                    }
+
+                    // Update margin info with appropriate color
+                    var color = marginAmount >= 0 ? 'text-success' : 'text-danger';
+                    $('#margin-info').html('<small class="' + color + '">Margin: Rp ' + marginInfo + '</small>');
+                } else {
+                    // Clear margin info if purchase price is 0
+                    $('#margin-info').remove();
+                }
+            }
+
+            // Calculate on input
+            $('input[name="price"], input[name="purchase_price"]').on('input', calculateMargin);
+
+            // Calculate initially if values are present
+            calculateMargin();
+        });
+    </script>
 @endpush

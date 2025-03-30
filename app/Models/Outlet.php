@@ -17,7 +17,8 @@ class Outlet extends Model
         'address2',
         'phone',
         'leader',
-        'notes'
+        'notes',
+        'is_warehouse'
     ];
 
     protected $dates = ['deleted_at'];
