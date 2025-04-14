@@ -131,6 +131,12 @@ class OrderController extends Controller
             $query->where('outlet_id', $outletId);
         }
 
+        // Get total order count
+        $totalOrderCount = $query->count();
+
+        // Get total items ordered
+        $totalItemsOrdered = $query->sum('total_item');
+
         // Existing summary calculations
         $totalRevenue = $query->sum('total');
         $totalDiscount = $query->sum('discount_amount');
@@ -270,6 +276,10 @@ class OrderController extends Controller
                     return $q->where('outlet_id', $outletId);
                 })->whereDate('created_at', $currentDateStr);
 
+                // Get daily order count and total items
+                $dailyOrderCount = (clone $baseDailyOrders)->count();
+                $dailyItemsOrdered = (clone $baseDailyOrders)->sum('total_item');
+
                 // Get daily QRIS fee with explicit casting
                 $dailyQrisFee = (clone $baseDailyOrders)
                     ->where('payment_method', 'qris')
@@ -328,6 +338,8 @@ class OrderController extends Controller
 
                 $dailyBreakdown[] = [
                     'date' => $currentDateStr,
+                    'order_count' => $dailyOrderCount,
+                    'items_count' => $dailyItemsOrdered,
                     'opening_balance' => $dailyOpeningBalance,
                     'expenses' => $dailyExpenses,
                     'cash_sales' => $dailyCashSales,
@@ -346,6 +358,10 @@ class OrderController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
+                // Order count data
+                'total_orders' => $totalOrderCount,
+                'total_items' => $totalItemsOrdered,
+
                 // Original summary data
                 'total_revenue' => $totalRevenue,
                 'total_discount' => $totalDiscount,
