@@ -15,15 +15,19 @@ class OrderItemController extends Controller
         $start_date = $request->input('start_date');
         $end_date = $request->input('end_date');
 
-        $query = OrderItem::query();
-
-        $query->select('order_items.*', DB::raw('(SELECT name FROM products WHERE products.id = order_items.product_id) AS product_name'));
+        $query = OrderItem::query()
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->select(
+                'order_items.*',
+                DB::raw('(SELECT name FROM products WHERE products.id = order_items.product_id) AS product_name')
+            );
 
         if ($start_date && $end_date) {
             $start = Carbon::parse($start_date)->startOfDay();
             $end = Carbon::parse($end_date)->endOfDay();
 
-            $query->whereBetween('order_items.created_at', [$start, $end]);
+            // Filter by the order's created_at instead of order_item's
+            $query->whereBetween('orders.created_at', [$start, $end]);
         }
 
         $orderItems = $query->get();
@@ -37,15 +41,25 @@ class OrderItemController extends Controller
     {
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        $query = OrderItem::select('order_items.product_id', DB::raw('(SELECT name FROM products WHERE products.id = order_items.product_id) AS product_name'), DB::raw('SUM(order_items.quantity) as total_quantity'))
+
+        $query = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->select(
+                'order_items.product_id',
+                DB::raw('(SELECT name FROM products WHERE products.id = order_items.product_id) AS product_name'),
+                DB::raw('SUM(order_items.quantity) as total_quantity')
+            )
             ->groupBy('order_items.product_id');
+
         if ($startDate && $endDate) {
             $start = Carbon::parse($startDate)->startOfDay();
             $end = Carbon::parse($endDate)->endOfDay();
 
-            $query->whereBetween('order_items.created_at', [$start, $end]);
+            // Filter by the order's created_at instead of order_item's
+            $query->whereBetween('orders.created_at', [$start, $end]);
         }
+
         $totalProductSold = $query->orderBy('total_quantity', 'desc')->get();
+
         return response()->json([
             'status' => 'success',
             'data' => $totalProductSold
