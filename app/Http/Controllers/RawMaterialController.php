@@ -672,7 +672,8 @@ class RawMaterialController extends Controller
     {
         try {
             $materials = RawMaterial::all();
-            $isWarehouse = Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff();
+            // $isWarehouse = Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff();
+            $isWarehouse = Auth::user()->role === 'owner' || (Auth::user()->role === 'admin' && Auth::user()->outlet && Auth::user()->outlet->is_warehouse);
 
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
