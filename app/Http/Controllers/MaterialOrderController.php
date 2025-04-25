@@ -6,10 +6,12 @@ use App\Models\MaterialOrder;
 use App\Models\MaterialOrderItem;
 use App\Models\RawMaterial;
 use App\Models\Outlet;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use PhpOffice\PhpSpreadsheet\Writer\Pdf as WriterPdf;
 
 class MaterialOrderController extends Controller
 {
@@ -494,6 +496,41 @@ class MaterialOrderController extends Controller
             return redirect()->back()
                 ->with('error', 'Gagal membatalkan pesanan: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Generate and download invoice for a material order
+     */
+    public function downloadInvoice(MaterialOrder $materialOrder)
+    {
+        // Verify that the user has access to this order
+        $user = Auth::user();
+        $canAccess =
+            $user->role === 'owner' ||
+            $user->role === 'staff' ||
+            ($user->role === 'admin' && $user->outlet && $user->outlet->is_warehouse) ||
+            $materialOrder->franchise_id === $user->outlet_id ||
+            $materialOrder->user_id === $user->id;
+
+        if (!$canAccess) {
+            return redirect()->route('material-orders.index')
+                ->with('error', 'Anda tidak memiliki izin untuk mengakses invoice ini');
+        }
+
+        // Load necessary relations
+        $materialOrder->load(['franchise', 'items.rawMaterial', 'user']);
+
+        // Generate PDF
+        $pdf = Pdf::loadView('pages.material-orders.invoice', compact('materialOrder'));
+
+        // Set PDF options
+        $pdf->setPaper('a4');
+
+        // Generate filename
+        $filename = 'Invoice_PesananBahan_' . $materialOrder->id . '_' . date('dmY') . '.pdf';
+
+        // Download PDF
+        return $pdf->download($filename);
     }
 
     /**

@@ -91,6 +91,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('products/bulk-update', [ProductController::class, 'bulkUpdate'])->name('products.bulkUpdate');
         Route::post('categories/import', [CategoryController::class, 'import'])->name('categories.import');
         Route::post('categories/bulk-update', [CategoryController::class, 'bulkUpdate'])->name('categories.bulkUpdate');
+
+        // Report
+        Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary'])->name('reports.sales-summary');
+        Route::get('/reports/material-purchases', [ReportController::class, 'materialPurchases'])->name('reports.material-purchases');
     });
 
     // Export routes (accessible by all)
@@ -122,9 +126,6 @@ Route::middleware(['auth'])->group(function () {
     //     Route::get('reports/supplier-purchases', [ReportController::class, 'supplierPurchases'])->name('supplier-purchases');
     // });
 
-    Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary'])->name('reports.sales-summary');
-    Route::get('/reports/material-purchases', [ReportController::class, 'materialPurchases'])->name('reports.material-purchases');
-
     // Raw Materials routes that require warehouse access
     Route::middleware('warehouse-access')->group(function () {
         Route::delete('raw-materials/delete-all', [RawMaterialController::class, 'deleteAll'])
@@ -147,6 +148,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('raw-materials', [RawMaterialController::class, 'index'])->name('raw-materials.index');
     Route::get('raw-materials/export', [RawMaterialController::class, 'export'])->name('raw-materials.export');
+
+    // invoice
+    Route::get('material-orders/{materialOrder}/download', [MaterialOrderController::class, 'downloadInvoice'])->name('material-orders.download');
 
 
     // Profile

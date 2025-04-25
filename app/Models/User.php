@@ -61,5 +61,6 @@ class User extends Authenticatable
     public function isWarehouseStaff()
     {
         return $this->outlet && $this->outlet->is_warehouse;
+        // return $this->role === 'admin' && $this->outlet && $this->outlet->is_warehouse;
     }
 }

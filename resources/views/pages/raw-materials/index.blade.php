@@ -166,7 +166,7 @@
                                                 <th>Nama</th>
                                                 <th>Satuan</th>
                                                 <th>Harga Jual</th>
-                                                @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                                                @if (Auth::user()->role === 'owner' || (Auth::user()->role === 'admin' && Auth::user()->outlet && Auth::user()->outlet->is_warehouse))
                                                     <th>Harga Beli</th>
                                                     <th>Margin</th>
                                                 @endif
@@ -186,7 +186,7 @@
                                                     <td>{{ $material->name }}</td>
                                                     <td>{{ $material->unit }}</td>
                                                     <td>Rp {{ number_format($material->price, 0, ',', '.') }}</td>
-                                                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                                                    @if (Auth::user()->role === 'owner' || (Auth::user()->role === 'admin' && Auth::user()->outlet && Auth::user()->outlet->is_warehouse))
                                                         <td>Rp {{ number_format($material->purchase_price, 0, ',', '.') }}
                                                         </td>
                                                         <td>
