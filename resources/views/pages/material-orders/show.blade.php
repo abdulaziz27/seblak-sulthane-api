@@ -155,6 +155,10 @@
                                 </div>
                             </div>
                             <div class="card-footer text-right">
+                                <a href="{{ route('material-orders.download', $materialOrder->id) }}"
+                                    class="btn btn-success">
+                                    <i class="fas fa-file-download"></i> Download Invoice
+                                </a>
                                 <a href="{{ route('material-orders.index') }}" class="btn btn-primary">
                                     <i class="fas fa-arrow-left"></i> Kembali ke Daftar
                                 </a>

@@ -19,12 +19,23 @@ class WarehouseAccessMiddleware
     {
         $user = Auth::user();
 
-        // Allow access if user is owner/admin or belongs to a warehouse outlet
-        if (!$user || (!in_array($user->role, ['owner', 'admin']) && !$user->isWarehouseStaff())) {
-            return redirect()->route('home')
-                ->with('error', 'Anda tidak memiliki akses ke fitur ini. Hanya outlet pusat yang dapat mengakses fitur gudang.');
+        if (!$user) {
+            return redirect()->route('login')
+                ->with('error', 'Anda harus login terlebih dahulu.');
         }
 
-        return $next($request);
+        // Allow access for owner regardless of outlet
+        if ($user->role === 'owner') {
+            return $next($request);
+        }
+
+        // For admin, check if their outlet is a warehouse
+        if ($user->role === 'admin' && $user->outlet && $user->outlet->is_warehouse) {
+            return $next($request);
+        }
+
+        // Deny access for all other users
+        return redirect()->route('home')
+            ->with('error', 'Anda tidak memiliki akses ke fitur ini. Hanya owner dan admin dari outlet pusat/gudang yang dapat mengakses fitur ini.');
     }
 }
