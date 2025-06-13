@@ -62,7 +62,7 @@ class ReportController extends Controller
 
         // Ambil data penyesuaian stok dengan tipe 'purchase'
         $purchases = StockAdjustment::with(['rawMaterial', 'user'])
-            ->where('adjustment_type', 'purchase')
+            ->whereIn('adjustment_type', ['purchase', 'usage', 'damage', 'other'])
             ->where('quantity', '>', 0)
             ->whereBetween('adjustment_date', [$startDate, $endDate])
             ->orderBy('adjustment_date', 'desc')
@@ -89,16 +89,37 @@ class ReportController extends Controller
             // Create detailed purchases array
             $detailedPurchases = [];
             foreach ($adjustments as $index => $adjustment) {
-                $detailedPurchases[] = [
+                // Base data yang selalu ada
+                $baseData = [
                     'no' => $index + 1,
                     'name' => $adjustment->rawMaterial->name,
                     'unit' => $adjustment->rawMaterial->unit,
-                    'purchase_price' => $adjustment->purchase_price,
-                    'selling_price' => $adjustment->rawMaterial->price,
                     'quantity' => $adjustment->quantity,
-                    'subtotal' => $adjustment->quantity * $adjustment->purchase_price,
+                    'adjustment_type' => $adjustment->adjustment_type,
                     'notes' => $adjustment->notes
                 ];
+
+                // Data spesifik berdasarkan tipe adjustment
+                if ($adjustment->adjustment_type === 'purchase') {
+                    // Untuk pembelian, tampilkan harga beli dan total nilai positif
+                    $specificData = [
+                        'purchase_price' => $adjustment->purchase_price,
+                        'selling_price' => $adjustment->rawMaterial->price,
+                        'subtotal' => $adjustment->quantity * $adjustment->purchase_price,
+                        'is_purchase' => true
+                    ];
+                } else {
+                    // Untuk pengurangan stok (usage/damage/other)
+                    // Harga menggunakan average cost atau harga terakhir dari stok yang ada
+                    $specificData = [
+                        'purchase_price' => null, // Tidak perlu tampilkan harga beli
+                        'selling_price' => null, // Tidak perlu tampilkan harga jual
+                        'subtotal' => -($adjustment->quantity), // Negative untuk pengurangan
+                        'is_purchase' => false
+                    ];
+                }
+
+                $detailedPurchases[] = array_merge($baseData, $specificData);
             }
 
             $dailyData[] = [
@@ -120,11 +141,19 @@ class ReportController extends Controller
 
         // Summary data
         $summaryData = [
-            'total_purchase_amount' => $purchases->sum(function ($adj) {
-                return $adj->quantity * $adj->purchase_price;
-            }),
-            'total_order_count' => $purchases->count(),
-            'total_item_count' => $purchases->sum('quantity')
+            // Data pembelian (penambahan)
+            'total_purchase_amount' => $purchases->where('adjustment_type', 'purchase')
+                ->sum(function ($adj) {
+                    return $adj->quantity * $adj->purchase_price;
+                }),
+            'total_purchase_count' => $purchases->where('adjustment_type', 'purchase')->count(),
+            'total_purchase_items' => $purchases->where('adjustment_type', 'purchase')
+                ->sum('quantity'),
+
+            // Data pengurangan
+            'total_reduction_count' => $purchases->where('adjustment_type', '!=', 'purchase')->count(),
+            'total_reduction_items' => $purchases->where('adjustment_type', '!=', 'purchase')
+                ->sum('quantity'),
         ];
 
         // Judul laporan
@@ -212,11 +241,19 @@ class ReportController extends Controller
 
             $row++;
             $sheet->setCellValue('A' . $row, 'Total Jumlah Pemesanan ke Supplier:');
-            $sheet->setCellValue('C' . $row, $summaryData['total_order_count']);
+            $sheet->setCellValue('C' . $row, $summaryData['total_purchase_count']);
 
             $row++;
             $sheet->setCellValue('A' . $row, 'Total Item yang Dipesan:');
-            $sheet->setCellValue('C' . $row, $summaryData['total_item_count']);
+            $sheet->setCellValue('C' . $row, $summaryData['total_purchase_items']);
+
+            $row++;
+            $sheet->setCellValue('A' . $row, 'Total Pengurangan Stok:');
+            $sheet->setCellValue('C' . $row, $summaryData['total_reduction_count']);
+
+            $row++;
+            $sheet->setCellValue('A' . $row, 'Total Item Berkurang:');
+            $sheet->setCellValue('C' . $row, $summaryData['total_reduction_items']);
 
             // Add daily data section
             $row += 2;
@@ -259,8 +296,8 @@ class ReportController extends Controller
             $row++;
             $sheet->setCellValue('A' . $row, 'TOTAL');
             $sheet->mergeCells('A' . $row . ':B' . $row);
-            $sheet->setCellValue('C' . $row, $summaryData['total_order_count']);
-            $sheet->setCellValue('D' . $row, $summaryData['total_item_count']);
+            $sheet->setCellValue('C' . $row, $summaryData['total_purchase_count']);
+            $sheet->setCellValue('D' . $row, $summaryData['total_purchase_items']);
             $sheet->setCellValue('E' . $row, $summaryData['total_purchase_amount']);
 
             // Format totals row

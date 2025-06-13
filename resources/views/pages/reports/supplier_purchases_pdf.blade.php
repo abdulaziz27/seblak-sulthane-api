@@ -116,17 +116,47 @@
     <div class="section-title">Ringkasan Periode</div>
 
     <table class="summary-table">
+        <!-- Pembelian -->
         <tr>
-            <th style="width: 60%;">Total Pembelian Bahan Baku ke Supplier</th>
+            <th colspan="2" style="background-color: #e3f2fd;">Pembelian dari Supplier</th>
+        </tr>
+        <tr>
+            <th style="width: 60%;">Total Nilai Pembelian</th>
             <td style="text-align: left;">Rp {{ number_format($summaryData['total_purchase_amount'], 0, ',', '.') }}</td>
         </tr>
         <tr>
-            <th style="width: 60%;">Total Jumlah Pemesanan ke Supplier</th>
-            <td style="text-align: left;">{{ number_format($summaryData['total_order_count'], 0, ',', '.') }}</td>
+            <th style="width: 60%;">Jumlah Transaksi Pembelian</th>
+            <td style="text-align: left;">{{ number_format($summaryData['total_purchase_count'], 0, ',', '.') }}</td>
         </tr>
         <tr>
-            <th style="width: 60%;">Total Item yang Dipesan</th>
-            <td style="text-align: left;">{{ number_format($summaryData['total_item_count'], 0, ',', '.') }}</td>
+            <th style="width: 60%;">Total Item Dibeli</th>
+            <td style="text-align: left;">{{ number_format($summaryData['total_purchase_items'], 0, ',', '.') }}</td>
+        </tr>
+
+        <!-- Pengurangan -->
+        <tr>
+            <th colspan="2" style="background-color: #fbe9e7;">Pengurangan Stok</th>
+        </tr>
+        <tr>
+            <th style="width: 60%;">Jumlah Transaksi Pengurangan</th>
+            <td style="text-align: left;">{{ number_format($summaryData['total_reduction_count'], 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th style="width: 60%;">Total Item Berkurang</th>
+            <td style="text-align: left;">{{ number_format($summaryData['total_reduction_items'], 0, ',', '.') }}</td>
+        </tr>
+
+        <!-- Total Keseluruhan -->
+        <tr>
+            <th colspan="2" style="background-color: #f5f5f5;">Total Keseluruhan</th>
+        </tr>
+        <tr>
+            <th style="width: 60%;">Total Seluruh Transaksi</th>
+            <td style="text-align: left;">{{ number_format($summaryData['total_purchase_count'] + $summaryData['total_reduction_count'], 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th style="width: 60%;">Total Seluruh Item</th>
+            <td style="text-align: left;">{{ number_format($summaryData['total_purchase_items'] + $summaryData['total_reduction_items'], 0, ',', '.') }}</td>
         </tr>
     </table>
 
@@ -155,7 +185,7 @@
         <tfoot>
             <tr class="total-row">
                 <td colspan="2" style="text-align: right;">TOTAL</td>
-                <td style="text-align: center;">{{ $summaryData['total_order_count'] }}</td>
+                <td style="text-align: center;">{{ $summaryData['total_p_count'] }}</td>
                 <td style="text-align: center;">{{ $summaryData['total_item_count'] }}</td>
                 <td style="text-align: right;">Rp {{ number_format($summaryData['total_purchase_amount'], 0, ',', '.') }}</td>
             </tr>
@@ -172,12 +202,17 @@
                 <thead>
                     <tr>
                         <th style="width: 5%; text-align: center;">No</th>
-                        <th style="width: 25%;">Nama Bahan</th>
+                        <th style="width: 20%;">Nama Bahan</th>
                         <th style="width: 10%; text-align: center;">Satuan</th>
-                        <th style="width: 15%; text-align: right;">Harga Beli</th>
-                        <th style="width: 15%; text-align: right;">Harga Jual</th>
-                        <th style="width: 10%; text-align: center;">Quantity</th>
-                        <th style="width: 20%; text-align: right;">Total Nilai Beli</th>
+                        <th style="width: 10%; text-align: center;">Jumlah</th>
+                        <th style="width: 15%; text-align: right;">
+                            Harga Satuan
+                        </th>
+                        <th style="width: 20%; text-align: right;">
+                            Total Nilai
+                        </th>
+                        <th style="width: 10%; text-align: center;">Tipe</th>
+                        <th style="width: 15%;">Catatan</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -186,18 +221,55 @@
                             <td style="text-align: center;">{{ $purchase['no'] }}</td>
                             <td>{{ $purchase['name'] }}</td>
                             <td style="text-align: center;">{{ $purchase['unit'] }}</td>
-                            <td style="text-align: right;">Rp {{ number_format($purchase['purchase_price'], 0, ',', '.') }}</td>
-                            <td style="text-align: right;">Rp {{ number_format($purchase['selling_price'], 0, ',', '.') }}</td>
-                            <td style="text-align: center;">{{ $purchase['quantity'] }}</td>
-                            <td style="text-align: right;">Rp {{ number_format($purchase['subtotal'], 0, ',', '.') }}</td>
+                            <td style="text-align: center;">
+                                @if($purchase['is_purchase'])
+                                    +{{ $purchase['quantity'] }}
+                                @else
+                                    -{{ $purchase['quantity'] }}
+                                @endif
+                            </td>
+                            <td style="text-align: right;">
+                                @if($purchase['is_purchase'])
+                                    Rp {{ number_format($purchase['purchase_price'], 0, ',', '.') }}
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td style="text-align: right;">
+                                @if($purchase['is_purchase'])
+                                    Rp {{ number_format($purchase['subtotal'], 0, ',', '.') }}
+                                @else
+                                    -{{ $purchase['quantity'] }} {{ $purchase['unit'] }}
+                                @endif
+                            </td>
+                            <td style="text-align: center;">
+                                @php
+                                    $typeLabels = [
+                                        'purchase' => 'Pembelian',
+                                        'usage' => 'Penggunaan',
+                                        'damage' => 'Rusak',
+                                        'other' => 'Lainnya'
+                                    ];
+                                @endphp
+                                {{ $typeLabels[$purchase['adjustment_type']] ?? ucfirst($purchase['adjustment_type']) }}
+                            </td>
+                            <td>{{ $purchase['notes'] ?? '-' }}</td>
                         </tr>
                     @endforeach
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <td colspan="5"></td>
-                        <td style="text-align: center;">TOTAL</td>
-                        <td style="text-align: right;">Rp {{ number_format($dayData['purchase_amount'], 0, ',', '.') }}</td>
+                        <td colspan="3" style="text-align: right;">TOTAL</td>
+                        <td style="text-align: center;">
+                            <!-- Pisahkan total penambahan dan pengurangan -->
+                            +{{ $dayData['total_additions'] ?? 0 }} / -{{ $dayData['total_reductions'] ?? 0 }}
+                        </td>
+                        <td></td>
+                        <td style="text-align: right;">
+                            <!-- Hanya tampilkan total nilai pembelian -->
+                            Rp {{ number_format($dayData['purchase_amount'], 0, ',', '.') }}
+                        </td>
+                        <td colspan="2"></td>
                     </tr>
                 </tfoot>
             </table>

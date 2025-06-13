@@ -8,12 +8,14 @@
         </div>
         <ul class="sidebar-menu">
             <!-- Bagian Dashboard -->
+            @if (Auth::user()->role !== 'staff')
             <li class="menu-header">Dasbor</li>
             <li class='nav-item'>
                 <a class="nav-link" href="{{ route('home') }}">
                     <i class="fas fa-columns"></i><span>Dasbor</span>
                 </a>
             </li>
+            @endif
 
             <!-- Bagian Laporan -->
             @if (Auth::user()->role === 'owner' || Auth::user()->role === 'admin')

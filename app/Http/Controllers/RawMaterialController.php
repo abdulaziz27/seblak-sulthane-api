@@ -22,6 +22,11 @@ class RawMaterialController extends Controller
      */
     public function index(Request $request)
     {
+        // Mendapatkan outlet_id dan is_warehouse dari user
+        $user = Auth::user();
+        $userOutletId = $user->outlet_id;
+        $isWarehouse = $user->outlet->is_warehouse ?? false;
+        
         $query = RawMaterial::query();
 
         // Search functionality
@@ -58,7 +63,9 @@ class RawMaterialController extends Controller
             'totalCount',
             'activeCount',
             'lowStockCount',
-            'totalValue'
+            'totalValue',
+            'userOutletId',
+            'isWarehouse'
         ));
     }
 

@@ -13,26 +13,21 @@
             <div class="section-header">
                 <h1>Bahan Baku</h1>
                 <div class="section-header-button d-none d-md-flex">
-                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
+                    <!-- Cek apakah user adalah owner atau admin dengan is_warehouse -->
+                    @if (Auth::user()->role === 'owner' || (Auth::user()->role === 'admin' && Auth::user()->outlet && Auth::user()->outlet->is_warehouse))
                         <a href="{{ route('raw-materials.create') }}" class="btn btn-primary">Tambah Baru</a>
                         <button type="button" class="btn btn-success ml-2" data-toggle="modal" data-target="#importModal">
                             Import Excel
                         </button>
-                    @endif
-
-                    <a href="{{ route('raw-materials.export') }}" class="btn btn-info ml-2">
-                        Ekspor Excel
-                    </a>
-
-                    @if (Auth::user()->role === 'owner' || Auth::user()->isWarehouseStaff())
-                        <button type="button" class="btn btn-warning ml-2" data-toggle="modal"
-                            data-target="#bulkUpdateModal">
+                        <button type="button" class="btn btn-warning ml-2" data-toggle="modal" data-target="#bulkUpdateModal">
                             Update Massal
                         </button>
-                        <button type="button" class="btn btn-danger ml-2" data-toggle="modal"
-                            data-target="#deleteAllModal">
+                        <button type="button" class="btn btn-danger ml-2" data-toggle="modal" data-target="#deleteAllModal">
                             Hapus Semua
                         </button>
+                        <a href="{{ route('raw-materials.export') }}" class="btn btn-info ml-2">
+                            Ekspor Excel
+                        </a>
                     @endif
                 </div>
                 <div class="section-header-breadcrumb">
@@ -147,8 +142,13 @@
                                                         <div>
                                                             <h6 class="mb-1 text-muted font-weight-normal">Nilai Inventaris
                                                             </h6>
-                                                            <h4 class="mb-0 text-nowrap">Rp
-                                                                {{ number_format($totalValue, 0, ',', '.') }}</h4>
+                                                            @if (Auth::user()->role === 'owner')  <!-- Owner bisa lihat semuanya -->
+                                                                <h4 class="mb-0 text-nowrap">Rp {{ number_format($totalValue, 0, ',', '.') }}</h4>
+                                                            @elseif (Auth::user()->role === 'admin' && $isWarehouse)  <!-- Admin dari outlet dengan is_warehouse = true -->
+                                                                <h4 class="mb-0 text-nowrap">Rp {{ number_format($totalValue, 0, ',', '.') }}</h4>
+                                                            @else
+                                                                <h4 class="mb-0 text-nowrap">-</h4> <!-- Staff atau Admin yang outletnya bukan warehouse tidak bisa lihat -->
+                                                            @endif
                                                         </div>
                                                     </div>
                                                 </div>
