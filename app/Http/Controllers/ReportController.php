@@ -110,11 +110,10 @@ class ReportController extends Controller
                     ];
                 } else {
                     // Untuk pengurangan stok (usage/damage/other)
-                    // Harga menggunakan average cost atau harga terakhir dari stok yang ada
                     $specificData = [
                         'purchase_price' => null, // Tidak perlu tampilkan harga beli
                         'selling_price' => null, // Tidak perlu tampilkan harga jual
-                        'subtotal' => -($adjustment->quantity), // Negative untuk pengurangan
+                        'subtotal' => - ($adjustment->quantity), // Negative untuk pengurangan
                         'is_purchase' => false
                     ];
                 }
