@@ -185,8 +185,8 @@
         <tfoot>
             <tr class="total-row">
                 <td colspan="2" style="text-align: right;">TOTAL</td>
-                <td style="text-align: center;">{{ $summaryData['total_p_count'] }}</td>
-                <td style="text-align: center;">{{ $summaryData['total_item_count'] }}</td>
+                <td style="text-align: center;">{{ $summaryData['total_purchase_count'] }}</td>
+                <td style="text-align: center;">{{ $summaryData['total_purchase_items'] }}</td>
                 <td style="text-align: right;">Rp {{ number_format($summaryData['total_purchase_amount'], 0, ',', '.') }}</td>
             </tr>
         </tfoot>
@@ -261,8 +261,8 @@
                     <tr class="total-row">
                         <td colspan="3" style="text-align: right;">TOTAL</td>
                         <td style="text-align: center;">
-                            <!-- Pisahkan total penambahan dan pengurangan -->
-                            +{{ $dayData['total_additions'] ?? 0 }} / -{{ $dayData['total_reductions'] ?? 0 }}
+                            <!-- Total item untuk hari ini -->
+                            {{ $dayData['item_count'] }}
                         </td>
                         <td></td>
                         <td style="text-align: right;">
