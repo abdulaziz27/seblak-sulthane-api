@@ -116,47 +116,46 @@
     <div class="section-title">Ringkasan Periode</div>
 
     <table class="summary-table">
-        <!-- Pembelian -->
         <tr>
-            <th colspan="2" style="background-color: #e3f2fd;">Pembelian dari Supplier</th>
+            <th colspan="2" style="background-color: #e3f2fd;">Pembelian dari Supplier (Masuk)</th>
         </tr>
         <tr>
-            <th style="width: 60%;">Total Nilai Pembelian</th>
-            <td style="text-align: left;">Rp {{ number_format($summaryData['total_purchase_amount'], 0, ',', '.') }}</td>
+            <th>Total Nilai Pembelian</th>
+            <td>Rp {{ number_format($summaryData['total_purchase_amount'], 0, ',', '.') }}</td>
         </tr>
         <tr>
-            <th style="width: 60%;">Jumlah Transaksi Pembelian</th>
-            <td style="text-align: left;">{{ number_format($summaryData['total_purchase_count'], 0, ',', '.') }}</td>
+            <th>Jumlah Transaksi Pembelian</th>
+            <td>{{ number_format($summaryData['total_purchase_count'], 0, ',', '.') }}</td>
         </tr>
         <tr>
-            <th style="width: 60%;">Total Item Dibeli</th>
-            <td style="text-align: left;">{{ number_format($summaryData['total_purchase_items'], 0, ',', '.') }}</td>
-        </tr>
-
-        <!-- Pengurangan -->
-        <tr>
-            <th colspan="2" style="background-color: #fbe9e7;">Pengurangan Stok</th>
+            <th>Total Item Dibeli</th>
+            <td>{{ number_format($summaryData['total_purchase_items'], 0, ',', '.') }}</td>
         </tr>
         <tr>
-            <th style="width: 60%;">Jumlah Transaksi Pengurangan</th>
-            <td style="text-align: left;">{{ number_format($summaryData['total_reduction_count'], 0, ',', '.') }}</td>
+            <th colspan="2" style="background-color: #fbe9e7;">Pengurangan Stok (Keluar)</th>
         </tr>
         <tr>
-            <th style="width: 60%;">Total Item Berkurang</th>
-            <td style="text-align: left;">{{ number_format($summaryData['total_reduction_items'], 0, ',', '.') }}</td>
-        </tr>
-
-        <!-- Total Keseluruhan -->
-        <tr>
-            <th colspan="2" style="background-color: #f5f5f5;">Total Keseluruhan</th>
+            <th>Jumlah Transaksi Pengurangan</th>
+            <td>{{ number_format($summaryData['total_reduction_count'], 0, ',', '.') }}</td>
         </tr>
         <tr>
-            <th style="width: 60%;">Total Seluruh Transaksi</th>
-            <td style="text-align: left;">{{ number_format($summaryData['total_purchase_count'] + $summaryData['total_reduction_count'], 0, ',', '.') }}</td>
+            <th>Total Item Berkurang</th>
+            <td>{{ number_format($summaryData['total_reduction_items'], 0, ',', '.') }}</td>
         </tr>
         <tr>
-            <th style="width: 60%;">Total Seluruh Item</th>
-            <td style="text-align: left;">{{ number_format($summaryData['total_purchase_items'] + $summaryData['total_reduction_items'], 0, ',', '.') }}</td>
+            <th>Total Nilai Pengurangan</th>
+            <td>Rp {{ number_format($summaryData['total_reduction_amount'], 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th colspan="2" style="background-color: #f5f5f5;">Saldo Akhir</th>
+        </tr>
+        <tr>
+            <th>Saldo Item</th>
+            <td>{{ number_format($summaryData['saldo_qty'], 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th>Saldo Nilai</th>
+            <td>Rp {{ number_format($summaryData['saldo_amount'], 0, ',', '.') }}</td>
         </tr>
     </table>
 
@@ -164,11 +163,15 @@
     <table class="summary-table">
         <thead>
             <tr>
-                <th style="width: 15%;">Tanggal</th>
-                <th style="width: 15%;">Hari</th>
-                <th style="width: 20%; text-align: center;">Jumlah Order</th>
-                <th style="width: 20%; text-align: center;">Jumlah Item</th>
-                <th style="width: 30%; text-align: right;">Total Pembelian</th>
+                <th>Tanggal</th>
+                <th>Hari</th>
+                <th style="text-align:center;">Order</th>
+                <th style="text-align:center;">Masuk</th>
+                <th style="text-align:center;">Keluar</th>
+                <th style="text-align:center;">Saldo</th>
+                <th style="text-align:right;">Nilai Masuk</th>
+                <th style="text-align:right;">Nilai Keluar</th>
+                <th style="text-align:right;">Saldo Nilai</th>
             </tr>
         </thead>
         <tbody>
@@ -177,17 +180,24 @@
                     <td>{{ \Carbon\Carbon::parse($dayData['date'])->format('d/m/Y') }}</td>
                     <td>{{ $dayData['day_name'] }}</td>
                     <td style="text-align: center;">{{ $dayData['order_count'] }}</td>
-                    <td style="text-align: center;">{{ $dayData['item_count'] }}</td>
-                    <td style="text-align: right;">Rp {{ number_format($dayData['purchase_amount'], 0, ',', '.') }}</td>
+                    <td style="text-align: center;">{{ $dayData['in_qty'] }}</td>
+                    <td style="text-align: center;">{{ $dayData['out_qty'] }}</td>
+                    <td style="text-align: center;">{{ $dayData['saldo_qty'] }}</td>
+                    <td style="text-align: right;">Rp {{ number_format($dayData['in_amount'], 0, ',', '.') }}</td>
+                    <td style="text-align: right;">Rp {{ number_format($dayData['out_amount'], 0, ',', '.') }}</td>
+                    <td style="text-align: right;">Rp {{ number_format($dayData['saldo_amount'], 0, ',', '.') }}</td>
                 </tr>
             @endforeach
         </tbody>
         <tfoot>
             <tr class="total-row">
-                <td colspan="2" style="text-align: right;">TOTAL</td>
-                <td style="text-align: center;">{{ $summaryData['total_purchase_count'] }}</td>
+                <td colspan="3" style="text-align: right;">TOTAL</td>
                 <td style="text-align: center;">{{ $summaryData['total_purchase_items'] }}</td>
+                <td style="text-align: center;">{{ $summaryData['total_reduction_items'] }}</td>
+                <td style="text-align: center;">{{ $summaryData['saldo_qty'] }}</td>
                 <td style="text-align: right;">Rp {{ number_format($summaryData['total_purchase_amount'], 0, ',', '.') }}</td>
+                <td style="text-align: right;">Rp {{ number_format($summaryData['total_reduction_amount'], 0, ',', '.') }}</td>
+                <td style="text-align: right;">Rp {{ number_format($summaryData['saldo_amount'], 0, ',', '.') }}</td>
             </tr>
         </tfoot>
     </table>
@@ -205,12 +215,8 @@
                         <th style="width: 20%;">Nama Bahan</th>
                         <th style="width: 10%; text-align: center;">Satuan</th>
                         <th style="width: 10%; text-align: center;">Jumlah</th>
-                        <th style="width: 15%; text-align: right;">
-                            Harga Satuan
-                        </th>
-                        <th style="width: 20%; text-align: right;">
-                            Total Nilai
-                        </th>
+                        <th style="width: 15%; text-align: right;">Harga Satuan</th>
+                        <th style="width: 20%; text-align: right;">Total Nilai</th>
                         <th style="width: 10%; text-align: center;">Tipe</th>
                         <th style="width: 15%;">Catatan</th>
                     </tr>
@@ -222,25 +228,21 @@
                             <td>{{ $purchase['name'] }}</td>
                             <td style="text-align: center;">{{ $purchase['unit'] }}</td>
                             <td style="text-align: center;">
-                                @if($purchase['is_purchase'])
-                                    +{{ $purchase['quantity'] }}
-                                @else
-                                    -{{ $purchase['quantity'] }}
-                                @endif
+                                {{ $purchase['quantity'] }}
                             </td>
                             <td style="text-align: right;">
                                 @if($purchase['is_purchase'])
                                     Rp {{ number_format($purchase['purchase_price'], 0, ',', '.') }}
                                 @else
-                                    -
+                                    @if($purchase['purchase_price'])
+                                        Rp {{ number_format($purchase['purchase_price'], 0, ',', '.') }}
+                                    @else
+                                        -
+                                    @endif
                                 @endif
                             </td>
                             <td style="text-align: right;">
-                                @if($purchase['is_purchase'])
-                                    Rp {{ number_format($purchase['subtotal'], 0, ',', '.') }}
-                                @else
-                                    -{{ $purchase['quantity'] }} {{ $purchase['unit'] }}
-                                @endif
+                                Rp {{ number_format($purchase['subtotal'], 0, ',', '.') }}
                             </td>
                             <td style="text-align: center;">
                                 @php
@@ -260,15 +262,9 @@
                 <tfoot>
                     <tr class="total-row">
                         <td colspan="3" style="text-align: right;">TOTAL</td>
-                        <td style="text-align: center;">
-                            <!-- Total item untuk hari ini -->
-                            {{ $dayData['item_count'] }}
-                        </td>
+                        <td style="text-align: center;">{{ $dayData['saldo_qty'] }}</td>
                         <td></td>
-                        <td style="text-align: right;">
-                            <!-- Hanya tampilkan total nilai pembelian -->
-                            Rp {{ number_format($dayData['purchase_amount'], 0, ',', '.') }}
-                        </td>
+                        <td style="text-align: right;">Rp {{ number_format($dayData['saldo_amount'], 0, ',', '.') }}</td>
                         <td colspan="2"></td>
                     </tr>
                 </tfoot>
