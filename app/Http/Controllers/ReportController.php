@@ -76,32 +76,43 @@ class ReportController extends Controller
 
         // Generate all dates in the range even if no purchases
         $currentDate = clone $startDate;
+        $grandTotalIn = 0;
+        $grandTotalOut = 0;
+        $grandTotalInQty = 0;
+        $grandTotalOutQty = 0;
         while ($currentDate <= $endDate) {
             $dateStr = $currentDate->format('Y-m-d');
             $adjustments = $dateGroups[$dateStr] ?? collect();
 
             $orderCount = $adjustments->count();
-            $itemCount = $adjustments->sum('quantity');
-            $purchaseAmount = $adjustments->sum(function ($adj) {
+            $inQty = $adjustments->where('adjustment_type', 'purchase')->sum('quantity');
+            $outQty = $adjustments->where('adjustment_type', '!=', 'purchase')->sum('quantity');
+            $inAmount = $adjustments->where('adjustment_type', 'purchase')->sum(function ($adj) {
                 return $adj->quantity * $adj->purchase_price;
             });
+            $outAmount = $adjustments->where('adjustment_type', '!=', 'purchase')->sum(function ($adj) {
+                return $adj->quantity * ($adj->purchase_price ?? 0);
+            });
+            $saldoQty = $inQty - $outQty;
+            $saldoAmount = $inAmount - $outAmount;
+
+            $grandTotalIn += $inAmount;
+            $grandTotalOut += $outAmount;
+            $grandTotalInQty += $inQty;
+            $grandTotalOutQty += $outQty;
 
             // Create detailed purchases array
             $detailedPurchases = [];
             foreach ($adjustments as $index => $adjustment) {
-                // Base data yang selalu ada
                 $baseData = [
                     'no' => $index + 1,
                     'name' => $adjustment->rawMaterial->name,
                     'unit' => $adjustment->rawMaterial->unit,
-                    'quantity' => $adjustment->quantity,
+                    'quantity' => $adjustment->adjustment_type === 'purchase' ? $adjustment->quantity : -$adjustment->quantity,
                     'adjustment_type' => $adjustment->adjustment_type,
                     'notes' => $adjustment->notes
                 ];
-
-                // Data spesifik berdasarkan tipe adjustment
                 if ($adjustment->adjustment_type === 'purchase') {
-                    // Untuk pembelian, tampilkan harga beli dan total nilai positif
                     $specificData = [
                         'purchase_price' => $adjustment->purchase_price,
                         'selling_price' => $adjustment->rawMaterial->price,
@@ -109,15 +120,13 @@ class ReportController extends Controller
                         'is_purchase' => true
                     ];
                 } else {
-                    // Untuk pengurangan stok (usage/damage/other)
                     $specificData = [
-                        'purchase_price' => null, // Tidak perlu tampilkan harga beli
-                        'selling_price' => null, // Tidak perlu tampilkan harga jual
-                        'subtotal' => - ($adjustment->quantity), // Negative untuk pengurangan
+                        'purchase_price' => $adjustment->purchase_price,
+                        'selling_price' => null,
+                        'subtotal' => - ($adjustment->quantity * ($adjustment->purchase_price ?? 0)),
                         'is_purchase' => false
                     ];
                 }
-
                 $detailedPurchases[] = array_merge($baseData, $specificData);
             }
 
@@ -125,8 +134,12 @@ class ReportController extends Controller
                 'date' => $dateStr,
                 'day_name' => $currentDate->locale('id')->isoFormat('dddd'),
                 'order_count' => $orderCount,
-                'item_count' => $itemCount,
-                'purchase_amount' => $purchaseAmount,
+                'in_qty' => $inQty,
+                'out_qty' => $outQty,
+                'saldo_qty' => $saldoQty,
+                'in_amount' => $inAmount,
+                'out_amount' => $outAmount,
+                'saldo_amount' => $saldoAmount,
                 'detailed_purchases' => $detailedPurchases
             ];
 
@@ -140,19 +153,14 @@ class ReportController extends Controller
 
         // Summary data
         $summaryData = [
-            // Data pembelian (penambahan)
-            'total_purchase_amount' => $purchases->where('adjustment_type', 'purchase')
-                ->sum(function ($adj) {
-                    return $adj->quantity * $adj->purchase_price;
-                }),
+            'total_purchase_amount' => $grandTotalIn,
             'total_purchase_count' => $purchases->where('adjustment_type', 'purchase')->count(),
-            'total_purchase_items' => $purchases->where('adjustment_type', 'purchase')
-                ->sum('quantity'),
-
-            // Data pengurangan
+            'total_purchase_items' => $grandTotalInQty,
             'total_reduction_count' => $purchases->where('adjustment_type', '!=', 'purchase')->count(),
-            'total_reduction_items' => $purchases->where('adjustment_type', '!=', 'purchase')
-                ->sum('quantity'),
+            'total_reduction_items' => $grandTotalOutQty,
+            'total_reduction_amount' => $grandTotalOut,
+            'saldo_qty' => $grandTotalInQty - $grandTotalOutQty,
+            'saldo_amount' => $grandTotalIn - $grandTotalOut,
         ];
 
         // Judul laporan
@@ -230,43 +238,46 @@ class ReportController extends Controller
             // Add summary section
             $row = 5;
             $sheet->setCellValue('A' . $row, 'RINGKASAN PERIODE');
-            $sheet->mergeCells('A' . $row . ':G' . $row);
+            $sheet->mergeCells('A' . $row . ':H' . $row);
             $sheet->getStyle('A' . $row)->applyFromArray($subHeaderStyle);
 
             $row++;
-            $sheet->setCellValue('A' . $row, 'Total Pembelian Bahan Baku ke Supplier:');
+            $sheet->setCellValue('A' . $row, 'Total Nilai Pembelian (Masuk)');
             $sheet->setCellValue('C' . $row, $summaryData['total_purchase_amount']);
-            $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('#,##0');
+            $sheet->setCellValue('E' . $row, 'Total Nilai Pengurangan (Keluar)');
+            $sheet->setCellValue('G' . $row, $summaryData['total_reduction_amount']);
+            $sheet->getStyle('C' . $row . ':G' . $row)->getNumberFormat()->setFormatCode('#,##0');
 
             $row++;
-            $sheet->setCellValue('A' . $row, 'Total Jumlah Pemesanan ke Supplier:');
-            $sheet->setCellValue('C' . $row, $summaryData['total_purchase_count']);
-
-            $row++;
-            $sheet->setCellValue('A' . $row, 'Total Item yang Dipesan:');
+            $sheet->setCellValue('A' . $row, 'Total Item Masuk');
             $sheet->setCellValue('C' . $row, $summaryData['total_purchase_items']);
+            $sheet->setCellValue('E' . $row, 'Total Item Keluar');
+            $sheet->setCellValue('G' . $row, $summaryData['total_reduction_items']);
 
             $row++;
-            $sheet->setCellValue('A' . $row, 'Total Pengurangan Stok:');
-            $sheet->setCellValue('C' . $row, $summaryData['total_reduction_count']);
-
-            $row++;
-            $sheet->setCellValue('A' . $row, 'Total Item Berkurang:');
-            $sheet->setCellValue('C' . $row, $summaryData['total_reduction_items']);
+            $sheet->setCellValue('A' . $row, 'Saldo Item');
+            $sheet->setCellValue('C' . $row, $summaryData['saldo_qty']);
+            $sheet->setCellValue('E' . $row, 'Saldo Nilai');
+            $sheet->setCellValue('G' . $row, $summaryData['saldo_amount']);
+            $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('#,##0');
 
             // Add daily data section
             $row += 2;
             $sheet->setCellValue('A' . $row, 'DATA HARIAN');
-            $sheet->mergeCells('A' . $row . ':E' . $row);
+            $sheet->mergeCells('A' . $row . ':I' . $row);
             $sheet->getStyle('A' . $row)->applyFromArray($subHeaderStyle);
 
             $row++;
             $sheet->setCellValue('A' . $row, 'Tanggal');
             $sheet->setCellValue('B' . $row, 'Hari');
-            $sheet->setCellValue('C' . $row, 'Jumlah Order');
-            $sheet->setCellValue('D' . $row, 'Jumlah Item');
-            $sheet->setCellValue('E' . $row, 'Total Pembelian');
-            $sheet->getStyle('A' . $row . ':E' . $row)->applyFromArray($headerStyle);
+            $sheet->setCellValue('C' . $row, 'Order');
+            $sheet->setCellValue('D' . $row, 'Masuk');
+            $sheet->setCellValue('E' . $row, 'Keluar');
+            $sheet->setCellValue('F' . $row, 'Saldo');
+            $sheet->setCellValue('G' . $row, 'Nilai Masuk');
+            $sheet->setCellValue('H' . $row, 'Nilai Keluar');
+            $sheet->setCellValue('I' . $row, 'Saldo Nilai');
+            $sheet->getStyle('A' . $row . ':I' . $row)->applyFromArray($headerStyle);
 
             // Add daily data
             $startDailyRow = $row + 1;
@@ -275,55 +286,41 @@ class ReportController extends Controller
                 $sheet->setCellValue('A' . $row, Carbon::parse($day['date'])->format('d/m/Y'));
                 $sheet->setCellValue('B' . $row, $day['day_name']);
                 $sheet->setCellValue('C' . $row, $day['order_count']);
-                $sheet->setCellValue('D' . $row, $day['item_count']);
-                $sheet->setCellValue('E' . $row, $day['purchase_amount']);
-
-                // Apply alignment: centered for count data, right-aligned for amounts
-                $sheet->getStyle('C' . $row . ':D' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
-
-                // Add zebra striping for better readability
+                $sheet->setCellValue('D' . $row, $day['in_qty']);
+                $sheet->setCellValue('E' . $row, $day['out_qty']);
+                $sheet->setCellValue('F' . $row, $day['saldo_qty']);
+                $sheet->setCellValue('G' . $row, $day['in_amount']);
+                $sheet->setCellValue('H' . $row, $day['out_amount']);
+                $sheet->setCellValue('I' . $row, $day['saldo_amount']);
+                $sheet->getStyle('G' . $row . ':I' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle('C' . $row . ':F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('G' . $row . ':I' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 if ($row % 2 == 0) {
-                    $sheet->getStyle('A' . $row . ':E' . $row)->getFill()
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F2F2F2');
                 }
             }
-
             // Total row for daily data
             $row++;
             $sheet->setCellValue('A' . $row, 'TOTAL');
-            $sheet->mergeCells('A' . $row . ':B' . $row);
-            $sheet->setCellValue('C' . $row, $summaryData['total_purchase_count']);
+            $sheet->mergeCells('A' . $row . ':C' . $row);
             $sheet->setCellValue('D' . $row, $summaryData['total_purchase_items']);
-            $sheet->setCellValue('E' . $row, $summaryData['total_purchase_amount']);
-
-            // Format totals row
-            $sheet->getStyle('A' . $row . ':E' . $row)->applyFromArray($subHeaderStyle);
-            $sheet->getStyle('C' . $row . ':D' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-            $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
-
-            // Add border to daily data table
-            $sheet->getStyle('A' . $startDailyRow . ':E' . $row)->applyFromArray([
-                'borders' => [
-                    'allBorders' => [
-                        'borderStyle' => Border::BORDER_THIN,
-                    ],
-                    'outline' => [
-                        'borderStyle' => Border::BORDER_MEDIUM,
-                    ],
-                ],
-            ]);
+            $sheet->setCellValue('E' . $row, $summaryData['total_reduction_items']);
+            $sheet->setCellValue('F' . $row, $summaryData['saldo_qty']);
+            $sheet->setCellValue('G' . $row, $summaryData['total_purchase_amount']);
+            $sheet->setCellValue('H' . $row, $summaryData['total_reduction_amount']);
+            $sheet->setCellValue('I' . $row, $summaryData['saldo_amount']);
+            $sheet->getStyle('A' . $row . ':I' . $row)->applyFromArray($subHeaderStyle);
+            $sheet->getStyle('G' . $row . ':I' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('G' . $row . ':I' . $row)->getNumberFormat()->setFormatCode('#,##0');
 
             // Add detail purchase section
             $row += 2;
             $sheet->setCellValue('A' . $row, 'DETAIL PEMBELIAN HARIAN');
-            $sheet->mergeCells('A' . $row . ':G' . $row);
+            $sheet->mergeCells('A' . $row . ':H' . $row);
             $sheet->getStyle('A' . $row)->applyFromArray($subHeaderStyle);
 
-            // Only add detailed purchases for days that have them
             $daysWithPurchases = array_filter($dailyData, function ($day) {
                 return count($day['detailed_purchases']) > 0;
             });
@@ -331,7 +328,7 @@ class ReportController extends Controller
             foreach ($daysWithPurchases as $day) {
                 $row += 2;
                 $sheet->setCellValue('A' . $row, 'Detail Pembelian: ' . $day['day_name'] . ', ' . Carbon::parse($day['date'])->format('d M Y'));
-                $sheet->mergeCells('A' . $row . ':G' . $row);
+                $sheet->mergeCells('A' . $row . ':H' . $row);
                 $sheet->getStyle('A' . $row)->applyFromArray($subHeaderStyle);
 
                 $row++;
@@ -339,68 +336,42 @@ class ReportController extends Controller
                 $sheet->setCellValue('B' . $row, 'Nama Bahan');
                 $sheet->setCellValue('C' . $row, 'Satuan');
                 $sheet->setCellValue('D' . $row, 'Harga Beli');
-                $sheet->setCellValue('E' . $row, 'Harga Jual');
-                $sheet->setCellValue('F' . $row, 'Quantity');
-                $sheet->setCellValue('G' . $row, 'Total Nilai Beli');
-                $sheet->getStyle('A' . $row . ':G' . $row)->applyFromArray($headerStyle);
-
-                // Track start of the current detail table
+                $sheet->setCellValue('E' . $row, 'Quantity');
+                $sheet->setCellValue('F' . $row, 'Total Nilai');
+                $sheet->setCellValue('G' . $row, 'Tipe');
+                $sheet->setCellValue('H' . $row, 'Catatan');
+                $sheet->getStyle('A' . $row . ':H' . $row)->applyFromArray($headerStyle);
                 $startDetailRow = $row + 1;
-
                 foreach ($day['detailed_purchases'] as $purchase) {
                     $row++;
                     $sheet->setCellValue('A' . $row, $purchase['no']);
                     $sheet->setCellValue('B' . $row, $purchase['name']);
                     $sheet->setCellValue('C' . $row, $purchase['unit']);
                     $sheet->setCellValue('D' . $row, $purchase['purchase_price']);
-                    $sheet->setCellValue('E' . $row, $purchase['selling_price']);
-                    $sheet->setCellValue('F' . $row, $purchase['quantity']);
-                    $sheet->setCellValue('G' . $row, $purchase['subtotal']);
-
-                    // Apply consistent alignment
-                    $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                    $sheet->getStyle('C' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                    $sheet->getStyle('D' . $row . ':E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                    $sheet->getStyle('F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                    $sheet->getStyle('G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-
-                    // Format numbers
-                    $sheet->getStyle('D' . $row)->getNumberFormat()->setFormatCode('#,##0');
-                    $sheet->getStyle('E' . $row)->getNumberFormat()->setFormatCode('#,##0');
-                    $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('#,##0');
-
-                    // Add zebra striping for better readability
-                    if (($row - $startDetailRow + 1) % 2 == 0) {
-                        $sheet->getStyle('A' . $row . ':G' . $row)->getFill()
-                            ->setFillType(Fill::FILL_SOLID)
-                            ->getStartColor()->setRGB('F2F2F2');
-                    }
+                    $sheet->setCellValue('E' . $row, $purchase['quantity']);
+                    $sheet->setCellValue('F' . $row, $purchase['subtotal']);
+                    // Tipe dalam bahasa Indonesia
+                    $typeLabels = [
+                        'purchase' => 'Pembelian',
+                        'usage' => 'Penggunaan',
+                        'damage' => 'Rusak',
+                        'other' => 'Lainnya',
+                    ];
+                    $sheet->setCellValue('G' . $row, isset($typeLabels[$purchase['adjustment_type']]) ? $typeLabels[$purchase['adjustment_type']] : ucfirst($purchase['adjustment_type']));
+                    $sheet->setCellValue('H' . $row, $purchase['notes']);
+                    $sheet->getStyle('D' . $row . ':F' . $row)->getNumberFormat()->setFormatCode('#,##0');
+                    $sheet->getStyle('E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $sheet->getStyle('F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 }
-
                 // Subtotal for this day
                 $row++;
-                $sheet->setCellValue('F' . $row, 'TOTAL');
-                $sheet->setCellValue('G' . $row, $day['purchase_amount']);
-                $sheet->getStyle('F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                $sheet->getStyle('G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                $sheet->getStyle('F' . $row . ':G' . $row)->applyFromArray($subHeaderStyle);
-                $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('#,##0');
-
-                // Add border to the current detail table
-                $sheet->getStyle('A' . $startDetailRow . ':G' . $row)->applyFromArray([
-                    'borders' => [
-                        'allBorders' => [
-                            'borderStyle' => Border::BORDER_THIN,
-                        ],
-                        'outline' => [
-                            'borderStyle' => Border::BORDER_MEDIUM,
-                        ],
-                    ],
-                ]);
+                $sheet->setCellValue('E' . $row, 'TOTAL');
+                $sheet->setCellValue('F' . $row, $day['saldo_amount']);
+                $sheet->getStyle('E' . $row . ':F' . $row)->applyFromArray($subHeaderStyle);
+                $sheet->getStyle('F' . $row)->getNumberFormat()->setFormatCode('#,##0');
             }
-
             // Auto-size columns
-            foreach (range('A', 'G') as $column) {
+            foreach (range('A', 'H') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
 
