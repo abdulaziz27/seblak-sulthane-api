@@ -235,14 +235,14 @@
                                     Rp {{ number_format($purchase['purchase_price'], 0, ',', '.') }}
                                 @else
                                     @if($purchase['purchase_price'])
-                                        Rp {{ number_format($purchase['purchase_price'], 0, ',', '.') }}
-                                    @else
-                                        -
+                                    Rp {{ number_format($purchase['purchase_price'], 0, ',', '.') }}
+                                @else
+                                    -
                                     @endif
                                 @endif
                             </td>
                             <td style="text-align: right;">
-                                Rp {{ number_format($purchase['subtotal'], 0, ',', '.') }}
+                                    Rp {{ number_format($purchase['subtotal'], 0, ',', '.') }}
                             </td>
                             <td style="text-align: center;">
                                 @php
