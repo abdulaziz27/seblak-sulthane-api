@@ -36,8 +36,8 @@ class ProductController extends Controller
             });
         }
 
-        // Sorting default berdasarkan tanggal pembuatan
-        $query->orderBy('created_at', 'desc');
+        // Sorting default berdasarkan abjad (nama produk)
+        $query->orderBy('name', 'asc');
 
         // Pagination dengan mempertahankan query string
         $products = $query->paginate(50)->withQueryString();
