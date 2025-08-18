@@ -14,7 +14,7 @@ class ProductController extends Controller
     public function index()
     {
 
-        $products = \App\Models\Product::orderBy('id', 'desc')->get();
+        $products = \App\Models\Product::orderBy('name', 'asc')->get();
 
         $products->load('category');
         return response()->json([
