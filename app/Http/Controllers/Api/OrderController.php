@@ -33,6 +33,7 @@ class OrderController extends Controller
             'nama_kasir' => 'required',
             'transaction_time' => 'required',
             'order_type' => 'required|in:dine_in,take_away',
+            'notes' => 'nullable|string|max:1000',
             // 'order_items' => 'required'
         ]);
 
@@ -53,6 +54,7 @@ class OrderController extends Controller
             'outlet_id' => $outletId,
             'order_type' => $request->order_type,
             'qris_fee' => 0, // Default value for qris_fee
+            'notes' => $request->notes, // Optional notes field
         ]);
 
         // Calculate QRIS fee if payment method is QRIS

@@ -65,6 +65,7 @@ class ProductController extends Controller
             'stock' => 'required|numeric',
             'status' => 'required|boolean',
             'is_favorite' => 'required|boolean',
+            'image' => 'nullable|image|mimes:png,jpg,jpeg|max:2048',
         ]);
 
         // store the request...
@@ -82,8 +83,11 @@ class ProductController extends Controller
         //save image
         if ($request->hasFile('image')) {
             $image = $request->file('image');
-            $image->storeAs('public/products', $product->id . '.' . $image->getClientOriginalExtension());
-            $product->image = 'storage/products/' . $product->id . '.' . $image->getClientOriginalExtension();
+            $filename = $product->id . '.' . $image->getClientOriginalExtension();
+            
+            // Store using public disk
+            $image->storeAs('products', $filename, 'public');
+            $product->image = 'storage/products/' . $filename;
             $product->save();
         }
 
@@ -117,6 +121,7 @@ class ProductController extends Controller
             'stock' => 'required|numeric',
             'status' => 'required|boolean',
             'is_favorite' => 'required|boolean',
+            'image' => 'nullable|image|mimes:png,jpg,jpeg|max:2048',
         ]);
 
         // update the request...
@@ -132,9 +137,17 @@ class ProductController extends Controller
 
         //save image
         if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($product->image && file_exists(public_path($product->image))) {
+                unlink(public_path($product->image));
+            }
+            
             $image = $request->file('image');
-            $image->storeAs('public/products', $product->id . '.' . $image->getClientOriginalExtension());
-            $product->image = 'storage/products/' . $product->id . '.' . $image->getClientOriginalExtension();
+            $filename = $product->id . '.' . $image->getClientOriginalExtension();
+            
+            // Store using public disk
+            $image->storeAs('products', $filename, 'public');
+            $product->image = 'storage/products/' . $filename;
             $product->save();
         }
 

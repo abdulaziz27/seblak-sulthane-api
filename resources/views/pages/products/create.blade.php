@@ -104,11 +104,10 @@
                                 @enderror
                             </div>
 
-                            {{-- <div class="form-group">
+                            <div class="form-group">
                                 <label class="form-label">Foto Produk</label>
                                 <div class="col-sm-9">
-                                    <input type="file" class="form-control" name="image"
-                                        @error('image') is-invalid @enderror>
+                                    <input type="file" class="form-control @error('image') is-invalid @enderror" name="image" accept="image/png,image/jpg,image/jpeg">
                                     <small class="text-muted">Format gambar: JPG, JPEG, PNG. Ukuran maksimal: 2MB</small>
                                 </div>
                                 @error('image')
@@ -116,7 +115,7 @@
                                         {{ $message }}
                                     </div>
                                 @enderror
-                            </div> --}}
+                            </div>
 
                             <div class="form-group">
                                 <label class="form-label">Status Produk</label>

@@ -26,7 +26,8 @@ class Order extends Model
         'outlet_id',
         'member_id',
         'order_type',
-        'qris_fee'
+        'qris_fee',
+        'notes'
     ];
 
     protected $casts = [
