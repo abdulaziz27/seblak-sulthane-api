@@ -87,6 +87,7 @@
                                 <div class="table-responsive">
                                     <table class="table-striped table">
                                         <tr>
+                                            <th>Gambar</th>
                                             <th>Nama Produk</th>
                                             <th>Kategori</th>
                                             <th>Harga</th>
@@ -96,7 +97,21 @@
                                         </tr>
                                         @foreach ($products as $product)
                                             <tr>
-                                                <td>{{ $product->name }}
+                                                <td>
+                                                    @if ($product->image)
+                                                        <img src="{{ asset($product->image) }}" alt="{{ $product->name }}" 
+                                                             style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
+                                                    @else
+                                                        <div style="width: 50px; height: 50px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                                            <i class="fas fa-image text-muted"></i>
+                                                        </div>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    {{ $product->name }}
+                                                    @if ($product->is_favorite)
+                                                        <i class="fas fa-star text-warning ml-1" title="Produk Favorit"></i>
+                                                    @endif
                                                 </td>
                                                 <td>
                                                     {{ $product->category->name }}

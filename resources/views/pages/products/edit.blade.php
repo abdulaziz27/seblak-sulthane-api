@@ -110,17 +110,16 @@
                                 @enderror
                             </div>
 
-                            {{-- <div class="form-group">
+                            <div class="form-group">
                                 <label class="form-label">Foto Produk</label>
                                 <div class="col-sm-9">
-                                    <input type="file" class="form-control" name="image"
-                                        @error('image') is-invalid @enderror>
+                                    <input type="file" class="form-control @error('image') is-invalid @enderror" name="image" accept="image/png,image/jpg,image/jpeg">
                                     <small class="text-muted">Biarkan kosong jika tidak ingin mengubah gambar.</small>
 
                                     @if ($product->image)
                                     <div class="mt-3">
                                         <p>Gambar saat ini:</p>
-                                        <img src="{{ asset($product->image) }}" alt="{{ $product->name }}" style="max-height: 100px">
+                                        <img src="{{ asset($product->image) }}" alt="{{ $product->name }}" style="max-height: 100px; border-radius: 8px; border: 1px solid #ddd;">
                                     </div>
                                     @endif
                                 </div>
@@ -129,7 +128,7 @@
                                         {{ $message }}
                                     </div>
                                 @enderror
-                            </div> --}}
+                            </div>
 
                             <div class="form-group mb-0">
                                 <label class="form-label w-100">Status Produk</label>

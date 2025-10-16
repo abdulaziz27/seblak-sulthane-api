@@ -13,10 +13,23 @@ class ProductController extends Controller
      */
     public function index()
     {
-
-        $products = \App\Models\Product::orderBy('name', 'asc')->get();
+        // Sort by favorite first, then alphabetically by name
+        $products = \App\Models\Product::orderBy('is_favorite', 'desc')
+                                      ->orderBy('name', 'asc')
+                                      ->get();
 
         $products->load('category');
+        
+        // Enhance image URLs for API response
+        $products = $products->map(function ($product) {
+            if ($product->image) {
+                $product->image_url = asset($product->image);
+            } else {
+                $product->image_url = null;
+            }
+            return $product;
+        });
+        
         return response()->json([
             'success' => true,
             'message' => 'List Data Product',
@@ -58,6 +71,13 @@ class ProductController extends Controller
         }
 
         if ($product) {
+            // Add image_url for consistent API response
+            if ($product->image) {
+                $product->image_url = asset($product->image);
+            } else {
+                $product->image_url = null;
+            }
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Product Created',
@@ -96,6 +116,14 @@ class ProductController extends Controller
             $product->image = $filename;
         }
         $product->save();
+        
+        // Add image_url for consistent API response
+        if ($product->image) {
+            $product->image_url = asset($product->image);
+        } else {
+            $product->image_url = null;
+        }
+        
         return response()->json([
             'success' => true,
             'message' => 'Product Updated',
