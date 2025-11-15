@@ -100,7 +100,11 @@ class DailyCashController extends Controller
                     'outlet_id' => Auth::user()->outlet_id,
                     'date' => $date,
                     'opening_balance' => 0,
+                    'cash_sales' => 0,
+                    'qris_sales' => 0,
+                    'qris_fee' => 0,
                     'expenses' => 0,
+                    'effective_expenses' => 0,
                     'expenses_note' => null,
                     'closing_balance' => 0,
                     'final_cash_closing' => 0,
@@ -114,17 +118,18 @@ class DailyCashController extends Controller
             ->where('payment_method', 'cash')
             ->sum('total');
 
-        // Hitung total penjualan termasuk QRIS
+        // Hitung total penjualan QRIS (biaya QRIS tidak lagi dihitung di sistem)
         $qrisSales = Order::where('outlet_id', Auth::user()->outlet_id)
             ->whereDate('created_at', $date)
             ->where('payment_method', 'qris')
             ->sum('total');
+        $qrisFee = 0;
 
-
-        $closingBalance = $dailyCash->opening_balance + $cashSales + $qrisSales - $dailyCash->expenses;
+        $effectiveExpenses = $dailyCash->opening_balance + $dailyCash->expenses;
+        $closingBalance = ($cashSales + $qrisSales) - $effectiveExpenses;
 
         // Calculate final cash closing (only cash payments)
-        $finalCashClosing = $dailyCash->opening_balance + $cashSales - $dailyCash->expenses;
+        $finalCashClosing = $cashSales - $dailyCash->expenses;
 
         return response()->json([
             'status' => 'success',
@@ -134,8 +139,11 @@ class DailyCashController extends Controller
                 'date' => $dailyCash->date,
                 'opening_balance' => $dailyCash->opening_balance,
                 'expenses' => $dailyCash->expenses,
+                'effective_expenses' => $effectiveExpenses,
                 'expenses_note' => $dailyCash->expenses_note,
                 'cash_sales' => $cashSales,
+                'qris_sales' => $qrisSales,
+                'qris_fee' => $qrisFee,
                 'closing_balance' => $closingBalance,
                 'final_cash_closing' => $finalCashClosing,
             ]

@@ -271,31 +271,31 @@ class DashboardController extends Controller
         $totalOpeningBalance = $dailyCashData->sum('opening_balance');
         $totalExpenses = $dailyCashData->sum('expenses');
 
-        // Get cash sales
-        $totalCashSales = Order::whereBetween('created_at', [$startDateFormatted, $endDateFormatted])
-            ->whereIn('payment_method', ['cash', 'qris']);
+        // Get sales per payment method
+        $totalCashSalesQuery = Order::whereBetween('created_at', [$startDateFormatted, $endDateFormatted])
+            ->where('payment_method', 'cash');
+        $totalQrisSalesQuery = Order::whereBetween('created_at', [$startDateFormatted, $endDateFormatted])
+            ->where('payment_method', 'qris');
 
         if (Auth::user()->role !== 'owner') {
-            $totalCashSales->where('outlet_id', Auth::user()->outlet_id);
+            $totalCashSalesQuery->where('outlet_id', Auth::user()->outlet_id);
+            $totalQrisSalesQuery->where('outlet_id', Auth::user()->outlet_id);
         } elseif ($request->outlet_id) {
-            $totalCashSales->where('outlet_id', $request->outlet_id);
+            $totalCashSalesQuery->where('outlet_id', $request->outlet_id);
+            $totalQrisSalesQuery->where('outlet_id', $request->outlet_id);
         }
 
-        $totalCashSales = $totalCashSales->sum('total');
+        $totalCashSales = (clone $totalCashSalesQuery)->sum('total');
+        $totalQrisSales = (clone $totalQrisSalesQuery)->sum('total');
+        $totalQrisFee = (clone $totalQrisSalesQuery)
+            ->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as total_fee')
+            ->first()
+            ->total_fee ?? 0;
 
-        // Get total sales from all payment methods
-        $totalSales = Order::whereBetween('created_at', [$startDateFormatted, $endDateFormatted]);
-
-        if (Auth::user()->role !== 'owner') {
-            $totalSales = $totalSales->where('outlet_id', Auth::user()->outlet_id);
-        } elseif ($request->outlet_id) {
-            $totalSales = $totalSales->where('outlet_id', $request->outlet_id);
-        }
-
-        $totalSales = $totalSales->sum('total');
+        $totalSales = $totalCashSales + $totalQrisSales;
 
         // Calculate closing balance
-        $closingBalance = $totalOpeningBalance + $totalSales - $totalExpenses;
+        $closingBalance = $totalSales - ($totalOpeningBalance + $totalExpenses + $totalQrisFee);
 
         // Prepare daily breakdown - generate dates range
         $datesInRange = [];
@@ -307,7 +307,6 @@ class DashboardController extends Controller
 
         // Prepare daily data with running balance
         $dailyData = [];
-        $runningBalance = 0; // Initialize running balance
 
         foreach ($datesInRange as $index => $date) {
             // PERUBAHAN DI SINI: Dapatkan semua record daily cash untuk tanggal ini
@@ -329,27 +328,26 @@ class DashboardController extends Controller
             }
 
             $cashSalesForDate = (clone $dateOrders)->where('payment_method', 'cash')->sum('total');
-            $qrisSalesForDate = (clone $dateOrders)->where('payment_method', 'qris')->sum('total');
+            $qrisOrdersForDate = (clone $dateOrders)->where('payment_method', 'qris');
+            $qrisSalesForDate = (clone $qrisOrdersForDate)->sum('total');
+            $qrisFeeForDate = (clone $qrisOrdersForDate)
+                ->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as total_fee')
+                ->first()
+                ->total_fee ?? 0;
             $totalSalesForDate = $cashSalesForDate + $qrisSalesForDate;
 
-            // Add opening balance to running balance
-            $runningBalance += $openingBalance;
-
-            // Add sales to running balance
-            $runningBalance += $totalSalesForDate;
-
-            // Subtract expenses from running balance
-            $runningBalance -= $expenses;
+            $dailyClosingBalance = $totalSalesForDate - ($openingBalance + $expenses + $qrisFeeForDate);
 
             // Store the daily data with the current running balance
             $dailyData[] = [
                 'date' => $date,
                 'opening_balance' => $openingBalance,
                 'expenses' => $expenses,
+                'qris_fee' => $qrisFeeForDate,
                 'cash_sales' => $cashSalesForDate,
                 'qris_sales' => $qrisSalesForDate,
                 'total_sales' => $totalSalesForDate,
-                'closing_balance' => $runningBalance // This now represents the running total
+                'closing_balance' => $dailyClosingBalance
             ];
         }
 
@@ -430,6 +428,8 @@ class DashboardController extends Controller
                 'totalOpeningBalance',
                 'totalExpenses',
                 'totalCashSales',
+                'totalQrisSales',
+                'totalQrisFee',
                 'totalSales',
                 'closingBalance',
                 'dailyData',

@@ -466,7 +466,7 @@ class ReportController extends Controller
         $avgOrderValue = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
 
         // Perbaikan perhitungan QRIS fee dengan CAST eksplisit
-        $totalQrisFee = (clone $query)->where('payment_method', 'qris')->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as total_fee')->first()->total_fee ?? 0;
+        $totalQrisFee = 0;
 
         // Data untuk beverage (minuman) - Asumsikan category_id 2 adalah minuman
         $beverageSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -526,12 +526,66 @@ class ReportController extends Controller
             ],
         ];
 
+        // Food (Makanan + Level) sales calculation
+        $foodSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->whereBetween('orders.created_at', [$startDate, $endDate])
+            ->when($outletId, function ($query) use ($outletId) {
+                return $query->where('orders.outlet_id', $outletId);
+            })
+            ->where('categories.id', '!=', 2)
+            ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+        $foodSalesByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->select('orders.payment_method', DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'), DB::raw('SUM(order_items.quantity) as total_quantity'))
+            ->whereBetween('orders.created_at', [$startDate, $endDate])
+            ->when($outletId, function ($query) use ($outletId) {
+                return $query->where('orders.outlet_id', $outletId);
+            })
+            ->where('categories.id', '!=', 2)
+            ->groupBy('orders.payment_method')
+            ->get();
+
+        $foodCashSales = 0;
+        $foodQrisSales = 0;
+        $foodCashQuantity = 0;
+        $foodQrisQuantity = 0;
+
+        foreach ($foodSalesByPayment as $paymentData) {
+            $paymentMethod = strtolower($paymentData->payment_method);
+            if ($paymentMethod === 'cash') {
+                $foodCashSales = $paymentData->total_sales;
+                $foodCashQuantity = $paymentData->total_quantity;
+            } elseif ($paymentMethod === 'qris') {
+                $foodQrisSales = $paymentData->total_sales;
+                $foodQrisQuantity = $paymentData->total_quantity;
+            }
+        }
+
+        $foodPaymentBreakdown = [
+            'cash' => [
+                'quantity' => $foodCashQuantity,
+                'amount' => $foodCashSales,
+            ],
+            'qris' => [
+                'quantity' => $foodQrisQuantity,
+                'amount' => $foodQrisSales,
+            ],
+            'total' => [
+                'quantity' => $foodCashQuantity + $foodQrisQuantity,
+                'amount' => $foodSales,
+            ],
+        ];
+
         // Data berdasarkan metode pembayaran
         $paymentMethods = Order::whereBetween('created_at', [$startDate, $endDate])
             ->when($outletId, function ($query) use ($outletId) {
                 return $query->where('outlet_id', $outletId);
             })
-            ->select('payment_method', DB::raw('COUNT(*) as count'), DB::raw('SUM(total) as total_amount'), DB::raw('CASE WHEN payment_method = "qris" THEN COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) ELSE 0 END as qris_fees'))
+            ->select('payment_method', DB::raw('COUNT(*) as count'), DB::raw('SUM(total) as total_amount'))
             ->groupBy('payment_method')
             ->get();
 
@@ -567,10 +621,12 @@ class ReportController extends Controller
         $totalOpeningBalance = $dailyCashData->sum('opening_balance');
         $totalExpenses = $dailyCashData->sum('expenses');
 
-        // Menghitung saldo akhir (kurangi dengan biaya QRIS)
-        $closingBalance = $totalOpeningBalance + $cashSales + $qrisSales - $totalExpenses - $totalQrisFee;
+        $effectiveExpenses = $totalOpeningBalance + $totalExpenses;
 
-        $finalCashClosing = $totalOpeningBalance + $cashSales - $totalExpenses;
+        // Menghitung saldo akhir (modal awal diperlakukan sebagai bagian pengeluaran)
+        $closingBalance = ($cashSales + $qrisSales) - $effectiveExpenses;
+
+        $finalCashClosing = $cashSales - $totalExpenses;
 
         // Persiapan data harian
         $dailyData = [];
@@ -603,8 +659,8 @@ class ReportController extends Controller
                 $dailyTax = $dailyOrdersQuery->sum('tax');
                 $dailyDiscountAmount = $dailyOrdersQuery->sum('discount_amount');
 
-                // Perbaikan perhitungan QRIS fee harian
-                $dailyQrisFee = (clone $dailyOrdersQuery)->where('payment_method', 'qris')->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as daily_fee')->first()->daily_fee ?? 0;
+                // Biaya QRIS tidak dihitung lagi
+                $dailyQrisFee = 0;
 
                 // Data harian metode pembayaran
                 $dailyPaymentMethods = (clone $dailyOrdersQuery)->select('payment_method', DB::raw('SUM(total) as total_amount'))->groupBy('payment_method')->get();
@@ -626,11 +682,13 @@ class ReportController extends Controller
                 $dailyOpeningBalance = $dailyCashRecord ? $dailyCashRecord->opening_balance : 0;
                 $dailyExpenses = $dailyCashRecord ? $dailyCashRecord->expenses : 0;
 
-                // Hitung saldo akhir harian (kurangi dengan biaya QRIS)
-                $dailyClosingBalance = $dailyOpeningBalance + $dailyCashSales + $dailyQrisSales - $dailyExpenses - $dailyQrisFee;
+                $dailyEffectiveExpenses = $dailyOpeningBalance + $dailyExpenses;
+
+                // Hitung saldo akhir harian
+                $dailyClosingBalance = ($dailyCashSales + $dailyQrisSales) - $dailyEffectiveExpenses;
 
                 // Calculate daily final cash closing
-                $dailyFinalCashClosing = $dailyOpeningBalance + $dailyCashSales - $dailyExpenses;
+                $dailyFinalCashClosing = $dailyCashSales - $dailyExpenses;
 
                 // Data minuman harian
                 $dailyBeverageSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -641,6 +699,17 @@ class ReportController extends Controller
                         return $query->where('orders.outlet_id', $outletId);
                     })
                     ->where('categories.id', 2) // ID kategori minuman
+                    ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+                // Data makanan + level harian (non-minuman)
+                $dailyFoodSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->whereDate('orders.created_at', $currentDateStr)
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', '!=', 2)
                     ->sum(DB::raw('order_items.quantity * order_items.price'));
 
                 // Get daily beverage sales by payment method
@@ -690,6 +759,50 @@ class ReportController extends Controller
                     ],
                 ];
 
+                // Get daily food sales by payment method
+                $dailyFoodByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->select('orders.payment_method', DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'), DB::raw('SUM(order_items.quantity) as total_quantity'))
+                    ->whereDate('orders.created_at', $currentDateStr)
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', '!=', 2)
+                    ->groupBy('orders.payment_method')
+                    ->get();
+
+                $dailyFoodCashSales = 0;
+                $dailyFoodQrisSales = 0;
+                $dailyFoodCashQuantity = 0;
+                $dailyFoodQrisQuantity = 0;
+
+                foreach ($dailyFoodByPayment as $paymentData) {
+                    $paymentMethod = strtolower($paymentData->payment_method);
+                    if ($paymentMethod === 'cash') {
+                        $dailyFoodCashSales = $paymentData->total_sales;
+                        $dailyFoodCashQuantity = $paymentData->total_quantity;
+                    } elseif ($paymentMethod === 'qris') {
+                        $dailyFoodQrisSales = $paymentData->total_sales;
+                        $dailyFoodQrisQuantity = $paymentData->total_quantity;
+                    }
+                }
+
+                $dailyFoodBreakdown = [
+                    'cash' => [
+                        'quantity' => $dailyFoodCashQuantity,
+                        'amount' => $dailyFoodCashSales,
+                    ],
+                    'qris' => [
+                        'quantity' => $dailyFoodQrisQuantity,
+                        'amount' => $dailyFoodQrisSales,
+                    ],
+                    'total' => [
+                        'quantity' => $dailyFoodCashQuantity + $dailyFoodQrisQuantity,
+                        'amount' => $dailyFoodSales,
+                    ],
+                ];
+
                 // Tambahkan ke array data harian
                 $dailyData[] = [
                     'date' => $currentDateStr,
@@ -704,10 +817,17 @@ class ReportController extends Controller
                     'beverage_cash_quantity' => $dailyBeverageCashQuantity,
                     'beverage_qris_quantity' => $dailyBeverageQrisQuantity,
                     'beverage_breakdown' => $dailyBeverageBreakdown, // Add structured breakdown
+                    'food_sales' => $dailyFoodSales,
+                    'food_cash_sales' => $dailyFoodCashSales,
+                    'food_qris_sales' => $dailyFoodQrisSales,
+                    'food_cash_quantity' => $dailyFoodCashQuantity,
+                    'food_qris_quantity' => $dailyFoodQrisQuantity,
+                    'food_breakdown' => $dailyFoodBreakdown,
                     'qris_sales' => $dailyQrisSales,
                     'qris_fee' => $dailyQrisFee,
                     'cash_sales' => $dailyCashSales,
                     'expenses' => $dailyExpenses,
+                    'effective_expenses' => $dailyEffectiveExpenses,
                     'opening_balance' => $dailyOpeningBalance,
                     'closing_balance' => $dailyClosingBalance,
                     'final_cash_closing' => $dailyFinalCashClosing,
@@ -814,6 +934,62 @@ class ReportController extends Controller
                         'amount' => $weekData->beverage_sales,
                     ],
                 ];
+
+                // Get food sales for this week (non-beverage categories)
+                $weekData->food_sales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->whereRaw('YEAR(orders.created_at) = ?', [$year])
+                    ->whereRaw('WEEK(orders.created_at) = ?', [$week])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', '!=', 2)
+                    ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+                $periodFoodByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->select('orders.payment_method', DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'), DB::raw('SUM(order_items.quantity) as total_quantity'))
+                    ->whereRaw('YEAR(orders.created_at) = ?', [$year])
+                    ->whereRaw('WEEK(orders.created_at) = ?', [$week])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', '!=', 2)
+                    ->groupBy('orders.payment_method')
+                    ->get();
+
+                $weekData->food_cash_sales = 0;
+                $weekData->food_qris_sales = 0;
+                $weekData->food_cash_quantity = 0;
+                $weekData->food_qris_quantity = 0;
+
+                foreach ($periodFoodByPayment as $paymentData) {
+                    $paymentMethod = strtolower($paymentData->payment_method);
+                    if ($paymentMethod === 'cash') {
+                        $weekData->food_cash_sales = $paymentData->total_sales;
+                        $weekData->food_cash_quantity = $paymentData->total_quantity;
+                    } elseif ($paymentMethod === 'qris') {
+                        $weekData->food_qris_sales = $paymentData->total_sales;
+                        $weekData->food_qris_quantity = $paymentData->total_quantity;
+                    }
+                }
+
+                $weekData->food_breakdown = [
+                    'cash' => [
+                        'quantity' => $weekData->food_cash_quantity,
+                        'amount' => $weekData->food_cash_sales,
+                    ],
+                    'qris' => [
+                        'quantity' => $weekData->food_qris_quantity,
+                        'amount' => $weekData->food_qris_sales,
+                    ],
+                    'total' => [
+                        'quantity' => $weekData->food_cash_quantity + $weekData->food_qris_quantity,
+                        'amount' => $weekData->food_sales,
+                    ],
+                ];
             }
         } elseif ($periodType === 'monthly') {
             // Query untuk data bulanan yang diperbaiki
@@ -913,6 +1089,62 @@ class ReportController extends Controller
                         'amount' => $monthData->beverage_sales,
                     ],
                 ];
+
+                // Get food sales for this month (non-beverage categories)
+                $monthData->food_sales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->whereRaw('YEAR(orders.created_at) = ?', [$year])
+                    ->whereRaw('MONTH(orders.created_at) = ?', [$month])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', '!=', 2)
+                    ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+                $periodFoodByPayment = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->join('categories', 'categories.id', '=', 'products.category_id')
+                    ->select('orders.payment_method', DB::raw('SUM(order_items.quantity * order_items.price) as total_sales'), DB::raw('SUM(order_items.quantity) as total_quantity'))
+                    ->whereRaw('YEAR(orders.created_at) = ?', [$year])
+                    ->whereRaw('MONTH(orders.created_at) = ?', [$month])
+                    ->when($outletId, function ($query) use ($outletId) {
+                        return $query->where('orders.outlet_id', $outletId);
+                    })
+                    ->where('categories.id', '!=', 2)
+                    ->groupBy('orders.payment_method')
+                    ->get();
+
+                $monthData->food_cash_sales = 0;
+                $monthData->food_qris_sales = 0;
+                $monthData->food_cash_quantity = 0;
+                $monthData->food_qris_quantity = 0;
+
+                foreach ($periodFoodByPayment as $paymentData) {
+                    $paymentMethod = strtolower($paymentData->payment_method);
+                    if ($paymentMethod === 'cash') {
+                        $monthData->food_cash_sales = $paymentData->total_sales;
+                        $monthData->food_cash_quantity = $paymentData->total_quantity;
+                    } elseif ($paymentMethod === 'qris') {
+                        $monthData->food_qris_sales = $paymentData->total_sales;
+                        $monthData->food_qris_quantity = $paymentData->total_quantity;
+                    }
+                }
+
+                $monthData->food_breakdown = [
+                    'cash' => [
+                        'quantity' => $monthData->food_cash_quantity,
+                        'amount' => $monthData->food_cash_sales,
+                    ],
+                    'qris' => [
+                        'quantity' => $monthData->food_qris_quantity,
+                        'amount' => $monthData->food_qris_sales,
+                    ],
+                    'total' => [
+                        'quantity' => $monthData->food_cash_quantity + $monthData->food_qris_quantity,
+                        'amount' => $monthData->food_sales,
+                    ],
+                ];
             }
         }
 
@@ -958,10 +1190,17 @@ class ReportController extends Controller
                     'beverageCashQuantity',
                     'beverageQrisQuantity',
                     'beveragePaymentBreakdown', // Add structured breakdown
+                    'foodSales',
+                    'foodCashSales',
+                    'foodQrisSales',
+                    'foodCashQuantity',
+                    'foodQrisQuantity',
+                    'foodPaymentBreakdown',
                     'qrisSales',
                     'cashSales',
                     'totalOpeningBalance',
                     'totalExpenses',
+                    'effectiveExpenses',
                     'totalQrisFee',
                     'closingBalance',
                     'finalCashClosing',
@@ -1304,16 +1543,24 @@ class ReportController extends Controller
                 ->setFormatCode('#,##0');
 
             $cashFlowRow++;
-            $sheet->setCellValue('A' . $cashFlowRow, 'Biaya Layanan QRIS:');
-            $sheet->setCellValue('B' . $cashFlowRow, $totalQrisFee);
+            $sheet->setCellValue('A' . $cashFlowRow, 'Pengeluaran Operasional:');
+            $sheet->setCellValue('B' . $cashFlowRow, $totalExpenses);
             $sheet
                 ->getStyle('B' . $cashFlowRow)
                 ->getNumberFormat()
                 ->setFormatCode('#,##0');
 
             $cashFlowRow++;
-            $sheet->setCellValue('A' . $cashFlowRow, 'Total Pengeluaran:');
-            $sheet->setCellValue('B' . $cashFlowRow, $totalExpenses);
+            $sheet->setCellValue('A' . $cashFlowRow, 'Modal Awal (Wajib Setor):');
+            $sheet->setCellValue('B' . $cashFlowRow, $totalOpeningBalance);
+            $sheet
+                ->getStyle('B' . $cashFlowRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
+
+            $cashFlowRow++;
+            $sheet->setCellValue('A' . $cashFlowRow, 'Total Pengeluaran (Modal + Operasional):');
+            $sheet->setCellValue('B' . $cashFlowRow, $effectiveExpenses);
             $sheet
                 ->getStyle('B' . $cashFlowRow)
                 ->getNumberFormat()

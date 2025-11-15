@@ -451,6 +451,7 @@
                                                     @foreach ($dailyData as $day)
                                                         @php
                                                             $dayBalance = 0; // Track balance for display purposes
+                                                            $qrisFee = $day['qris_fee'] ?? 0;
                                                         @endphp
 
                                                         <!-- Opening Balance -->
@@ -491,6 +492,24 @@
                                                             </tr>
                                                         @endif
 
+                                                        <!-- QRIS Fee -->
+                                                        @if ($qrisFee > 0)
+                                                            @php
+                                                                $dayBalance -= $qrisFee;
+                                                                $totalCashOut += $qrisFee;
+                                                            @endphp
+                                                            <tr>
+                                                                <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}
+                                                                </td>
+                                                                <td>Biaya QRIS</td>
+                                                                <td class="text-right">-</td>
+                                                                <td class="text-right cash-out">Rp
+                                                                    {{ number_format($qrisFee, 0, ',', '.') }}</td>
+                                                                <td class="text-right">Rp
+                                                                    {{ number_format($dayBalance, 0, ',', '.') }}</td>
+                                                            </tr>
+                                                        @endif
+
                                                         <!-- Expenses -->
                                                         @if ($day['expenses'] > 0)
                                                             @php
@@ -509,7 +528,7 @@
                                                             </tr>
                                                         @endif
 
-                                                        @if ($day['opening_balance'] > 0 || $day['total_sales'] > 0 || $day['expenses'] > 0)
+                                                        @if ($day['opening_balance'] > 0 || $day['total_sales'] > 0 || $day['expenses'] > 0 || $qrisFee > 0)
                                                             <!-- Daily Closing -->
                                                             <tr class="bg-light">
                                                                 <td>{{ \Carbon\Carbon::parse($day['date'])->format('d M Y') }}

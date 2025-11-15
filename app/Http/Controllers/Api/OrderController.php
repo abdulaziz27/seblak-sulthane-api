@@ -146,11 +146,8 @@ class OrderController extends Controller
         $totalServiceCharge = $query->sum('service_charge');
         $totalSubtotal = $query->sum('sub_total');
 
-        // Calculate total QRIS fees using explicit casting to ensure correct summation
-        $totalQrisFee = (clone $query)
-            ->where('payment_method', 'qris')
-            ->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as total_fee')
-            ->first()->total_fee;
+        // QRIS fees no longer tracked in financial calculations
+        $totalQrisFee = 0;
 
         // Get daily cash data for the period
         $dailyCashQuery = DailyCash::query();
@@ -178,8 +175,7 @@ class OrderController extends Controller
         $paymentMethodSummary = $paymentMethods->select(
             'payment_method',
             DB::raw('COUNT(*) as count'),
-            DB::raw('SUM(total) as total_amount'),
-            DB::raw('CASE WHEN payment_method = "qris" THEN COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) ELSE 0 END as qris_fees')
+            DB::raw('SUM(total) as total_amount')
         )
             ->groupBy('payment_method')
             ->get();
@@ -190,7 +186,7 @@ class OrderController extends Controller
             $paymentMethodData[$method->payment_method] = [
                 'count' => $method->count,
                 'total' => $method->total_amount,
-                'qris_fees' => $method->qris_fees
+                'qris_fees' => 0
             ];
         }
 
@@ -258,10 +254,63 @@ class OrderController extends Controller
         // For backward compatibility, keep the original beverageSales variable
         $beverageSales = $beveragePaymentBreakdown['total']['amount'];
 
-        // Calculate closing balance
-        $closingBalance = $totalOpeningBalance + $cashSales + $qrisSales - $totalExpenses - $totalQrisFee;
+        // Food (Makanan + Level) sales calculation (non-beverage categories)
+        $foodByPaymentMethod = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->where('products.category_id', '!=', 2)
+            ->select(
+                'orders.payment_method',
+                DB::raw('SUM(order_items.quantity) as total_quantity'),
+                DB::raw('SUM(order_items.quantity * order_items.price) as total_amount')
+            );
 
-        $finalCashClosing = $totalOpeningBalance + $cashSales - $totalExpenses;
+        if ($startDate && $endDate) {
+            $start = Carbon::parse($startDate)->startOfDay();
+            $end = Carbon::parse($endDate)->endOfDay();
+            $foodByPaymentMethod->whereBetween('orders.created_at', [$start, $end]);
+        }
+
+        if ($outletId) {
+            $foodByPaymentMethod->where('orders.outlet_id', $outletId);
+        }
+
+        $foodByPaymentMethod = $foodByPaymentMethod
+            ->groupBy('orders.payment_method')
+            ->get();
+
+        $foodPaymentBreakdown = [
+            'cash' => [
+                'quantity' => 0,
+                'amount' => 0,
+            ],
+            'qris' => [
+                'quantity' => 0,
+                'amount' => 0,
+            ],
+            'total' => [
+                'quantity' => 0,
+                'amount' => 0,
+            ],
+        ];
+
+        foreach ($foodByPaymentMethod as $item) {
+            $method = strtolower($item->payment_method);
+            if (isset($foodPaymentBreakdown[$method])) {
+                $foodPaymentBreakdown[$method]['quantity'] = $item->total_quantity;
+                $foodPaymentBreakdown[$method]['amount'] = $item->total_amount;
+            }
+
+            $foodPaymentBreakdown['total']['quantity'] += $item->total_quantity;
+            $foodPaymentBreakdown['total']['amount'] += $item->total_amount;
+        }
+
+        $foodSales = $foodPaymentBreakdown['total']['amount'];
+
+        // Calculate closing balance
+        $effectiveExpenses = $totalOpeningBalance + $totalExpenses;
+        $closingBalance = ($cashSales + $qrisSales) - $effectiveExpenses;
+
+        $finalCashClosing = $cashSales - $totalExpenses;
 
         // Prepare daily breakdown data if date range is provided
         $dailyBreakdown = [];
@@ -282,11 +331,8 @@ class OrderController extends Controller
                 $dailyOrderCount = (clone $baseDailyOrders)->count();
                 $dailyItemsOrdered = (clone $baseDailyOrders)->sum('total_item');
 
-                // Get daily QRIS fee with explicit casting
-                $dailyQrisFee = (clone $baseDailyOrders)
-                    ->where('payment_method', 'qris')
-                    ->selectRaw('COALESCE(SUM(CAST(qris_fee AS DECIMAL(10,2))), 0) as daily_fee')
-                    ->first()->daily_fee;
+                // QRIS fee no longer tracked in system calculations
+                $dailyQrisFee = 0;
 
                 // Ambil semua record DailyCash untuk hari ini (bisa lebih dari satu record jika semua outlet)
                 $dailyCashRecords = DailyCash::when($outletId, function ($q) use ($outletId) {
@@ -303,8 +349,9 @@ class OrderController extends Controller
 
                 // Hitung total dan closing balance harian
                 $totalSales = $dailyCashSales + $dailyQrisSales;
-                $dailyClosingBalance = $dailyOpeningBalance + $totalSales - $dailyExpenses - $dailyQrisFee;
-                $dailyFinalCashClosing = $dailyOpeningBalance + $dailyCashSales - $dailyExpenses;
+                $dailyEffectiveExpenses = $dailyOpeningBalance + $dailyExpenses;
+                $dailyClosingBalance = $totalSales - $dailyEffectiveExpenses;
+                $dailyFinalCashClosing = $dailyCashSales - $dailyExpenses;
 
                 // Get beverage breakdown by payment method
                 $dailyBeverageByPaymentMethod = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -338,19 +385,59 @@ class OrderController extends Controller
                     $dailyBeverageBreakdown['total']['amount'] += $bevItem->daily_amount;
                 }
 
+                // Food breakdown per payment method (non-beverage categories)
+                $dailyFoodByPaymentMethod = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->whereDate('orders.created_at', $currentDateStr)
+                    ->where('products.category_id', '!=', 2)
+                    ->select(
+                        'orders.payment_method',
+                        DB::raw('SUM(order_items.quantity) as daily_quantity'),
+                        DB::raw('SUM(order_items.quantity * order_items.price) as daily_amount')
+                    )
+                    ->when($outletId, function ($q) use ($outletId) {
+                        return $q->where('orders.outlet_id', $outletId);
+                    })
+                    ->groupBy('orders.payment_method')
+                    ->get();
+
+                $dailyFoodBreakdown = [
+                    'cash' => ['quantity' => 0, 'amount' => 0],
+                    'qris' => ['quantity' => 0, 'amount' => 0],
+                    'total' => ['quantity' => 0, 'amount' => 0],
+                ];
+
+                foreach ($dailyFoodByPaymentMethod as $foodItem) {
+                    $method = strtolower($foodItem->payment_method);
+                    if (isset($dailyFoodBreakdown[$method])) {
+                        $dailyFoodBreakdown[$method]['quantity'] = $foodItem->daily_quantity;
+                        $dailyFoodBreakdown[$method]['amount'] = $foodItem->daily_amount;
+                    }
+                    $dailyFoodBreakdown['total']['quantity'] += $foodItem->daily_quantity;
+                    $dailyFoodBreakdown['total']['amount'] += $foodItem->daily_amount;
+                }
+
                 $dailyBreakdown[] = [
                     'date' => $currentDateStr,
                     'order_count' => $dailyOrderCount,
                     'items_count' => $dailyItemsOrdered,
                     'opening_balance' => $dailyOpeningBalance,
                     'expenses' => $dailyExpenses,
+                    'effective_expenses' => $dailyEffectiveExpenses,
                     'cash_sales' => $dailyCashSales,
                     'qris_sales' => $dailyQrisSales,
                     'qris_fee' => $dailyQrisFee,
                     'total_sales' => $totalSales,
                     'closing_balance' => $dailyClosingBalance,
                     'final_cash_closing' => $dailyFinalCashClosing,
-                    'beverage_breakdown' => $dailyBeverageBreakdown
+                    'beverage_sales' => $dailyBeverageBreakdown['total']['amount'],
+                    'beverage_cash_sales' => $dailyBeverageBreakdown['cash']['amount'],
+                    'beverage_qris_sales' => $dailyBeverageBreakdown['qris']['amount'],
+                    'beverage_breakdown' => $dailyBeverageBreakdown,
+                    'food_sales' => $dailyFoodBreakdown['total']['amount'],
+                    'food_cash_sales' => $dailyFoodBreakdown['cash']['amount'],
+                    'food_qris_sales' => $dailyFoodBreakdown['qris']['amount'],
+                    'food_breakdown' => $dailyFoodBreakdown
                 ];
 
                 $currentDate->addDay();
@@ -374,11 +461,18 @@ class OrderController extends Controller
                 // New cash flow data
                 'opening_balance' => $totalOpeningBalance,
                 'expenses' => $totalExpenses,
+                'effective_expenses' => $effectiveExpenses,
                 'cash_sales' => $cashSales,
                 'qris_sales' => $qrisSales,
                 'qris_fee' => $totalQrisFee,
                 'beverage_sales' => $beverageSales,
+                'beverage_cash_sales' => $beverageCashSales,
+                'beverage_qris_sales' => $beverageQrisSales,
                 'beverage_breakdown' => $beveragePaymentBreakdown,
+                'food_sales' => $foodSales,
+                'food_cash_sales' => $foodPaymentBreakdown['cash']['amount'],
+                'food_qris_sales' => $foodPaymentBreakdown['qris']['amount'],
+                'food_breakdown' => $foodPaymentBreakdown,
                 'closing_balance' => $closingBalance,
                 'final_cash_closing' => $finalCashClosing,
 

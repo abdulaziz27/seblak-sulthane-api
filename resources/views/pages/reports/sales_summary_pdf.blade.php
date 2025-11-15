@@ -129,6 +129,40 @@
         <p>{{ $subtitle }}</p>
     </div>
 
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0">Detail Penjualan Makanan + Level</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped table-bordered">
+                <thead class="table-secondary">
+                    <tr>
+                        <th>Metode Pembayaran</th>
+                        <th>Jumlah Item</th>
+                        <th>Total Penjualan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Cash</td>
+                        <td>{{ number_format($foodPaymentBreakdown['cash']['quantity'], 0, ',', '.') }}</td>
+                        <td>Rp {{ number_format($foodPaymentBreakdown['cash']['amount'], 0, ',', '.') }}</td>
+                    </tr>
+                    <tr>
+                        <td>QRIS</td>
+                        <td>{{ number_format($foodPaymentBreakdown['qris']['quantity'], 0, ',', '.') }}</td>
+                        <td>Rp {{ number_format($foodPaymentBreakdown['qris']['amount'], 0, ',', '.') }}</td>
+                    </tr>
+                    <tr class="font-weight-bold table-info">
+                        <td>TOTAL</td>
+                        <td>{{ number_format($foodPaymentBreakdown['total']['quantity'], 0, ',', '.') }}</td>
+                        <td>Rp {{ number_format($foodPaymentBreakdown['total']['amount'], 0, ',', '.') }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="section-title">Ringkasan Periode</div>
 
     <table class="summary-table">
@@ -149,16 +183,32 @@
             <td>Rp {{ number_format($totalTax, 0, ',', '.') }}</td>
         </tr>
         <tr>
-            <th>Total Penjualan Beverage</th>
+            <th>Total Penjualan Minuman</th>
             <td>Rp {{ number_format($beverageSales, 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th>Total Penjualan Minuman (CASH)</th>
+            <td>Rp {{ number_format($beverageCashSales, 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th>Total Penjualan Minuman (QRIS)</th>
+            <td>Rp {{ number_format($beverageQrisSales, 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th>Total Penjualan Makanan + Level</th>
+            <td>Rp {{ number_format($foodSales, 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th>Total Penjualan Makanan + Level (CASH)</th>
+            <td>Rp {{ number_format($foodCashSales, 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <th>Total Penjualan Makanan + Level (QRIS)</th>
+            <td>Rp {{ number_format($foodQrisSales, 0, ',', '.') }}</td>
         </tr>
         <tr>
             <th>Total Penjualan QRIS</th>
             <td>Rp {{ number_format($qrisSales, 0, ',', '.') }}</td>
-        </tr>
-        <tr>
-            <th>Total Biaya Layanan QRIS (0.3%)</th>
-            <td>Rp {{ number_format($totalQrisFee, 0, ',', '.') }}</td>
         </tr>
         <tr>
             <th>Total Penjualan CASH</th>
@@ -230,8 +280,10 @@
                 <th>Total Minuman</th>
                 <th>Minuman (CASH)</th>
                 <th>Minuman (QRIS)</th>
+                <th>Makanan + Level (Total)</th>
+                <th>Makanan + Level (CASH)</th>
+                <th>Makanan + Level (QRIS)</th>
                 <th>QRIS</th>
-                <th>Biaya QRIS</th>
                 <th>CASH</th>
                 <th>Saldo Awal</th>
                 <th>Pengeluaran</th>
@@ -248,8 +300,10 @@
                     <td>Rp {{ number_format($day['beverage_sales'], 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($day['beverage_breakdown']['cash']['amount'], 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($day['beverage_breakdown']['qris']['amount'], 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($day['food_sales'] ?? 0, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($day['food_cash_sales'] ?? 0, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($day['food_qris_sales'] ?? 0, 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($day['qris_sales'], 0, ',', '.') }}</td>
-                    <td>Rp {{ number_format($day['qris_fee'], 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($day['cash_sales'], 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($day['opening_balance'], 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($day['expenses'], 0, ',', '.') }}</td>
@@ -269,8 +323,10 @@
                 <th>Minuman</th>
                 <th>Minuman (CASH)</th>
                 <th>Minuman (QRIS)</th>
+                <th>Makanan + Level</th>
+                <th>Makanan + Level (CASH)</th>
+                <th>Makanan + Level (QRIS)</th>
                 <th>QRIS</th>
-                <th>Biaya QRIS</th>
                 <th>CASH</th>
             </tr>
             @foreach (collect($salesData)->sortByDesc('period_key') as $data)
@@ -283,8 +339,10 @@
                     <td>Rp {{ number_format($data->beverage_sales ?? 0, 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($data->beverage_cash_sales ?? 0, 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($data->beverage_qris_sales ?? 0, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($data->food_sales ?? 0, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($data->food_cash_sales ?? 0, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($data->food_qris_sales ?? 0, 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($data->qris_sales ?? 0, 0, ',', '.') }}</td>
-                    <td>Rp {{ number_format($data->qris_fee, 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($data->cash_sales ?? 0, 0, ',', '.') }}</td>
                 </tr>
             @endforeach
@@ -301,8 +359,10 @@
                 <th>Minuman</th>
                 <th>Minuman (CASH)</th>
                 <th>Minuman (QRIS)</th>
+                <th>Makanan + Level</th>
+                <th>Makanan + Level (CASH)</th>
+                <th>Makanan + Level (QRIS)</th>
                 <th>QRIS</th>
-                <th>Biaya QRIS</th>
                 <th>CASH</th>
             </tr>
             @foreach (collect($salesData)->sortByDesc('period_key') as $data)
@@ -315,8 +375,10 @@
                     <td>Rp {{ number_format($data->beverage_sales ?? 0, 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($data->beverage_cash_sales ?? 0, 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($data->beverage_qris_sales ?? 0, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($data->food_sales ?? 0, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($data->food_cash_sales ?? 0, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($data->food_qris_sales ?? 0, 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($data->qris_sales ?? 0, 0, ',', '.') }}</td>
-                    <td>Rp {{ number_format($data->qris_fee, 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($data->cash_sales ?? 0, 0, ',', '.') }}</td>
                 </tr>
             @endforeach
