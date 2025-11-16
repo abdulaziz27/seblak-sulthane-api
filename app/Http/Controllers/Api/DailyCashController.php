@@ -21,6 +21,14 @@ class DailyCashController extends Controller
             'opening_balance' => 'required|numeric|min:0',
         ]);
 
+        // Check if user has outlet_id (owner doesn't have outlet_id)
+        if (!Auth::user()->outlet_id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User tidak memiliki outlet. Hanya admin dan staff yang dapat mengatur saldo awal.',
+            ], 403);
+        }
+
         $dailyCash = DailyCash::updateOrCreate(
             [
                 'outlet_id' => Auth::user()->outlet_id,
@@ -49,6 +57,14 @@ class DailyCashController extends Controller
             'amount' => 'required|numeric|min:0',
             'note' => 'nullable|string',
         ]);
+
+        // Check if user has outlet_id (owner doesn't have outlet_id)
+        if (!Auth::user()->outlet_id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User tidak memiliki outlet. Hanya admin dan staff yang dapat menambahkan pengeluaran.',
+            ], 403);
+        }
 
         // Cari atau buat record daily cash untuk tanggal tersebut
         $dailyCash = DailyCash::firstOrCreate(
@@ -88,6 +104,14 @@ class DailyCashController extends Controller
     public function getDailyCash(Request $request)
     {
         $date = $request->date ?? Carbon::now()->format('Y-m-d');
+
+        // Check if user has outlet_id (owner doesn't have outlet_id)
+        if (!Auth::user()->outlet_id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User tidak memiliki outlet. Hanya admin dan staff yang dapat melihat data kas harian.',
+            ], 403);
+        }
 
         $dailyCash = DailyCash::where('outlet_id', Auth::user()->outlet_id)
             ->where('date', $date)

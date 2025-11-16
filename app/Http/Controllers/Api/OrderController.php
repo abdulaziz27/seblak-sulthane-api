@@ -15,7 +15,7 @@ class OrderController extends Controller
     //save order
     public function saveOrder(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
         $outletId = $user->outlet_id;
 
         //validate request
@@ -482,6 +482,32 @@ class OrderController extends Controller
                 // Daily breakdown for date ranges
                 'daily_breakdown' => $dailyBreakdown
             ]
+        ], 200);
+    }
+
+    public function show(Request $request, $id)
+    {
+        $order = Order::with(['outlet', 'orderItems.product'])->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Order not found'
+            ], 404);
+        }
+
+        // Check if user has access to this order
+        $user = $request->user();
+        if ($user->role !== 'owner' && $order->outlet_id !== $user->outlet_id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'You do not have permission to view this order'
+            ], 403);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $order
         ], 200);
     }
 }
