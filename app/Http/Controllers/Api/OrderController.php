@@ -308,9 +308,10 @@ class OrderController extends Controller
 
         // Calculate closing balance
         $effectiveExpenses = $totalOpeningBalance + $totalExpenses;
-        $closingBalance = ($cashSales + $qrisSales) - $effectiveExpenses;
+        $closingBalance = ($cashSales + $qrisSales + $totalOpeningBalance) - $effectiveExpenses;
 
-        $finalCashClosing = $cashSales - $totalExpenses;
+        // Final cash closing (opening balance ditambahkan ke cash dan expenses)
+        $finalCashClosing = ($cashSales + $totalOpeningBalance) - ($totalExpenses + $totalOpeningBalance);
 
         // Prepare daily breakdown data if date range is provided
         $dailyBreakdown = [];
@@ -350,8 +351,10 @@ class OrderController extends Controller
                 // Hitung total dan closing balance harian
                 $totalSales = $dailyCashSales + $dailyQrisSales;
                 $dailyEffectiveExpenses = $dailyOpeningBalance + $dailyExpenses;
-                $dailyClosingBalance = $totalSales - $dailyEffectiveExpenses;
-                $dailyFinalCashClosing = $dailyCashSales - $dailyExpenses;
+                // Closing balance harian (opening balance ditambahkan ke pendapatan)
+                $dailyClosingBalance = ($dailyCashSales + $dailyQrisSales + $dailyOpeningBalance) - $dailyEffectiveExpenses;
+                // Final cash closing harian (opening balance ditambahkan ke cash dan expenses)
+                $dailyFinalCashClosing = ($dailyCashSales + $dailyOpeningBalance) - ($dailyExpenses + $dailyOpeningBalance);
 
                 // Get beverage breakdown by payment method
                 $dailyBeverageByPaymentMethod = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')

@@ -294,8 +294,8 @@ class DashboardController extends Controller
 
         $totalSales = $totalCashSales + $totalQrisSales;
 
-        // Calculate closing balance
-        $closingBalance = $totalSales - ($totalOpeningBalance + $totalExpenses + $totalQrisFee);
+        // Calculate closing balance (opening balance ditambahkan ke pendapatan)
+        $closingBalance = ($totalSales + $totalOpeningBalance) - ($totalOpeningBalance + $totalExpenses + $totalQrisFee);
 
         // Prepare daily breakdown - generate dates range
         $datesInRange = [];
@@ -336,7 +336,8 @@ class DashboardController extends Controller
                 ->total_fee ?? 0;
             $totalSalesForDate = $cashSalesForDate + $qrisSalesForDate;
 
-            $dailyClosingBalance = $totalSalesForDate - ($openingBalance + $expenses + $qrisFeeForDate);
+            // Daily closing balance (opening balance ditambahkan ke pendapatan)
+            $dailyClosingBalance = ($totalSalesForDate + $openingBalance) - ($openingBalance + $expenses + $qrisFeeForDate);
 
             // Store the daily data with the current running balance
             $dailyData[] = [

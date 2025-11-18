@@ -623,10 +623,11 @@ class ReportController extends Controller
 
         $effectiveExpenses = $totalOpeningBalance + $totalExpenses;
 
-        // Menghitung saldo akhir (modal awal diperlakukan sebagai bagian pengeluaran)
-        $closingBalance = ($cashSales + $qrisSales) - $effectiveExpenses;
+        // Menghitung saldo akhir (opening balance ditambahkan ke pendapatan)
+        $closingBalance = ($cashSales + $qrisSales + $totalOpeningBalance) - $effectiveExpenses;
 
-        $finalCashClosing = $cashSales - $totalExpenses;
+        // Final cash closing (opening balance ditambahkan ke cash dan expenses)
+        $finalCashClosing = ($cashSales + $totalOpeningBalance) - ($totalExpenses + $totalOpeningBalance);
 
         // Persiapan data harian
         $dailyData = [];
@@ -684,11 +685,11 @@ class ReportController extends Controller
 
                 $dailyEffectiveExpenses = $dailyOpeningBalance + $dailyExpenses;
 
-                // Hitung saldo akhir harian
-                $dailyClosingBalance = ($dailyCashSales + $dailyQrisSales) - $dailyEffectiveExpenses;
+                // Hitung saldo akhir harian (opening balance ditambahkan ke pendapatan)
+                $dailyClosingBalance = ($dailyCashSales + $dailyQrisSales + $dailyOpeningBalance) - $dailyEffectiveExpenses;
 
-                // Calculate daily final cash closing
-                $dailyFinalCashClosing = $dailyCashSales - $dailyExpenses;
+                // Calculate daily final cash closing (opening balance ditambahkan ke cash dan expenses)
+                $dailyFinalCashClosing = ($dailyCashSales + $dailyOpeningBalance) - ($dailyExpenses + $dailyOpeningBalance);
 
                 // Data minuman harian
                 $dailyBeverageSales = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')

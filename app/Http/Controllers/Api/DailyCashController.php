@@ -150,10 +150,11 @@ class DailyCashController extends Controller
         $qrisFee = 0;
 
         $effectiveExpenses = $dailyCash->opening_balance + $dailyCash->expenses;
-        $closingBalance = ($cashSales + $qrisSales) - $effectiveExpenses;
+        // Closing balance (opening balance ditambahkan ke pendapatan)
+        $closingBalance = ($cashSales + $qrisSales + $dailyCash->opening_balance) - $effectiveExpenses;
 
-        // Calculate final cash closing (only cash payments)
-        $finalCashClosing = $cashSales - $dailyCash->expenses;
+        // Calculate final cash closing (opening balance ditambahkan ke cash dan expenses)
+        $finalCashClosing = ($cashSales + $dailyCash->opening_balance) - ($dailyCash->expenses + $dailyCash->opening_balance);
 
         return response()->json([
             'status' => 'success',
